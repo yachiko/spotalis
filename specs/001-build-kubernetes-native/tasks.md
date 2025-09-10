@@ -57,11 +57,11 @@ Single project with Karpenter architecture pattern:
 ### Integration Tests (User Scenarios from quickstart.md)
 - [x] T010 [P] Integration test basic workload deployment with annotations in tests/integration/basic_deployment_test.go
 - [x] T011 [P] Integration test spot node termination scenario in tests/integration/spot_termination_test.go
-- [ ] T012 [P] Integration test configuration change scenario in tests/integration/config_change_test.go
-- [ ] T013 [P] Integration test scale up/down scenario in tests/integration/scaling_test.go
-- [ ] T014 [P] Integration test leader election scenario in tests/integration/leader_election_test.go
+- [x] T012 [P] Integration test configuration change scenario in tests/integration/config_change_test.go
+- [x] T013 [P] Integration test scale up/down scenario in tests/integration/scaling_test.go
+- [x] T014 [P] Integration test leader election scenario in tests/integration/leader_election_test.go
 - [x] T015 [P] Integration test multi-tenant namespace filtering in tests/integration/namespace_filtering_test.go
-- [ ] T016 [P] Integration test performance tuning scenario in tests/integration/performance_test.go
+- [x] T016 [P] Integration test performance tuning scenario in tests/integration/performance_test.go
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
 
