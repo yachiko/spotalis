@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
@@ -90,10 +91,13 @@ var _ = Describe("GET /healthz endpoint", func() {
 			req, err := http.NewRequest("GET", "/healthz", nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			start := GinkgoHelper()
+			GinkgoHelper()
+			start := time.Now()
 			router.ServeHTTP(recorder, req)
+			duration := time.Since(start)
 
 			// Health checks should be fast
+			Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
 			Expect(recorder.Code).To(Equal(http.StatusOK))
 		})
 	})

@@ -5,7 +5,78 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/li		req, e		body, err := js		req, err 		req, er		Expect(err).N		req, err := http.NewRequest("POST", "/mutate", bytes.NewBuffer(body))
+		Expect(err).NotTo(HaveOccurred())
+		req.Header.Set("Content-Type", "application/json")
+
+		GinkgoHelper()
+		start := time.Now()
+		router.ServeHTTP(recorder, req)
+		duration := time.Since(start)
+
+		// Webhook should be fast to not delay deployments
+		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
+		Expect(recorder.Code).To(Equal(http.StatusOK))Occurred())
+
+		req, err := http.NewRequest("POST", "/mutate", bytes.NewBuffer(body))
+		Expect(err).NotTo(HaveOccurred())
+		req.Header.Set("Content-Type", "application/json")
+
+		GinkgoHelper()
+		start := time.Now()
+		router.ServeHTTP(recorder, req)
+		duration := time.Since(start)
+
+		// Webhook should be fast to not delay deployments
+		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
+		Expect(recorder.Code).To(Equal(http.StatusOK))ewRequest("POST", "/mutate", bytes.NewBuffer(body))
+		Expect(err).NotTo(HaveOccurred())
+		req.Header.Set("Content-Type", "application/json")
+
+		GinkgoHelper()
+		start := time.Now()
+		router.ServeHTTP(recorder, req)
+		duration := time.Since(start)
+
+		// Webhook should be fast to not delay deployments
+		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
+		Expect(recorder.Code).To(Equal(http.StatusOK))ewRequest("POST", "/mutate", bytes.NewBuffer(body))
+		Expect(err).NotTo(HaveOccurred())
+		req.Header.Set("Content-Type", "application/json")
+
+		GinkgoHelper()
+		start := time.Now()
+		router.ServeHTTP(recorder, req)
+		duration := time.Since(start)
+
+		// Webhook should be fast to not delay deployments
+		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
+		Expect(recorder.Code).To(Equal(http.StatusOK))l(admissionReview)
+		Expect(err).NotTo(HaveOccurred())
+
+		req, err := http.NewRequest("POST", "/mutate", bytes.NewBuffer(body))
+		Expect(err).NotTo(HaveOccurred())
+		req.Header.Set("Content-Type", "application/json")
+
+		GinkgoHelper()
+		start := time.Now()
+		router.ServeHTTP(recorder, req)
+		duration := time.Since(start)
+
+		// Webhook should be fast to not delay deployments
+		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
+		Expect(recorder.Code).To(Equal(http.StatusOK))ewRequest("POST", "/mutate", bytes.NewBuffer(body))
+		Expect(err).NotTo(HaveOccurred())
+		req.Header.Set("Content-Type", "application/json")
+
+		GinkgoHelper()
+		start := time.Now()
+		router.ServeHTTP(recorder, req)
+		duration := time.Since(start)
+
+		// Webhook should be fast to not delay deployments
+		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
+		Expect(recorder.Code).To(Equal(http.StatusOK))CENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -240,7 +311,7 @@ var _ = Describe("POST /mutate webhook", func() {
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("Content-Type", "application/json")
 
-			start := GinkgoHelper()
+			GinkgoHelper()
 			router.ServeHTTP(recorder, req)
 
 			// Webhook should be fast to not delay deployments

@@ -11,13 +11,13 @@ GOARCH ?= $(shell go env GOARCH)
 CGO_ENABLED ?= 0
 
 # Tools
-CONTROLLER_GEN_VERSION ?= v0.13.0
+CONTROLLER_GEN_VERSION ?= v0.19.0
 ENVTEST_K8S_VERSION = 1.28.0
 
 # Directories
 BIN_DIR := bin
 BUILD_DIR := build
-TOOLS_DIR := $(BIN_DIR)/tools
+TOOLS_DIR := $(shell pwd)/$(BIN_DIR)/tools
 
 .PHONY: help
 help: ## Display this help

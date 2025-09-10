@@ -2,7 +2,17 @@
 Copyright 2024 The Spotalis Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
+you may not use this file except in compliance with t		req, err := http.NewRequest("GET", "/metrics", nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		GinkgoHelper()
+		start := time.Now()
+		router.ServeHTTP(recorder, req)
+		duration := time.Since(start)
+
+		// Metrics endpoint should be responsive
+		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
+		Expect(recorder.Code).To(Equal(http.StatusOK))se.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
@@ -21,6 +31,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
@@ -158,10 +169,13 @@ var _ = Describe("GET /metrics endpoint", func() {
 			req, err := http.NewRequest("GET", "/metrics", nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			start := GinkgoHelper()
+			GinkgoHelper()
+			start := time.Now()
 			router.ServeHTTP(recorder, req)
+			duration := time.Since(start)
 
 			// Metrics endpoint should be responsive
+			Expect(duration).To(BeNumerically("<", 1*time.Second))
 			Expect(recorder.Code).To(Equal(http.StatusOK))
 		})
 
