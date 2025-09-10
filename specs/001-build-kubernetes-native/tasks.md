@@ -45,22 +45,22 @@ Single project with Karpenter architecture pattern:
 - [x] T004 [P] Configure golangci-lint and gofmt tools in .golangci.yml
 - [x] T005 [P] Create Docker and docker-bake.hcl configuration in build/docker/
 
-## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
+## Phase 3.2: Tests First (TDD) ✅ COMPLETE
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
 
 ### Contract Tests (HTTP Endpoints)
-- [ ] T006 [P] Contract test GET /healthz endpoint in tests/contract/healthz_test.go
-- [ ] T007 [P] Contract test GET /readyz endpoint in tests/contract/readyz_test.go  
-- [ ] T008 [P] Contract test GET /metrics endpoint in tests/contract/metrics_test.go
-- [ ] T009 [P] Contract test POST /mutate webhook in tests/contract/webhook_test.go
+- [x] T006 [P] Contract test GET /healthz endpoint in tests/contract/healthz_test.go
+- [x] T007 [P] Contract test GET /readyz endpoint in tests/contract/readyz_test.go  
+- [x] T008 [P] Contract test GET /metrics endpoint in tests/contract/metrics_test.go
+- [x] T009 [P] Contract test POST /mutate webhook in tests/contract/webhook_test.go
 
 ### Integration Tests (User Scenarios from quickstart.md)
-- [ ] T010 [P] Integration test basic workload deployment with annotations in tests/integration/basic_deployment_test.go
-- [ ] T011 [P] Integration test spot node termination scenario in tests/integration/spot_termination_test.go
+- [x] T010 [P] Integration test basic workload deployment with annotations in tests/integration/basic_deployment_test.go
+- [x] T011 [P] Integration test spot node termination scenario in tests/integration/spot_termination_test.go
 - [ ] T012 [P] Integration test configuration change scenario in tests/integration/config_change_test.go
 - [ ] T013 [P] Integration test scale up/down scenario in tests/integration/scaling_test.go
 - [ ] T014 [P] Integration test leader election scenario in tests/integration/leader_election_test.go
-- [ ] T015 [P] Integration test multi-tenant namespace filtering in tests/integration/namespace_filtering_test.go
+- [x] T015 [P] Integration test multi-tenant namespace filtering in tests/integration/namespace_filtering_test.go
 - [ ] T016 [P] Integration test performance tuning scenario in tests/integration/performance_test.go
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
