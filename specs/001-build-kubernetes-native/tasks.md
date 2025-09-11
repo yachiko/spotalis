@@ -92,17 +92,17 @@ Single project with Karpenter architecture pattern:
 ## Phase 3.4: Integration
 
 ### Kubernetes Integration
-- [ ] T035 Kubernetes client configuration and RBAC setup in pkg/operator/kubernetes.go
-- [ ] T036 Leader election implementation using controller-runtime in pkg/operator/leader_election.go
-- [ ] T037 Controller registration and manager setup in pkg/controllers/manager.go
-- [ ] T038 [P] Webhook admission configuration and TLS setup in pkg/webhook/admission.go
-- [ ] T039 [P] Configuration loading from YAML and environment variables in internal/config/loader.go
+- [x] T035 Kubernetes client configuration and RBAC setup in pkg/operator/kubernetes.go
+- [x] T036 Leader election implementation using controller-runtime in pkg/operator/leader_election.go
+- [x] T037 Controller registration and manager setup in pkg/controllers/manager.go
+- [x] T038 [P] Webhook admission configuration and TLS setup in pkg/webhook/admission.go
+- [x] T039 [P] Configuration loading from YAML and environment variables in internal/config/loader.go
 
 ### Operational Features
-- [ ] T040 Structured logging with slog integration in pkg/utils/logging.go
-- [ ] T041 Graceful shutdown and signal handling in pkg/operator/shutdown.go
-- [ ] T042 [P] Rate limiting and API server protection in pkg/utils/rate_limiter.go
-- [ ] T043 [P] Multi-tenant namespace filtering implementation in pkg/controllers/namespace_filter.go
+- [x] T040 Structured logging with slog integration in pkg/utils/logging.go
+- [x] T041 Graceful shutdown and signal handling in pkg/operator/shutdown.go
+- [x] T042 [P] Rate limiting and API server protection in pkg/utils/rate_limiter.go
+- [x] T043 [P] Multi-tenant namespace filtering implementation in pkg/controllers/namespace_filter.go
 
 ## Phase 3.5: Polish
 
