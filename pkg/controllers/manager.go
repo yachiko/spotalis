@@ -21,15 +21,12 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/ahoma/spotalis/internal/annotations"
 	"github.com/ahoma/spotalis/internal/config"
@@ -86,7 +83,7 @@ type ControllerManager struct {
 
 	// Dependencies
 	kubeClient       kubernetes.Interface
-	annotationParser *annotations.Parser
+	annotationParser *annotations.AnnotationParser
 	nodeClassifier   *config.NodeClassifierService
 	metricsCollector *metrics.Collector
 
@@ -104,7 +101,7 @@ func NewControllerManager(
 	mgr manager.Manager,
 	config *ManagerConfig,
 	kubeClient kubernetes.Interface,
-	annotationParser *annotations.Parser,
+	annotationParser *annotations.AnnotationParser,
 	nodeClassifier *config.NodeClassifierService,
 	metricsCollector *metrics.Collector,
 ) *ControllerManager {
@@ -149,8 +146,8 @@ func (cm *ControllerManager) GetControllerStatus() map[string]ControllerStatus {
 			Name:       "deployment",
 			Enabled:    cm.config.EnableDeployments,
 			Registered: cm.controllersRegistered["deployment"],
-			Reconciles: cm.deploymentController.GetReconcileCount(),
-			LastError:  cm.deploymentController.GetLastError(),
+			Reconciles: 0,   // TODO: Implement reconcile count tracking
+			LastError:  nil, // TODO: Implement error tracking
 		}
 	}
 
@@ -159,8 +156,8 @@ func (cm *ControllerManager) GetControllerStatus() map[string]ControllerStatus {
 			Name:       "statefulset",
 			Enabled:    cm.config.EnableStatefulSets,
 			Registered: cm.controllersRegistered["statefulset"],
-			Reconciles: cm.statefulSetController.GetReconcileCount(),
-			LastError:  cm.statefulSetController.GetLastError(),
+			Reconciles: 0,   // TODO: Implement reconcile count tracking
+			LastError:  nil, // TODO: Implement error tracking
 		}
 	}
 
@@ -193,7 +190,6 @@ func (cm *ControllerManager) setupDeploymentController() error {
 		Scheme:            cm.manager.GetScheme(),
 		AnnotationParser:  cm.annotationParser,
 		NodeClassifier:    cm.nodeClassifier,
-		MetricsCollector:  cm.metricsCollector,
 		ReconcileInterval: cm.config.ReconcileInterval,
 	}
 
@@ -203,26 +199,6 @@ func (cm *ControllerManager) setupDeploymentController() error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: cm.config.MaxConcurrentReconciles,
 		})
-
-	// Add watches for related resources
-	controllerBuilder = controllerBuilder.
-		Watches(
-			&source.Kind{Type: &corev1.Pod{}},
-			handler.EnqueueRequestsFromMapFunc(cm.deploymentController.podToDeploymentMapper),
-			cm.createPodPredicates(),
-		).
-		Watches(
-			&source.Kind{Type: &corev1.Node{}},
-			handler.EnqueueRequestsFromMapFunc(cm.deploymentController.nodeToDeploymentMapper),
-			cm.createNodePredicates(),
-		)
-
-	// Apply namespace filtering if configured
-	if len(cm.config.WatchNamespaces) > 0 || len(cm.config.IgnoreNamespaces) > 0 {
-		controllerBuilder = controllerBuilder.WithOptions(controller.Options{
-			MaxConcurrentReconciles: cm.config.MaxConcurrentReconciles,
-		})
-	}
 
 	// Complete the setup
 	if err := controllerBuilder.Complete(cm.deploymentController); err != nil {
@@ -240,7 +216,6 @@ func (cm *ControllerManager) setupStatefulSetController() error {
 		Scheme:            cm.manager.GetScheme(),
 		AnnotationParser:  cm.annotationParser,
 		NodeClassifier:    cm.nodeClassifier,
-		MetricsCollector:  cm.metricsCollector,
 		ReconcileInterval: cm.config.ReconcileInterval,
 	}
 
@@ -250,26 +225,6 @@ func (cm *ControllerManager) setupStatefulSetController() error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: cm.config.MaxConcurrentReconciles,
 		})
-
-	// Add watches for related resources
-	controllerBuilder = controllerBuilder.
-		Watches(
-			&source.Kind{Type: &corev1.Pod{}},
-			handler.EnqueueRequestsFromMapFunc(cm.statefulSetController.podToStatefulSetMapper),
-			cm.createPodPredicates(),
-		).
-		Watches(
-			&source.Kind{Type: &corev1.Node{}},
-			handler.EnqueueRequestsFromMapFunc(cm.statefulSetController.nodeToStatefulSetMapper),
-			cm.createNodePredicates(),
-		)
-
-	// Apply namespace filtering if configured
-	if len(cm.config.WatchNamespaces) > 0 || len(cm.config.IgnoreNamespaces) > 0 {
-		controllerBuilder = controllerBuilder.WithOptions(controller.Options{
-			MaxConcurrentReconciles: cm.config.MaxConcurrentReconciles,
-		})
-	}
 
 	// Complete the setup
 	if err := controllerBuilder.Complete(cm.statefulSetController); err != nil {
@@ -368,10 +323,10 @@ func (cm *ControllerManager) GetManagerMetrics() map[string]interface{} {
 
 	// Add controller-specific metrics
 	if cm.deploymentController != nil {
-		metrics["deployment_reconciles"] = cm.deploymentController.GetReconcileCount()
+		metrics["deployment_reconciles"] = int64(0) // TODO: Implement reconcile count tracking
 	}
 	if cm.statefulSetController != nil {
-		metrics["statefulset_reconciles"] = cm.statefulSetController.GetReconcileCount()
+		metrics["statefulset_reconciles"] = int64(0) // TODO: Implement reconcile count tracking
 	}
 
 	return metrics

@@ -105,53 +105,54 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Calculate desired distribution based on configuration
-	desiredReplicas := deployment.Status.Replicas
+	// Set total replicas in the state
+	replicaState.TotalReplicas = deployment.Status.Replicas
 	if deployment.Spec.Replicas != nil {
-		desiredReplicas = *deployment.Spec.Replicas
+		replicaState.TotalReplicas = *deployment.Spec.Replicas
 	}
 
-	desiredState := replicaState.CalculateDesiredDistribution(workloadConfig, desiredReplicas)
+	replicaState.CalculateDesiredDistribution(*workloadConfig)
 
 	// Determine if reconciliation is needed
-	action := replicaState.GetNextAction(desiredState)
+	action := replicaState.GetNextAction()
 
 	switch action {
 	case apis.ReplicaActionNone:
 		logger.V(1).Info("No reconciliation action needed")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, nil
 
-	case apis.ReplicaActionScaleUp:
+	case apis.ReplicaActionScaleUpOnDemand, apis.ReplicaActionScaleUpSpot:
 		logger.Info("Scaling up deployment",
-			"currentSpot", replicaState.CurrentSpotReplicas,
-			"currentOnDemand", replicaState.CurrentOnDemandReplicas,
-			"desiredSpot", desiredState.DesiredSpotReplicas,
-			"desiredOnDemand", desiredState.DesiredOnDemandReplicas)
+			"currentSpot", replicaState.CurrentSpot,
+			"currentOnDemand", replicaState.CurrentOnDemand,
+			"desiredSpot", replicaState.DesiredSpot,
+			"desiredOnDemand", replicaState.DesiredOnDemand)
 
-		if err := r.performScaleUp(ctx, &deployment, desiredState); err != nil {
+		if err := r.performScaleUp(ctx, &deployment, replicaState); err != nil {
 			logger.Error(err, "Failed to scale up deployment")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
 
-	case apis.ReplicaActionScaleDown:
+	case apis.ReplicaActionScaleDownOnDemand, apis.ReplicaActionScaleDownSpot:
 		logger.Info("Scaling down deployment",
-			"currentSpot", replicaState.CurrentSpotReplicas,
-			"currentOnDemand", replicaState.CurrentOnDemandReplicas,
-			"desiredSpot", desiredState.DesiredSpotReplicas,
-			"desiredOnDemand", desiredState.DesiredOnDemandReplicas)
+			"currentSpot", replicaState.CurrentSpot,
+			"currentOnDemand", replicaState.CurrentOnDemand,
+			"desiredSpot", replicaState.DesiredSpot,
+			"desiredOnDemand", replicaState.DesiredOnDemand)
 
-		if err := r.performScaleDown(ctx, &deployment, desiredState); err != nil {
+		if err := r.performScaleDown(ctx, &deployment, replicaState); err != nil {
 			logger.Error(err, "Failed to scale down deployment")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
 
-	case apis.ReplicaActionRebalance:
+	case apis.ReplicaActionMigrateToSpot, apis.ReplicaActionMigrateToOnDemand:
 		logger.Info("Rebalancing deployment",
-			"currentSpot", replicaState.CurrentSpotReplicas,
-			"currentOnDemand", replicaState.CurrentOnDemandReplicas,
-			"desiredSpot", desiredState.DesiredSpotReplicas,
-			"desiredOnDemand", desiredState.DesiredOnDemandReplicas)
+			"currentSpot", replicaState.CurrentSpot,
+			"currentOnDemand", replicaState.CurrentOnDemand,
+			"desiredSpot", replicaState.DesiredSpot,
+			"desiredOnDemand", replicaState.DesiredOnDemand)
 
-		if err := r.performRebalance(ctx, &deployment, desiredState); err != nil {
+		if err := r.performRebalance(ctx, &deployment, replicaState); err != nil {
 			logger.Error(err, "Failed to rebalance deployment")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
@@ -171,9 +172,8 @@ func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context,
 	}
 
 	if err := r.List(ctx, podList, &client.ListOptions{
-		Namespace:     deployment.Namespace,
-		LabelSelector: selector,
-	}); err != nil {
+		Namespace: deployment.Namespace,
+	}, selector); err != nil {
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
@@ -209,9 +209,9 @@ func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context,
 			Namespace:  deployment.Namespace,
 			UID:        deployment.UID,
 		},
-		CurrentSpotReplicas:     spotReplicas,
-		CurrentOnDemandReplicas: onDemandReplicas,
-		LastUpdated:             time.Now(),
+		CurrentSpot:     spotReplicas,
+		CurrentOnDemand: onDemandReplicas,
+		LastReconciled:  time.Now(),
 	}, nil
 }
 
@@ -220,7 +220,7 @@ func (r *DeploymentReconciler) performScaleUp(ctx context.Context, deployment *a
 	// For deployments, we rely on the scheduler to place pods on appropriate nodes
 	// We update the replica count and let node affinity/tolerations do the work
 
-	newReplicaCount := desiredState.DesiredSpotReplicas + desiredState.DesiredOnDemandReplicas
+	newReplicaCount := desiredState.DesiredSpot + desiredState.DesiredOnDemand
 
 	deployment.Spec.Replicas = &newReplicaCount
 
@@ -234,8 +234,8 @@ func (r *DeploymentReconciler) performScaleUp(ctx context.Context, deployment *a
 // performScaleDown handles scaling down the deployment while maintaining distribution
 func (r *DeploymentReconciler) performScaleDown(ctx context.Context, deployment *appsv1.Deployment, desiredState *apis.ReplicaState) error {
 	// Calculate how many replicas to remove and from which node types
-	currentTotal := desiredState.CurrentSpotReplicas + desiredState.CurrentOnDemandReplicas
-	desiredTotal := desiredState.DesiredSpotReplicas + desiredState.DesiredOnDemandReplicas
+	currentTotal := desiredState.CurrentSpot + desiredState.CurrentOnDemand
+	desiredTotal := desiredState.DesiredSpot + desiredState.DesiredOnDemand
 
 	if currentTotal <= desiredTotal {
 		return nil // Nothing to scale down

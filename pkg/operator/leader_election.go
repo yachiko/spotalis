@@ -330,10 +330,15 @@ func (l *LeaderElectionManager) getLeaseInfo() *LeaseInfo {
 	}
 
 	info := &LeaseInfo{
-		Name:              lease.Name,
-		Namespace:         lease.Namespace,
-		LeaseDuration:     l.config.LeaseDuration,
-		LeaderTransitions: lease.Spec.LeaseTransitions,
+		Name:          lease.Name,
+		Namespace:     lease.Namespace,
+		LeaseDuration: l.config.LeaseDuration,
+		LeaderTransitions: func() int32 {
+			if lease.Spec.LeaseTransitions != nil {
+				return *lease.Spec.LeaseTransitions
+			}
+			return 0
+		}(),
 	}
 
 	if lease.Spec.HolderIdentity != nil {

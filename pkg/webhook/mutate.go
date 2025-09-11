@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"gomodules.xyz/jsonpatch/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,7 @@ type MutationHandler struct {
 	Client           client.Client
 	AnnotationParser *annotations.AnnotationParser
 	NodeClassifier   *config.NodeClassifierService
-	decoder          *admission.Decoder
+	decoder          admission.Decoder
 }
 
 // NewMutationHandler creates a new mutation handler
@@ -121,7 +122,20 @@ func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request) 
 	}
 
 	logger.Info("Applied pod mutations", "patches", len(patches))
-	return admission.Patched("applied Spotalis mutations", patchBytes...)
+
+	podBytes, err := pod.Marshal()
+	if err != nil {
+		logger.Error(err, "Failed to marshal pod")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	patchOperations, err := jsonpatch.CreatePatch(podBytes, patchBytes)
+
+	if err != nil {
+		logger.Error(err, "Failed to create patch operations")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+	return admission.Patched("applied Spotalis mutations", patchOperations...)
 }
 
 // mutateDeployment handles deployment mutation for Spotalis annotations
@@ -162,7 +176,20 @@ func (m *MutationHandler) mutateDeployment(ctx context.Context, req admission.Re
 	}
 
 	logger.Info("Applied deployment mutations", "patches", len(patches))
-	return admission.Patched("applied Spotalis mutations", patchBytes...)
+
+	deploymentBytes, err := json.Marshal(deployment)
+	if err != nil {
+		logger.Error(err, "Failed to marshal deployment")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	patchOperations, err := jsonpatch.CreatePatch(deploymentBytes, patchBytes)
+	if err != nil {
+		logger.Error(err, "Failed to create patch operations")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	return admission.Patched("applied Spotalis mutations", patchOperations...)
 }
 
 // mutateStatefulSet handles StatefulSet mutation for Spotalis annotations
@@ -203,7 +230,20 @@ func (m *MutationHandler) mutateStatefulSet(ctx context.Context, req admission.R
 	}
 
 	logger.Info("Applied StatefulSet mutations", "patches", len(patches))
-	return admission.Patched("applied Spotalis mutations", patchBytes...)
+
+	statefulSetBytes, err := json.Marshal(statefulSet)
+	if err != nil {
+		logger.Error(err, "Failed to marshal statefulSet")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	patchOperations, err := jsonpatch.CreatePatch(statefulSetBytes, patchBytes)
+	if err != nil {
+		logger.Error(err, "Failed to create patch operations")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	return admission.Patched("applied Spotalis mutations", patchOperations...)
 }
 
 // getWorkloadConfigForPod retrieves workload configuration for a pod
@@ -441,7 +481,7 @@ func (m *MutationHandler) generateSchedulingAnnotationPatches(pod *corev1.Pod, c
 	schedulingAnnotations := map[string]string{
 		"spotalis.io/spot-percentage":     strconv.Itoa(int(config.SpotPercentage)),
 		"spotalis.io/min-on-demand":       strconv.Itoa(int(config.MinOnDemand)),
-		"spotalis.io/scheduled-timestamp": metav1.Now().Format(metav1.TimeFormat),
+		"spotalis.io/scheduled-timestamp": metav1.Now().Format("2006-01-02T15:04:05Z"),
 	}
 
 	// Add annotations if they don't exist
@@ -475,7 +515,7 @@ func jsonPointerEscape(s string) string {
 }
 
 // InjectDecoder injects the decoder into the handler
-func (m *MutationHandler) InjectDecoder(d *admission.Decoder) error {
+func (m *MutationHandler) InjectDecoder(d admission.Decoder) error {
 	m.decoder = d
 	return nil
 }

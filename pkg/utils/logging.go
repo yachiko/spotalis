@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logging
+package utils
 
 import (
 	"context"
@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -96,7 +97,6 @@ func NewLogger(config *LoggerConfig) (*Logger, error) {
 
 	// Create handler based on format
 	var handler slog.Handler
-	var err error
 
 	opts := &slog.HandlerOptions{
 		Level:     parseLogLevel(config.Level),
@@ -321,18 +321,18 @@ func parseLogLevel(level string) slog.Level {
 }
 
 // parseZapLogLevel parses string log level to zap level (for controller-runtime)
-func parseZapLogLevel(level string) zap.Level {
+func parseZapLogLevel(level string) zapcore.Level {
 	switch strings.ToLower(level) {
 	case "debug":
-		return zap.DebugLevel
+		return zapcore.DebugLevel
 	case "info":
-		return zap.InfoLevel
+		return zapcore.InfoLevel
 	case "warn", "warning":
-		return zap.WarnLevel
+		return zapcore.WarnLevel
 	case "error":
-		return zap.ErrorLevel
+		return zapcore.ErrorLevel
 	default:
-		return zap.InfoLevel
+		return zapcore.InfoLevel
 	}
 }
 

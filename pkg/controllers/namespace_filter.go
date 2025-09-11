@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -250,14 +251,14 @@ func (nf *NamespaceFilter) GetFilteredNamespaces(ctx context.Context) ([]string,
 	var namespaces []string
 
 	// List all namespaces
-	namespaceList := &metav1.List{}
+	namespaceList := &corev1.NamespaceList{}
 	if err := nf.client.List(ctx, namespaceList); err != nil {
 		return nil, fmt.Errorf("failed to list namespaces: %w", err)
 	}
 
 	// Filter namespaces
 	for _, item := range namespaceList.Items {
-		namespace := item.GetName()
+		namespace := item.Name
 		result, err := nf.IsNamespaceAllowed(ctx, namespace)
 		if err != nil {
 			continue // Skip on error
@@ -300,7 +301,7 @@ func (nf *NamespaceFilter) GetTenantNamespaces(ctx context.Context, tenant strin
 	}
 	selector = selector.Add(*requirement)
 
-	namespaceList := &metav1.List{}
+	namespaceList := &corev1.NamespaceList{}
 	listOpts := &client.ListOptions{
 		LabelSelector: selector,
 	}
@@ -310,7 +311,7 @@ func (nf *NamespaceFilter) GetTenantNamespaces(ctx context.Context, tenant strin
 	}
 
 	for _, item := range namespaceList.Items {
-		namespace := item.GetName()
+		namespace := item.Name
 		result, err := nf.IsNamespaceAllowedForTenant(ctx, namespace, tenant)
 		if err != nil {
 			continue
@@ -431,7 +432,7 @@ func (nf *NamespaceFilter) performFiltering(ctx context.Context, namespace strin
 
 	// Check namespace labels and annotations
 	if nf.client != nil {
-		namespaceObj := &metav1.Namespace{}
+		namespaceObj := &corev1.Namespace{}
 		err := nf.client.Get(ctx, client.ObjectKey{Name: namespace}, namespaceObj)
 		if err != nil {
 			// Namespace might not exist, allow processing to proceed

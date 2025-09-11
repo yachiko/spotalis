@@ -264,7 +264,7 @@ func (sm *ShutdownManager) performGracefulShutdown(ctx context.Context) error {
 // performForceShutdown performs a forced shutdown
 func (sm *ShutdownManager) performForceShutdown() error {
 	setupLog := ctrl.Log.WithName("shutdown-manager")
-	setupLog.Warn("Performing force shutdown", "timeout", sm.config.ForceTimeout)
+	setupLog.Info("Performing force shutdown", "timeout", sm.config.ForceTimeout)
 
 	// Create force shutdown context
 	forceCtx, cancel := context.WithTimeout(context.Background(), sm.config.ForceTimeout)

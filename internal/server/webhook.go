@@ -36,10 +36,10 @@ import (
 
 // WebhookServer provides webhook admission control functionality
 type WebhookServer struct {
-	server        *webhook.Server
+	server        webhook.Server
 	mutateHandler *webhookMutate.MutationHandler
 	scheme        *runtime.Scheme
-	decoder       *admission.Decoder
+	decoder       admission.Decoder
 
 	// TLS configuration
 	certPath  string
@@ -65,13 +65,12 @@ func NewWebhookServer(config WebhookServerConfig, mutateHandler *webhookMutate.M
 	decoder := admission.NewDecoder(scheme)
 
 	// Create webhook server
-	webhookServer := &webhook.Server{
-		Port:          config.Port,
-		CertDir:       "", // We'll use CertName and KeyName instead
-		CertName:      config.CertPath,
-		KeyName:       config.KeyPath,
-		TLSMinVersion: "1.3",
-	}
+	webhookServer := webhook.NewServer(webhook.Options{
+		Port:     config.Port,
+		CertDir:  "", // We'll use CertName and KeyName instead
+		CertName: config.CertPath,
+		KeyName:  config.KeyPath,
+	})
 
 	return &WebhookServer{
 		server:        webhookServer,
@@ -257,7 +256,7 @@ func (w *WebhookServer) SetupRoutes(router *gin.Engine) {
 }
 
 // GetControllerRuntimeServer returns the controller-runtime webhook server for integration
-func (w *WebhookServer) GetControllerRuntimeServer() *webhook.Server {
+func (w *WebhookServer) GetControllerRuntimeServer() webhook.Server {
 	return w.server
 }
 

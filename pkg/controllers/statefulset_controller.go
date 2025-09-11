@@ -111,48 +111,49 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		desiredReplicas = *statefulSet.Spec.Replicas
 	}
 
-	desiredState := replicaState.CalculateDesiredDistribution(workloadConfig, desiredReplicas)
+	replicaState.TotalReplicas = desiredReplicas
+	replicaState.CalculateDesiredDistribution(*workloadConfig)
 
 	// Determine if reconciliation is needed
-	action := replicaState.GetNextAction(desiredState)
+	action := replicaState.GetNextAction()
 
 	switch action {
 	case apis.ReplicaActionNone:
 		logger.V(1).Info("No reconciliation action needed")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, nil
 
-	case apis.ReplicaActionScaleUp:
+	case apis.ReplicaActionScaleUpOnDemand, apis.ReplicaActionScaleUpSpot:
 		logger.Info("Scaling up StatefulSet",
-			"currentSpot", replicaState.CurrentSpotReplicas,
-			"currentOnDemand", replicaState.CurrentOnDemandReplicas,
-			"desiredSpot", desiredState.DesiredSpotReplicas,
-			"desiredOnDemand", desiredState.DesiredOnDemandReplicas)
+			"currentSpot", replicaState.CurrentSpot,
+			"currentOnDemand", replicaState.CurrentOnDemand,
+			"desiredSpot", replicaState.DesiredSpot,
+			"desiredOnDemand", replicaState.DesiredOnDemand)
 
-		if err := r.performScaleUp(ctx, &statefulSet, desiredState); err != nil {
+		if err := r.performScaleUp(ctx, &statefulSet, replicaState); err != nil {
 			logger.Error(err, "Failed to scale up StatefulSet")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
 
-	case apis.ReplicaActionScaleDown:
+	case apis.ReplicaActionScaleDownOnDemand, apis.ReplicaActionScaleDownSpot:
 		logger.Info("Scaling down StatefulSet",
-			"currentSpot", replicaState.CurrentSpotReplicas,
-			"currentOnDemand", replicaState.CurrentOnDemandReplicas,
-			"desiredSpot", desiredState.DesiredSpotReplicas,
-			"desiredOnDemand", desiredState.DesiredOnDemandReplicas)
+			"currentSpot", replicaState.CurrentSpot,
+			"currentOnDemand", replicaState.CurrentOnDemand,
+			"desiredSpot", replicaState.DesiredSpot,
+			"desiredOnDemand", replicaState.DesiredOnDemand)
 
-		if err := r.performScaleDown(ctx, &statefulSet, desiredState); err != nil {
+		if err := r.performScaleDown(ctx, &statefulSet, replicaState); err != nil {
 			logger.Error(err, "Failed to scale down StatefulSet")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
 
-	case apis.ReplicaActionRebalance:
+	case apis.ReplicaActionMigrateToSpot, apis.ReplicaActionMigrateToOnDemand:
 		logger.Info("Rebalancing StatefulSet",
-			"currentSpot", replicaState.CurrentSpotReplicas,
-			"currentOnDemand", replicaState.CurrentOnDemandReplicas,
-			"desiredSpot", desiredState.DesiredSpotReplicas,
-			"desiredOnDemand", desiredState.DesiredOnDemandReplicas)
+			"currentSpot", replicaState.CurrentSpot,
+			"currentOnDemand", replicaState.CurrentOnDemand,
+			"desiredSpot", replicaState.DesiredSpot,
+			"desiredOnDemand", replicaState.DesiredOnDemand)
 
-		if err := r.performRebalance(ctx, &statefulSet, desiredState); err != nil {
+		if err := r.performRebalance(ctx, &statefulSet, replicaState); err != nil {
 			logger.Error(err, "Failed to rebalance StatefulSet")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
@@ -172,9 +173,8 @@ func (r *StatefulSetReconciler) calculateCurrentReplicaState(ctx context.Context
 	}
 
 	if err := r.List(ctx, podList, &client.ListOptions{
-		Namespace:     statefulSet.Namespace,
-		LabelSelector: selector,
-	}); err != nil {
+		Namespace: statefulSet.Namespace,
+	}, selector); err != nil {
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
@@ -210,9 +210,9 @@ func (r *StatefulSetReconciler) calculateCurrentReplicaState(ctx context.Context
 			Namespace:  statefulSet.Namespace,
 			UID:        statefulSet.UID,
 		},
-		CurrentSpotReplicas:     spotReplicas,
-		CurrentOnDemandReplicas: onDemandReplicas,
-		LastUpdated:             time.Now(),
+		CurrentSpot:     spotReplicas,
+		CurrentOnDemand: onDemandReplicas,
+		LastReconciled:  time.Now(),
 	}, nil
 }
 
@@ -221,7 +221,7 @@ func (r *StatefulSetReconciler) performScaleUp(ctx context.Context, statefulSet 
 	// For StatefulSets, we can control replica placement more precisely
 	// by updating individual pod specs as they are created
 
-	newReplicaCount := desiredState.DesiredSpotReplicas + desiredState.DesiredOnDemandReplicas
+	newReplicaCount := desiredState.DesiredSpot + desiredState.DesiredOnDemand
 
 	// Update the replica count
 	statefulSet.Spec.Replicas = &newReplicaCount
@@ -240,8 +240,8 @@ func (r *StatefulSetReconciler) performScaleUp(ctx context.Context, statefulSet 
 
 // performScaleDown handles scaling down the StatefulSet while maintaining distribution
 func (r *StatefulSetReconciler) performScaleDown(ctx context.Context, statefulSet *appsv1.StatefulSet, desiredState *apis.ReplicaState) error {
-	currentTotal := desiredState.CurrentSpotReplicas + desiredState.CurrentOnDemandReplicas
-	desiredTotal := desiredState.DesiredSpotReplicas + desiredState.DesiredOnDemandReplicas
+	currentTotal := desiredState.CurrentSpot + desiredState.CurrentOnDemand
+	desiredTotal := desiredState.DesiredSpot + desiredState.DesiredOnDemand
 
 	if currentTotal <= desiredTotal {
 		return nil // Nothing to scale down
@@ -280,9 +280,8 @@ func (r *StatefulSetReconciler) performRebalance(ctx context.Context, statefulSe
 	}
 
 	if err := r.List(ctx, podList, &client.ListOptions{
-		Namespace:     statefulSet.Namespace,
-		LabelSelector: selector,
-	}); err != nil {
+		Namespace: statefulSet.Namespace,
+	}, selector); err != nil {
 		return fmt.Errorf("failed to list pods for rebalancing: %w", err)
 	}
 
@@ -347,16 +346,15 @@ func (r *StatefulSetReconciler) deleteExcessPods(ctx context.Context, statefulSe
 	}
 
 	if err := r.List(ctx, podList, &client.ListOptions{
-		Namespace:     statefulSet.Namespace,
-		LabelSelector: selector,
-	}); err != nil {
+		Namespace: statefulSet.Namespace,
+	}, selector); err != nil {
 		return fmt.Errorf("failed to list pods: %w", err)
 	}
 
-	currentSpot := desiredState.CurrentSpotReplicas
-	currentOnDemand := desiredState.CurrentOnDemandReplicas
-	desiredSpot := desiredState.DesiredSpotReplicas
-	desiredOnDemand := desiredState.DesiredOnDemandReplicas
+	currentSpot := desiredState.CurrentSpot
+	currentOnDemand := desiredState.CurrentOnDemand
+	desiredSpot := desiredState.DesiredSpot
+	desiredOnDemand := desiredState.DesiredOnDemand
 
 	excessSpot := currentSpot - desiredSpot
 	excessOnDemand := currentOnDemand - desiredOnDemand
@@ -411,10 +409,10 @@ func (r *StatefulSetReconciler) deletePodsByNodeType(ctx context.Context, pods [
 func (r *StatefulSetReconciler) shouldMovePod(pod *corev1.Pod, currentNodeType apis.NodeType, desiredState *apis.ReplicaState) bool {
 	// Simple heuristic: if we have too many of this type, consider moving some
 
-	currentSpot := desiredState.CurrentSpotReplicas
-	currentOnDemand := desiredState.CurrentOnDemandReplicas
-	desiredSpot := desiredState.DesiredSpotReplicas
-	desiredOnDemand := desiredState.DesiredOnDemandReplicas
+	currentSpot := desiredState.CurrentSpot
+	currentOnDemand := desiredState.CurrentOnDemand
+	desiredSpot := desiredState.DesiredSpot
+	desiredOnDemand := desiredState.DesiredOnDemand
 
 	if currentNodeType == apis.NodeTypeSpot && currentSpot > desiredSpot {
 		return true
@@ -432,7 +430,7 @@ func (r *StatefulSetReconciler) updatePodTemplateForNodePlacement(statefulSet *a
 	template := &statefulSet.Spec.Template
 
 	// Add spot instance tolerations if needed
-	if desiredState.DesiredSpotReplicas > 0 {
+	if desiredState.DesiredSpot > 0 {
 		if template.Spec.Tolerations == nil {
 			template.Spec.Tolerations = make([]corev1.Toleration, 0)
 		}
@@ -459,8 +457,8 @@ func (r *StatefulSetReconciler) updatePodTemplateForNodePlacement(statefulSet *a
 		template.Annotations = make(map[string]string)
 	}
 
-	template.Annotations["spotalis.io/desired-spot-replicas"] = strconv.Itoa(int(desiredState.DesiredSpotReplicas))
-	template.Annotations["spotalis.io/desired-ondemand-replicas"] = strconv.Itoa(int(desiredState.DesiredOnDemandReplicas))
+	template.Annotations["spotalis.io/desired-spot-replicas"] = strconv.Itoa(int(desiredState.DesiredSpot))
+	template.Annotations["spotalis.io/desired-ondemand-replicas"] = strconv.Itoa(int(desiredState.DesiredOnDemand))
 
 	return nil
 }

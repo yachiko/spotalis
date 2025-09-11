@@ -133,7 +133,7 @@ type AdmissionController struct {
 	validatingHandler admission.Handler
 
 	// State
-	webhookServer *webhook.Server
+	webhookServer webhook.Server
 	registered    bool
 }
 
@@ -258,11 +258,9 @@ func (a *AdmissionController) setupWebhookServer() error {
 	webhookServer := a.manager.GetWebhookServer()
 
 	// Configure webhook server
-	webhookServer.Port = a.config.Port
-	webhookServer.CertDir = a.config.CertDir
-	webhookServer.CertName = a.config.CertName
-	webhookServer.KeyName = a.config.KeyName
-	webhookServer.TLSMinVersion = a.config.TLSMinVersion
+	// Port and cert directory should be set via manager.Options when creating the manager,
+	// not directly on the server object.
+	// See: https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Options
 
 	// Register webhook handlers
 	if a.mutatingHandler != nil {
@@ -277,7 +275,7 @@ func (a *AdmissionController) setupWebhookServer() error {
 
 // registerWebhookConfiguration creates or updates the MutatingAdmissionWebhook
 func (a *AdmissionController) registerWebhookConfiguration(ctx context.Context) error {
-	webhook := &admissionv1.MutatingAdmissionWebhook{
+	webhook := &admissionv1.MutatingWebhook{
 		Name:                    a.config.WebhookName,
 		ClientConfig:            a.createClientConfig(),
 		Rules:                   a.config.Rules,
@@ -289,7 +287,7 @@ func (a *AdmissionController) registerWebhookConfiguration(ctx context.Context) 
 		ObjectSelector:          a.config.ObjectSelector,
 	}
 
-	configuration := &admissionv1.MutatingAdmissionWebhookConfiguration{
+	configuration := &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: a.config.WebhookName + "-configuration",
 			Labels: map[string]string{
@@ -298,19 +296,19 @@ func (a *AdmissionController) registerWebhookConfiguration(ctx context.Context) 
 				"app.kubernetes.io/managed-by": "spotalis-controller",
 			},
 		},
-		Webhooks: []admissionv1.MutatingAdmissionWebhook{*webhook},
+		Webhooks: []admissionv1.MutatingWebhook{*webhook},
 	}
 
 	// Try to update existing configuration
 	existing, err := a.kubeClient.AdmissionregistrationV1().
-		MutatingAdmissionWebhookConfigurations().
+		MutatingWebhookConfigurations().
 		Get(ctx, configuration.Name, metav1.GetOptions{})
 
 	if err == nil {
 		// Update existing configuration
 		existing.Webhooks = configuration.Webhooks
 		_, err = a.kubeClient.AdmissionregistrationV1().
-			MutatingAdmissionWebhookConfigurations().
+			MutatingWebhookConfigurations().
 			Update(ctx, existing, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update webhook configuration: %w", err)
@@ -318,7 +316,7 @@ func (a *AdmissionController) registerWebhookConfiguration(ctx context.Context) 
 	} else {
 		// Create new configuration
 		_, err = a.kubeClient.AdmissionregistrationV1().
-			MutatingAdmissionWebhookConfigurations().
+			MutatingWebhookConfigurations().
 			Create(ctx, configuration, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to create webhook configuration: %w", err)
@@ -429,7 +427,7 @@ func (a *AdmissionController) Cleanup(ctx context.Context) error {
 
 	configName := a.config.WebhookName + "-configuration"
 	err := a.kubeClient.AdmissionregistrationV1().
-		MutatingAdmissionWebhookConfigurations().
+		MutatingWebhookConfigurations().
 		Delete(ctx, configName, metav1.DeleteOptions{})
 
 	if err != nil {

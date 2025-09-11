@@ -35,23 +35,23 @@ import (
 // KubernetesConfig contains Kubernetes client configuration
 type KubernetesConfig struct {
 	// Client configuration
-	Kubeconfig    string
-	Context       string
-	QPS           float32
-	Burst         int
-	Timeout       time.Duration
-	UserAgent     string
-	
+	Kubeconfig string
+	Context    string
+	QPS        float32
+	Burst      int
+	Timeout    time.Duration
+	UserAgent  string
+
 	// RBAC configuration
-	ServiceAccount  string
-	Namespace       string
-	ClusterRole     string
-	RoleBinding     string
-	
+	ServiceAccount string
+	Namespace      string
+	ClusterRole    string
+	RoleBinding    string
+
 	// Security configuration
 	ImpersonateUser   string
 	ImpersonateGroups []string
-	
+
 	// Advanced configuration
 	DisableCompression bool
 	ContentType        string
@@ -205,21 +205,21 @@ func (k *KubernetesClientManager) GetClusterInfo(ctx context.Context) (*ClusterI
 	}
 
 	return &ClusterInfo{
-		Version:         version.String(),
-		NodeCount:       len(nodes.Items),
-		NamespaceCount:  len(namespaces.Items),
-		APIServerURL:    k.restConfig.Host,
-		CurrentContext:  k.config.Context,
+		Version:        version.String(),
+		NodeCount:      len(nodes.Items),
+		NamespaceCount: len(namespaces.Items),
+		APIServerURL:   k.restConfig.Host,
+		CurrentContext: k.config.Context,
 	}, nil
 }
 
 // ClusterInfo contains information about the Kubernetes cluster
 type ClusterInfo struct {
-	Version         string
-	NodeCount       int
-	NamespaceCount  int
-	APIServerURL    string
-	CurrentContext  string
+	Version        string
+	NodeCount      int
+	NamespaceCount int
+	APIServerURL   string
+	CurrentContext string
 }
 
 // initializeRESTConfig initializes the REST configuration
@@ -348,44 +348,44 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 		Rules: []rbacv1.PolicyRule{
 			// Node permissions
 			{
-				APIGroups: [""],
-				Resources: ["nodes"],
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			// Pod permissions
 			{
-				APIGroups: [""],
-				Resources: ["pods"],
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
 				Verbs:     []string{"get", "list", "watch", "patch", "delete"},
 			},
 			// Deployment permissions
 			{
-				APIGroups: ["apps"],
-				Resources: ["deployments"],
+				APIGroups: []string{"apps"},
+				Resources: []string{"deployments"},
 				Verbs:     []string{"get", "list", "watch", "patch"},
 			},
 			// StatefulSet permissions
 			{
-				APIGroups: ["apps"],
-				Resources: ["statefulsets"],
+				APIGroups: []string{"apps"},
+				Resources: []string{"statefulsets"},
 				Verbs:     []string{"get", "list", "watch", "patch"},
 			},
 			// Event permissions
 			{
-				APIGroups: [""],
-				Resources: ["events"],
+				APIGroups: []string{""},
+				Resources: []string{"events"},
 				Verbs:     []string{"create", "patch"},
 			},
 			// Leader election permissions
 			{
-				APIGroups: ["coordination.k8s.io"],
-				Resources: ["leases"],
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
 				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
 			},
 			// Namespace permissions
 			{
-				APIGroups: [""],
-				Resources: ["namespaces"],
+				APIGroups: []string{""},
+				Resources: []string{"namespaces"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 		},
@@ -466,6 +466,6 @@ func (k *KubernetesClientManager) validatePermission(ctx context.Context, resour
 			return err
 		}
 	}
-	
+
 	return nil
 }

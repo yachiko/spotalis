@@ -26,7 +26,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	metricsCollector "github.com/ahoma/spotalis/pkg/metrics"
 )
@@ -48,14 +47,9 @@ type MetricsServer struct {
 func NewMetricsServer(collector *metricsCollector.Collector) *MetricsServer {
 	registry := prometheus.NewRegistry()
 
-	// Register the collector with the custom registry
+	// Let the collector register its own metrics
 	if collector != nil {
-		registry.MustRegister(collector)
-	}
-
-	// Also register with controller-runtime's default registry
-	if collector != nil {
-		metrics.Registry.MustRegister(collector)
+		collector.RegisterMetrics()
 	}
 
 	return &MetricsServer{
@@ -96,7 +90,7 @@ func (m *MetricsServer) MetricsHandler(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 		defer cancel()
 
-		if err := m.collector.UpdateMetrics(ctx); err != nil {
+		if err := m.collector.UpdateNodeMetrics(ctx); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":  "failed to update metrics",
 				"reason": err.Error(),
