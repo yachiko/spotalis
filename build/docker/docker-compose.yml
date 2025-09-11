@@ -1,0 +1,71 @@
+# Docker Compose for local development
+version: '3.8'
+
+services:
+  controller:
+    build:
+      context: ../../
+      dockerfile: build/docker/Dockerfile
+    image: spotalis/controller:local
+    container_name: spotalis-controller
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - LOG_LEVEL=debug
+      - KUBECONFIG=/etc/kubeconfig/config
+      - ENABLE_METRICS=true
+      - METRICS_PORT=8080
+      - WEBHOOK_PORT=9443
+      - HEALTH_PORT=8081
+    
+    # Volume mounts
+    volumes:
+      - ${HOME}/.kube/config:/etc/kubeconfig/config:ro
+      - ./configs:/etc/spotalis:ro
+    
+    # Port mappings
+    ports:
+      - "8080:8080"  # Metrics
+      - "8081:8081"  # Health checks
+      - "9443:9443"  # Webhook
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: spotalis-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    profiles:
+      - monitoring
+
+networks:
+  default:
+    name: spotalis-network

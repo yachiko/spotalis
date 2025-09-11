@@ -1,0 +1,22 @@
+# Prometheus configuration for Spotalis metrics
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Spotalis controller metrics
+  - job_name: 'spotalis-controller'
+    static_configs:
+      - targets: ['controller:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
