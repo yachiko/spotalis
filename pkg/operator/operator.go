@@ -18,47 +18,479 @@ package operator
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"time"
 
+	"github.com/gin-gonic/gin"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/spotalis/spotalis/internal/annotations"
+	"github.com/spotalis/spotalis/internal/config"
+	"github.com/spotalis/spotalis/internal/server"
+	"github.com/spotalis/spotalis/pkg/controllers"
+	"github.com/spotalis/spotalis/pkg/metrics"
+	webhookMutate "github.com/spotalis/spotalis/pkg/webhook"
 )
 
-// Operator represents the main Spotalis operator
+// Operator represents the main Spotalis operator following Karpenter architecture pattern
 type Operator struct {
-	// Implementation will be added in Phase 3.3
+	manager.Manager
+
+	// Configuration
+	config    *OperatorConfig
+	namespace string
+
+	// Core services
+	annotationParser *annotations.Parser
+	nodeClassifier   *config.NodeClassifierService
+	metricsCollector *metrics.Collector
+	mutationHandler  *webhookMutate.MutationHandler
+
+	// HTTP Server components
+	ginEngine     *gin.Engine
+	healthChecker *server.HealthChecker
+	metricsServer *server.MetricsServer
+	webhookServer *server.WebhookServer
+
+	// Kubernetes clients
+	kubeClient kubernetes.Interface
+
+	// Runtime state
+	started bool
 }
 
-// Metrics represents operator metrics
+// OperatorConfig contains configuration for the Spotalis operator
+type OperatorConfig struct {
+	// Basic configuration
+	MetricsAddr      string
+	ProbeAddr        string
+	WebhookAddr      string
+	LeaderElection   bool
+	LeaderElectionID string
+	Namespace        string
+
+	// Controller configuration
+	ReconcileInterval       time.Duration
+	MaxConcurrentReconciles int
+
+	// Webhook configuration
+	WebhookCertDir  string
+	WebhookCertName string
+	WebhookKeyName  string
+	WebhookPort     int
+
+	// Operational configuration
+	LogLevel      string
+	EnablePprof   bool
+	EnableWebhook bool
+	ReadOnlyMode  bool
+
+	// Multi-tenancy
+	NamespaceFilter []string
+
+	// Performance tuning
+	APIQPSLimit   float32
+	APIBurstLimit int
+}
+
+// Metrics represents operator metrics (for compatibility)
 type Metrics struct {
 	WorkloadsManaged  int
 	SpotInterruptions int
 }
 
-// New creates a new operator instance
-func New(cfg *rest.Config) *Operator {
-	// This will fail until we implement it in T033
-	panic("New not implemented - test should fail")
+// DefaultOperatorConfig returns the default operator configuration
+func DefaultOperatorConfig() *OperatorConfig {
+	return &OperatorConfig{
+		MetricsAddr:             ":8080",
+		ProbeAddr:               ":8081",
+		WebhookAddr:             ":9443",
+		LeaderElection:          true,
+		LeaderElectionID:        "spotalis-controller-leader",
+		Namespace:               "spotalis-system",
+		ReconcileInterval:       30 * time.Second,
+		MaxConcurrentReconciles: 10,
+		WebhookCertDir:          "/tmp/k8s-webhook-server/serving-certs",
+		WebhookCertName:         "tls.crt",
+		WebhookKeyName:          "tls.key",
+		WebhookPort:             9443,
+		LogLevel:                "info",
+		EnablePprof:             false,
+		EnableWebhook:           true,
+		ReadOnlyMode:            false,
+		APIQPSLimit:             20.0,
+		APIBurstLimit:           30,
+	}
 }
 
-// NewWithConfig creates a new operator with configuration
+// New creates a new operator instance (for compatibility)
+func New(cfg *rest.Config) *Operator {
+	config := DefaultOperatorConfig()
+	operator, err := NewOperator(config)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create operator: %v", err))
+	}
+	return operator
+}
+
+// NewWithConfig creates a new operator with configuration (for compatibility)
 func NewWithConfig(cfg *rest.Config, operatorConfig interface{}) *Operator {
-	// This will fail until we implement it in T033
-	panic("NewWithConfig not implemented - test should fail")
+	var config *OperatorConfig
+	if operatorConfig != nil {
+		if c, ok := operatorConfig.(*OperatorConfig); ok {
+			config = c
+		} else {
+			config = DefaultOperatorConfig()
+		}
+	} else {
+		config = DefaultOperatorConfig()
+	}
+
+	operator, err := NewOperator(config)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create operator with config: %v", err))
+	}
+	return operator
+}
+
+// NewOperator creates a new Spotalis operator instance
+func NewOperator(config *OperatorConfig) (*Operator, error) {
+	if config == nil {
+		config = DefaultOperatorConfig()
+	}
+
+	// Override from environment variables
+	if err := configFromEnv(config); err != nil {
+		return nil, fmt.Errorf("failed to load configuration from environment: %w", err)
+	}
+
+	// Setup scheme
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("failed to add client-go scheme: %w", err)
+	}
+
+	// Setup logger
+	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == "debug")))
+
+	// Create manager
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:                  scheme,
+		MetricsBindAddress:      config.MetricsAddr,
+		Port:                    config.WebhookPort,
+		HealthProbeBindAddress:  config.ProbeAddr,
+		LeaderElection:          config.LeaderElection,
+		LeaderElectionID:        config.LeaderElectionID,
+		LeaderElectionNamespace: config.Namespace,
+		Namespace:               config.Namespace,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create manager: %w", err)
+	}
+
+	// Create Kubernetes client
+	kubeClient, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	operator := &Operator{
+		Manager:    mgr,
+		config:     config,
+		namespace:  config.Namespace,
+		kubeClient: kubeClient,
+	}
+
+	// Initialize core services
+	if err := operator.initializeCoreServices(); err != nil {
+		return nil, fmt.Errorf("failed to initialize core services: %w", err)
+	}
+
+	// Initialize HTTP server
+	if err := operator.initializeHTTPServer(); err != nil {
+		return nil, fmt.Errorf("failed to initialize HTTP server: %w", err)
+	}
+
+	// Setup controllers
+	if err := operator.setupControllers(); err != nil {
+		return nil, fmt.Errorf("failed to setup controllers: %w", err)
+	}
+
+	// Setup webhooks
+	if config.EnableWebhook {
+		if err := operator.setupWebhooks(); err != nil {
+			return nil, fmt.Errorf("failed to setup webhooks: %w", err)
+		}
+	}
+
+	// Setup health and readiness checks
+	operator.setupHealthChecks()
+
+	return operator, nil
 }
 
 // Start starts the operator
 func (o *Operator) Start(ctx context.Context) error {
-	// This will fail until we implement it in T033
-	panic("Start not implemented - test should fail")
+	if o.started {
+		return fmt.Errorf("operator already started")
+	}
+
+	setupLog := ctrl.Log.WithName("setup")
+	setupLog.Info("Starting Spotalis operator",
+		"namespace", o.namespace,
+		"webhook-enabled", o.config.EnableWebhook,
+		"read-only", o.config.ReadOnlyMode,
+		"leader-election", o.config.LeaderElection,
+	)
+
+	// Start the manager (includes controllers and webhooks)
+	o.started = true
+	return o.Manager.Start(ctx)
 }
 
 // IsReady returns true if the operator is ready
 func (o *Operator) IsReady() bool {
-	// This will fail until we implement it in T033
-	panic("IsReady not implemented - test should fail")
+	if !o.started {
+		return false
+	}
+
+	// Check if manager is elected (for leader election)
+	select {
+	case <-o.Manager.Elected():
+		return true
+	default:
+		// If no leader election, consider ready if started
+		return !o.config.LeaderElection
+	}
 }
 
-// GetMetrics returns current operator metrics
+// GetMetrics returns current operator metrics (for compatibility)
 func (o *Operator) GetMetrics() Metrics {
-	// This will fail until we implement it in T029
-	panic("GetMetrics not implemented - test should fail")
+	if o.metricsCollector == nil {
+		return Metrics{}
+	}
+
+	// Get metrics from collector
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	summary, err := o.metricsCollector.GetNodeSummary(ctx)
+	if err != nil {
+		return Metrics{}
+	}
+
+	return Metrics{
+		WorkloadsManaged:  summary.TotalNodes,
+		SpotInterruptions: 0, // This would need to be tracked separately
+	}
+}
+
+// GetConfig returns the operator configuration
+func (o *Operator) GetConfig() *OperatorConfig {
+	return o.config
+}
+
+// GetGinEngine returns the Gin HTTP engine
+func (o *Operator) GetGinEngine() *gin.Engine {
+	return o.ginEngine
+}
+
+// GetHealthChecker returns the health checker
+func (o *Operator) GetHealthChecker() *server.HealthChecker {
+	return o.healthChecker
+}
+
+// GetMetricsServer returns the metrics server
+func (o *Operator) GetMetricsServer() *server.MetricsServer {
+	return o.metricsServer
+}
+
+// GetWebhookServer returns the webhook server
+func (o *Operator) GetWebhookServer() *server.WebhookServer {
+	return o.webhookServer
+}
+
+// initializeCoreServices initializes the core business logic services
+func (o *Operator) initializeCoreServices() error {
+	// Initialize annotation parser
+	o.annotationParser = annotations.NewParser()
+
+	// Initialize node classifier
+	nodeClassifierConfig := &config.NodeClassifierConfig{
+		CacheSize:      1000,
+		CacheTTL:       5 * time.Minute,
+		UpdateInterval: 30 * time.Second,
+	}
+	o.nodeClassifier = config.NewNodeClassifierService(o.kubeClient, nodeClassifierConfig)
+
+	// Initialize metrics collector
+	o.metricsCollector = metrics.NewCollector(o.nodeClassifier)
+
+	// Initialize mutation handler
+	o.mutationHandler = webhookMutate.NewMutationHandler(
+		o.annotationParser,
+		o.nodeClassifier,
+		o.metricsCollector,
+	)
+
+	return nil
+}
+
+// initializeHTTPServer initializes the HTTP server components
+func (o *Operator) initializeHTTPServer() error {
+	// Setup Gin engine
+	if o.config.LogLevel != "debug" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	o.ginEngine = gin.New()
+	o.ginEngine.Use(gin.Recovery())
+	if o.config.LogLevel == "debug" {
+		o.ginEngine.Use(gin.Logger())
+	}
+
+	// Initialize health checker
+	o.healthChecker = server.NewHealthChecker(o.Manager, o.kubeClient, o.namespace)
+
+	// Initialize metrics server
+	o.metricsServer = server.NewMetricsServer(o.metricsCollector)
+
+	// Initialize webhook server (if enabled)
+	if o.config.EnableWebhook {
+		webhookConfig := server.WebhookServerConfig{
+			Port:     o.config.WebhookPort,
+			CertPath: o.config.WebhookCertName,
+			KeyPath:  o.config.WebhookKeyName,
+			ReadOnly: o.config.ReadOnlyMode,
+		}
+		o.webhookServer = server.NewWebhookServer(webhookConfig, o.mutationHandler, o.Manager.GetScheme())
+	}
+
+	// Setup HTTP routes
+	o.setupHTTPRoutes()
+
+	return nil
+}
+
+// setupHTTPRoutes configures the HTTP routes
+func (o *Operator) setupHTTPRoutes() {
+	// Health endpoints
+	o.ginEngine.GET("/healthz", o.healthChecker.HealthzHandler)
+	o.ginEngine.GET("/readyz", o.healthChecker.ReadyzHandler)
+
+	// Metrics endpoints
+	o.ginEngine.GET("/metrics", o.metricsServer.MetricsHandler)
+	o.ginEngine.GET("/metrics/health", o.metricsServer.HealthMetricsHandler)
+
+	// Webhook endpoints (if enabled)
+	if o.webhookServer != nil {
+		o.webhookServer.SetupRoutes(o.ginEngine)
+	}
+
+	// Debug endpoints (if enabled)
+	if o.config.EnablePprof {
+		// Add pprof routes here if needed
+	}
+}
+
+// setupControllers sets up the Kubernetes controllers
+func (o *Operator) setupControllers() error {
+	// Setup Deployment controller
+	deploymentController := &controllers.DeploymentReconciler{
+		Client:            o.Manager.GetClient(),
+		Scheme:            o.Manager.GetScheme(),
+		AnnotationParser:  o.annotationParser,
+		NodeClassifier:    o.nodeClassifier,
+		MetricsCollector:  o.metricsCollector,
+		ReconcileInterval: o.config.ReconcileInterval,
+	}
+
+	if err := deploymentController.SetupWithManager(o.Manager); err != nil {
+		return fmt.Errorf("failed to setup deployment controller: %w", err)
+	}
+
+	// Setup StatefulSet controller
+	statefulSetController := &controllers.StatefulSetReconciler{
+		Client:            o.Manager.GetClient(),
+		Scheme:            o.Manager.GetScheme(),
+		AnnotationParser:  o.annotationParser,
+		NodeClassifier:    o.nodeClassifier,
+		MetricsCollector:  o.metricsCollector,
+		ReconcileInterval: o.config.ReconcileInterval,
+	}
+
+	if err := statefulSetController.SetupWithManager(o.Manager); err != nil {
+		return fmt.Errorf("failed to setup statefulset controller: %w", err)
+	}
+
+	return nil
+}
+
+// setupWebhooks sets up the admission webhooks
+func (o *Operator) setupWebhooks() error {
+	if o.webhookServer == nil {
+		return fmt.Errorf("webhook server not initialized")
+	}
+
+	// Get the webhook server from manager
+	hookServer := o.Manager.GetWebhookServer()
+
+	// Register mutation webhook
+	hookServer.Register("/mutate", &webhook.Admission{
+		Handler: o.mutationHandler,
+	})
+
+	return nil
+}
+
+// setupHealthChecks configures health and readiness checks
+func (o *Operator) setupHealthChecks() {
+	// Add health checks to manager
+	if err := o.Manager.AddHealthzCheck("healthz", o.healthChecker.GetHealthzChecker()); err != nil {
+		ctrl.Log.Error(err, "failed to add healthz check")
+	}
+
+	if err := o.Manager.AddReadyzCheck("readyz", o.healthChecker.GetReadyzChecker()); err != nil {
+		ctrl.Log.Error(err, "failed to add readyz check")
+	}
+}
+
+// configFromEnv loads configuration from environment variables
+func configFromEnv(config *OperatorConfig) error {
+	if addr := os.Getenv("METRICS_ADDR"); addr != "" {
+		config.MetricsAddr = addr
+	}
+	if addr := os.Getenv("PROBE_ADDR"); addr != "" {
+		config.ProbeAddr = addr
+	}
+	if addr := os.Getenv("WEBHOOK_ADDR"); addr != "" {
+		config.WebhookAddr = addr
+	}
+	if ns := os.Getenv("NAMESPACE"); ns != "" {
+		config.Namespace = ns
+	}
+	if level := os.Getenv("LOG_LEVEL"); level != "" {
+		config.LogLevel = level
+	}
+	if os.Getenv("DISABLE_LEADER_ELECTION") == "true" {
+		config.LeaderElection = false
+	}
+	if os.Getenv("DISABLE_WEBHOOK") == "true" {
+		config.EnableWebhook = false
+	}
+	if os.Getenv("READ_ONLY_MODE") == "true" {
+		config.ReadOnlyMode = true
+	}
+	if os.Getenv("ENABLE_PPROF") == "true" {
+		config.EnablePprof = true
+	}
+
+	return nil
 }
