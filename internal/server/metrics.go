@@ -28,7 +28,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
-	metricsCollector "github.com/spotalis/spotalis/pkg/metrics"
+	metricsCollector "github.com/ahoma/spotalis/pkg/metrics"
 )
 
 // MetricsServer provides metrics collection and serving functionality

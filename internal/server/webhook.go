@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	webhookMutate "github.com/spotalis/spotalis/pkg/webhook"
+	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 )
 
 // WebhookServer provides webhook admission control functionality

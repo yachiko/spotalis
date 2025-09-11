@@ -32,12 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/spotalis/spotalis/internal/annotations"
-	"github.com/spotalis/spotalis/internal/config"
-	"github.com/spotalis/spotalis/internal/server"
-	"github.com/spotalis/spotalis/pkg/controllers"
-	"github.com/spotalis/spotalis/pkg/metrics"
-	webhookMutate "github.com/spotalis/spotalis/pkg/webhook"
+	"github.com/ahoma/spotalis/internal/annotations"
+	"github.com/ahoma/spotalis/internal/config"
+	"github.com/ahoma/spotalis/internal/server"
+	"github.com/ahoma/spotalis/pkg/controllers"
+	"github.com/ahoma/spotalis/pkg/metrics"
+	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 )
 
 // Operator represents the main Spotalis operator following Karpenter architecture pattern
