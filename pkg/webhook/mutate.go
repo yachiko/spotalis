@@ -290,29 +290,26 @@ func (m *MutationHandler) getConfigFromReplicaSet(ctx context.Context, namespace
 // getConfigFromDeployment gets configuration from a Deployment
 func (m *MutationHandler) getConfigFromDeployment(ctx context.Context, namespace, name string) (*apis.WorkloadConfiguration, error) {
 	var deployment appsv1.Deployment
-	if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &deployment); err != nil {
-		return nil, err
-	}
-
-	if !m.AnnotationParser.HasSpotalisAnnotations(&deployment) {
-		return nil, nil
-	}
-
-	return m.AnnotationParser.ParseWorkloadConfiguration(&deployment)
+	return m.getConfigFromWorkload(ctx, namespace, name, &deployment)
 }
 
 // getConfigFromStatefulSet gets configuration from a StatefulSet
 func (m *MutationHandler) getConfigFromStatefulSet(ctx context.Context, namespace, name string) (*apis.WorkloadConfiguration, error) {
 	var statefulSet appsv1.StatefulSet
-	if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &statefulSet); err != nil {
+	return m.getConfigFromWorkload(ctx, namespace, name, &statefulSet)
+}
+
+// getConfigFromWorkload is a generic helper to get configuration from any workload type
+func (m *MutationHandler) getConfigFromWorkload(ctx context.Context, namespace, name string, obj client.Object) (*apis.WorkloadConfiguration, error) {
+	if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, obj); err != nil {
 		return nil, err
 	}
 
-	if !m.AnnotationParser.HasSpotalisAnnotations(&statefulSet) {
+	if !m.AnnotationParser.HasSpotalisAnnotations(obj) {
 		return nil, nil
 	}
 
-	return m.AnnotationParser.ParseWorkloadConfiguration(&statefulSet)
+	return m.AnnotationParser.ParseWorkloadConfiguration(obj)
 }
 
 // generatePodPatches generates JSON patches for pod mutation

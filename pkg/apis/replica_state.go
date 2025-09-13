@@ -191,6 +191,10 @@ func (r *ReplicaState) GetReconciliationAge() time.Duration {
 
 // IsStale returns true if the state hasn't been reconciled recently
 func (r *ReplicaState) IsStale(maxAge time.Duration) bool {
+	// If never reconciled, it's considered stale
+	if r.LastReconciled.IsZero() {
+		return true
+	}
 	return r.GetReconciliationAge() > maxAge
 }
 

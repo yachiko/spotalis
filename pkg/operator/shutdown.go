@@ -52,7 +52,7 @@ type ShutdownConfig struct {
 func DefaultShutdownConfig() *ShutdownConfig {
 	return &ShutdownConfig{
 		GracefulTimeout:       30 * time.Second,
-		ForceTimeout:          5 * time.Second,
+		ForceTimeout:          60 * time.Second,
 		PreShutdownDelay:      2 * time.Second,
 		ShutdownSignals:       []os.Signal{syscall.SIGINT, syscall.SIGTERM},
 		WaitForLeaderElection: true,

@@ -692,16 +692,3 @@ var _ = Describe("Performance tuning scenario", func() {
 		})
 	})
 })
-
-func int32Ptr(i int32) *int32 {
-	return &i
-}
-
-func randString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-	}
-	return string(b)
-}

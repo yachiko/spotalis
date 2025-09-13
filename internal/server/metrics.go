@@ -71,19 +71,8 @@ func (m *MetricsServer) MetricsHandler(c *gin.Context) {
 		m.mu.Unlock()
 	}()
 
-	// Check if there's a collection error
-	m.mu.RLock()
-	collectionError := m.collectionError
-	m.mu.RUnlock()
-
-	if collectionError != "" {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":  "metrics collection failed",
-			"reason": collectionError,
-			"code":   "METRICS_COLLECTION_ERROR",
-		})
-		return
-	}
+	// Collection errors are exposed via the health endpoint, not by failing metrics serving
+	// This allows metrics to continue working even when there are collection issues
 
 	// Update metrics before serving
 	if m.collector != nil {

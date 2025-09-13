@@ -65,6 +65,9 @@ test-integration: generate fmt vet ## Run integration tests with Kind
 test-e2e: ## Run end-to-end tests
 	go test ./tests/e2e/... -v -tags=e2e
 
+.PHONY: test-all
+test-all: test test-integration test-e2e ## Run all tests (unit, integration, and e2e)
+
 ##@ Build
 
 .PHONY: build

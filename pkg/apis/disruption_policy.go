@@ -235,7 +235,30 @@ func (d *DisruptionPolicy) GetMaxAllowedDisruptions() int32 {
 
 // IsHealthy returns true if the disruption policy is not being violated
 func (d *DisruptionPolicy) IsHealthy() bool {
-	return d.GetMaxAllowedDisruptions() >= 0
+	// If no PDB exists, there are no constraints to violate
+	if d.PDBRef == nil {
+		return true
+	}
+
+	availablePods := d.TotalReplicas - d.CurrentlyDisrupted
+
+	// Check MinAvailable constraint - unhealthy if we violate it
+	if d.MinAvailable != nil {
+		minAvailable := d.resolveIntOrString(d.MinAvailable, d.TotalReplicas)
+		if availablePods < minAvailable {
+			return false
+		}
+	}
+
+	// Check MaxUnavailable constraint - unhealthy if we exceed it
+	if d.MaxUnavailable != nil {
+		maxUnavailable := d.resolveIntOrString(d.MaxUnavailable, d.TotalReplicas)
+		if d.CurrentlyDisrupted > maxUnavailable {
+			return false
+		}
+	}
+
+	return true
 }
 
 // UpdateTotalReplicas updates the total replica count and recalculates constraints
@@ -252,7 +275,7 @@ func (d *DisruptionPolicy) GetPolicyStatus() DisruptionPolicyStatus {
 		AvailablePods:  d.GetAvailablePods(),
 		DisruptedPods:  d.CurrentlyDisrupted,
 		MaxDisruptions: d.GetMaxAllowedDisruptions(),
-		CanDisrupt:     d.CanDisrupt,
+		CanDisrupt:     d.calculateCanDisrupt(), // Calculate current state, don't use cached value
 		HasPDB:         d.PDBRef != nil,
 		LastChecked:    d.LastChecked,
 		WithinWindow:   d.isWithinDisruptionWindow(),

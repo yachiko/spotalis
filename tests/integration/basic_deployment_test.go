@@ -22,7 +22,6 @@ package integration_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -305,16 +304,3 @@ var _ = Describe("Basic workload deployment with annotations", func() {
 		})
 	})
 })
-
-func int32Ptr(i int32) *int32 {
-	return &i
-}
-
-func randString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-	}
-	return string(b)
-}

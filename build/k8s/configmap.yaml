@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spotalis-config
+  namespace: spotalis-system
+  labels:
+    app.kubernetes.io/name: spotalis
+    app.kubernetes.io/instance: spotalis
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/managed-by: kubectl
+data:
+  config.yaml: |
+    # Namespace filtering for multi-tenant clusters
+    # If not specified, all namespaces are managed
+    namespaceSelector:
+      matchLabels:
+        spotalis.io/enabled: "true"
+    
+    # Controller behavior
+    reconcileInterval: 30s
+    leaderElection: true
+    leaderElectionLeaseDuration: 60s
+    leaderElectionRenewDeadline: 40s
+    leaderElectionRetryPeriod: 10s
+    
+    # Webhook configuration
+    webhook:
+      port: 9443
+      certDir: /tmp/k8s-webhook-server/serving-certs
+      
+    # Health and metrics endpoints
+    healthAddr: :8081
+    metricsAddr: :8080
+    
+    # Logging configuration
+    logLevel: info
+    logFormat: json
+    
+    # Performance tuning
+    maxConcurrentReconciles: 10
+    rateLimiter:
+      baseDelay: 5ms
+      maxDelay: 1000s
+      failureMaxDelay: 30s

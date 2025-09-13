@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spotalis-system
+  labels:
+    app.kubernetes.io/name: spotalis
+    app.kubernetes.io/instance: spotalis
+    app.kubernetes.io/component: system
+    app.kubernetes.io/managed-by: kubectl
