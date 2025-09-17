@@ -27,20 +27,9 @@ rules:
   - deployments
   - statefulsets
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments/finalizers
-  - statefulsets/finalizers
-  verbs:
-  - update
 - apiGroups:
   - apps
   resources:
@@ -48,5 +37,3 @@ rules:
   - statefulsets/status
   verbs:
   - get
-  - patch
-  - update
