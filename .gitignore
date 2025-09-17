@@ -45,3 +45,6 @@ coverage.html
 # Temporary files
 *.tmp
 *.temp
+
+# Generated certificates (contains sensitive data)
+build/k8s/secret.yaml
