@@ -548,7 +548,7 @@ var _ = Describe("Metrics Integration", func() {
 			// This should not panic
 			Expect(func() {
 				collector.RecordWorkloadMetrics("namespace", "workload", "deployment", nil)
-			}).To(Panic()) // Actually, this might panic in the real implementation
+			}).ToNot(Panic()) // The implementation handles nil gracefully
 		})
 
 		It("should handle empty strings in metrics", func() {
