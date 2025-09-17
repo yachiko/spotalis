@@ -61,6 +61,12 @@ test: generate fmt vet envtest ## Run unit tests
 test-integration: generate fmt vet ## Run integration tests with Kind
 	go test ./tests/integration/... -v -tags=integration
 
+.PHONY: test-integration-kind
+test-integration-kind: ## Run integration tests against Kind cluster with Spotalis deployed
+	@echo "Running integration tests against Kind cluster..."
+	@kubectl config current-context | grep -q "kind-" || (echo "Error: Not connected to a Kind cluster. Run 'kubectl config use-context kind-spotalis'" && exit 1)
+	go test ./tests/integration/... -v -tags=integration_kind -timeout=10m
+
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests
 	go test ./tests/e2e/... -v -tags=e2e
@@ -107,6 +113,19 @@ kind-delete: ## Delete Kind cluster
 .PHONY: kind-load
 kind-load: docker-build ## Load image into Kind cluster
 	kind load docker-image $(IMG) --name spotalis
+
+.PHONY: generate-certs
+generate-certs: ## Generate TLS certificates for webhook
+	./generate-certs.sh
+
+.PHONY: kind-integration-full
+kind-integration-full: kind-create docker-build kind-load generate-certs ## Full Kind integration setup and test
+	@echo "Deploying Spotalis to Kind cluster..."
+	kubectl apply -f build/k8s/
+	@echo "Waiting for Spotalis to be ready..."
+	kubectl wait --for=condition=available --timeout=300s deployment/spotalis-controller -n spotalis-system
+	@echo "Running integration tests..."
+	$(MAKE) test-integration-kind
 
 ##@ Tools
 
