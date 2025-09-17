@@ -81,7 +81,6 @@ type ShutdownManager struct {
 
 	// Synchronization
 	mu              sync.RWMutex
-	shutdownWG      sync.WaitGroup
 	componentStates map[string]ComponentShutdownState
 }
 
@@ -162,7 +161,7 @@ func (sm *ShutdownManager) Start(ctx context.Context) error {
 }
 
 // InitiateShutdown starts the graceful shutdown process
-func (sm *ShutdownManager) initiateShutdown(ctx context.Context, reason string) error {
+func (sm *ShutdownManager) initiateShutdown(_ context.Context, reason string) error {
 	sm.mu.Lock()
 	if sm.shutdownStarted {
 		sm.mu.Unlock()
@@ -280,7 +279,7 @@ func (sm *ShutdownManager) performForceShutdown() error {
 }
 
 // stopNewRequests stops accepting new HTTP requests
-func (sm *ShutdownManager) stopNewRequests(ctx context.Context) error {
+func (sm *ShutdownManager) stopNewRequests(_ context.Context) error {
 	sm.updateComponentState("http-server", ShutdownStateStarted)
 
 	// TODO: Implement graceful HTTP server shutdown
@@ -294,7 +293,7 @@ func (sm *ShutdownManager) stopNewRequests(ctx context.Context) error {
 }
 
 // transferLeadership transfers leadership to another instance
-func (sm *ShutdownManager) transferLeadership(ctx context.Context) error {
+func (sm *ShutdownManager) transferLeadership(_ context.Context) error {
 	sm.updateComponentState("leader-election", ShutdownStateStarted)
 
 	if sm.operator == nil {
@@ -313,7 +312,7 @@ func (sm *ShutdownManager) transferLeadership(ctx context.Context) error {
 }
 
 // drainConnections drains existing HTTP connections
-func (sm *ShutdownManager) drainConnections(ctx context.Context) error {
+func (sm *ShutdownManager) drainConnections(_ context.Context) error {
 	sm.updateComponentState("connection-drain", ShutdownStateStarted)
 
 	// Wait for existing connections to finish
@@ -324,7 +323,7 @@ func (sm *ShutdownManager) drainConnections(ctx context.Context) error {
 }
 
 // finishReconciliations waits for ongoing reconciliations to complete
-func (sm *ShutdownManager) finishReconciliations(ctx context.Context) error {
+func (sm *ShutdownManager) finishReconciliations(_ context.Context) error {
 	sm.updateComponentState("reconciliation", ShutdownStateStarted)
 
 	// TODO: Implement reconciliation finishing
@@ -338,7 +337,7 @@ func (sm *ShutdownManager) finishReconciliations(ctx context.Context) error {
 }
 
 // stopControllers stops the controller manager
-func (sm *ShutdownManager) stopControllers(ctx context.Context) error {
+func (sm *ShutdownManager) stopControllers(_ context.Context) error {
 	sm.updateComponentState("controllers", ShutdownStateStarted)
 
 	if sm.operator != nil && sm.operator.Manager != nil {
@@ -351,7 +350,7 @@ func (sm *ShutdownManager) stopControllers(ctx context.Context) error {
 }
 
 // cleanupResources performs final resource cleanup
-func (sm *ShutdownManager) cleanupResources(ctx context.Context) error {
+func (sm *ShutdownManager) cleanupResources(_ context.Context) error {
 	sm.updateComponentState("cleanup", ShutdownStateStarted)
 
 	// TODO: Implement resource cleanup
