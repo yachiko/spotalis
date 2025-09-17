@@ -217,6 +217,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				invalidStatefulSet := statefulSet.DeepCopy()
 				invalidStatefulSet.Name = "invalid-statefulset"
 				invalidStatefulSet.ResourceVersion = "" // Clear resourceVersion for Create
+				invalidStatefulSet.Annotations["spotalis.io/enabled"] = "true"
 				invalidStatefulSet.Annotations["spotalis.io/spot-percentage"] = "invalid"
 
 				Expect(fakeClient.Create(ctx, invalidStatefulSet)).To(Succeed())

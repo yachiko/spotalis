@@ -27,35 +27,14 @@ import (
 )
 
 const (
+	// EnabledAnnotation enables/disables Spotalis management for the workload
+	EnabledAnnotation = "spotalis.io/enabled"
+
 	// SpotPercentageAnnotation configures the percentage of replicas on spot instances
 	SpotPercentageAnnotation = "spotalis.io/spot-percentage"
 
 	// MinOnDemandAnnotation configures minimum number of on-demand replicas
 	MinOnDemandAnnotation = "spotalis.io/min-on-demand"
-
-	// MaxSurgeAnnotation configures maximum surge during rolling updates
-	MaxSurgeAnnotation = "spotalis.io/max-surge"
-
-	// MaxUnavailableAnnotation configures maximum unavailable during rolling updates
-	MaxUnavailableAnnotation = "spotalis.io/max-unavailable"
-
-	// DisruptionBudgetAnnotation configures pod disruption budget
-	DisruptionBudgetAnnotation = "spotalis.io/disruption-budget"
-
-	// DisruptionWindowAnnotation configures allowed disruption time windows
-	DisruptionWindowAnnotation = "spotalis.io/disruption-window"
-
-	// NodeAffinityAnnotation configures node affinity preferences
-	NodeAffinityAnnotation = "spotalis.io/node-affinity"
-
-	// TolerationAnnotation configures tolerations for scheduling
-	TolerationAnnotation = "spotalis.io/tolerations"
-
-	// MonitoringEnabledAnnotation enables/disables monitoring for the workload
-	MonitoringEnabledAnnotation = "spotalis.io/monitoring-enabled"
-
-	// ReconcileIntervalAnnotation configures custom reconciliation interval
-	ReconcileIntervalAnnotation = "spotalis.io/reconcile-interval"
 )
 
 // AnnotationParser provides methods for parsing Spotalis annotations
@@ -75,9 +54,24 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 
 	config := &apis.WorkloadConfiguration{}
 
+	// Check if Spotalis is enabled for this workload
+	if enabled, exists := annotations[EnabledAnnotation]; exists {
+		config.Enabled = enabled == "true"
+	} else {
+		// If no enabled annotation, default to false
+		config.Enabled = false
+	}
+
+	// Only process other annotations if enabled
+	if !config.Enabled {
+		return config, nil
+	}
+
 	// Parse spot percentage
 	if spotPerc, exists := annotations[SpotPercentageAnnotation]; exists {
-		percentage, err := strconv.Atoi(spotPerc)
+		// Remove % symbol if present
+		percentageStr := strings.TrimSuffix(spotPerc, "%")
+		percentage, err := strconv.Atoi(percentageStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid spot-percentage annotation: %w", err)
 		}
@@ -93,28 +87,6 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 		config.MinOnDemand = int32(count)
 	}
 
-	// Parse enabled flag (default true if any Spotalis annotations exist)
-	config.Enabled = true
-
-	// Parse replica strategy
-	if strategy, exists := annotations["spotalis.io/replica-strategy"]; exists {
-		config.ReplicaStrategy = strategy
-	}
-
-	// Parse scaling policy
-	if policy, exists := annotations["spotalis.io/scaling-policy"]; exists {
-		config.ScalingPolicy = policy
-	}
-
-	// Parse max replicas
-	if maxReplicas, exists := annotations["spotalis.io/max-replicas"]; exists {
-		count, err := strconv.Atoi(maxReplicas)
-		if err != nil {
-			return nil, fmt.Errorf("invalid max-replicas annotation: %w", err)
-		}
-		config.MaxReplicas = int32(count)
-	}
-
 	return config, nil
 }
 
@@ -126,11 +98,9 @@ func (p *AnnotationParser) HasSpotalisAnnotations(obj metav1.Object) bool {
 	}
 
 	spotalisAnnotations := []string{
+		EnabledAnnotation,
 		SpotPercentageAnnotation,
 		MinOnDemandAnnotation,
-		"spotalis.io/replica-strategy",
-		"spotalis.io/scaling-policy",
-		"spotalis.io/max-replicas",
 	}
 
 	for _, annotation := range spotalisAnnotations {
@@ -175,30 +145,7 @@ func (p *AnnotationParser) RemoveAnnotation(obj metav1.Object, key string) {
 	obj.SetAnnotations(annotations)
 }
 
-// parseIntOrPercentage parses a value that can be either an integer or percentage
-func (p *AnnotationParser) parseIntOrPercentage(value string) (interface{}, error) {
-	if strings.HasSuffix(value, "%") {
-		percentStr := strings.TrimSuffix(value, "%")
-		percent, err := strconv.Atoi(percentStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid percentage value: %s", value)
-		}
-		if percent < 0 || percent > 100 {
-			return nil, fmt.Errorf("percentage must be between 0 and 100: %s", value)
-		}
-		return fmt.Sprintf("%d%%", percent), nil
-	}
-
-	intValue, err := strconv.Atoi(value)
-	if err != nil {
-		return nil, fmt.Errorf("invalid integer value: %s", value)
-	}
-	if intValue < 0 {
-		return nil, fmt.Errorf("value must be non-negative: %s", value)
-	}
-
-	return intValue, nil
-}
+// validateSpotPercentage validates spot percentage annotation value
 
 // ValidateAnnotations validates that all Spotalis annotations have valid values
 func (p *AnnotationParser) ValidateAnnotations(obj metav1.Object) []error {
@@ -207,6 +154,13 @@ func (p *AnnotationParser) ValidateAnnotations(obj metav1.Object) []error {
 
 	if annotations == nil {
 		return errors
+	}
+
+	// Validate enabled annotation if present
+	if value, exists := annotations[EnabledAnnotation]; exists {
+		if value != "true" && value != "false" {
+			errors = append(errors, fmt.Errorf("invalid %s: must be 'true' or 'false', got '%s'", EnabledAnnotation, value))
+		}
 	}
 
 	// Validate each annotation if present
@@ -222,18 +176,14 @@ func (p *AnnotationParser) ValidateAnnotations(obj metav1.Object) []error {
 		}
 	}
 
-	if value, exists := annotations["spotalis.io/max-replicas"]; exists {
-		if err := p.validateMinOnDemand(value); err != nil { // Same validation as min-on-demand
-			errors = append(errors, fmt.Errorf("invalid spotalis.io/max-replicas: %w", err))
-		}
-	}
-
 	return errors
 }
 
 // validateSpotPercentage validates spot percentage annotation value
 func (p *AnnotationParser) validateSpotPercentage(value string) error {
-	percentage, err := strconv.Atoi(value)
+	// Remove % symbol if present
+	percentageStr := strings.TrimSuffix(value, "%")
+	percentage, err := strconv.Atoi(percentageStr)
 	if err != nil {
 		return fmt.Errorf("must be an integer: %w", err)
 	}

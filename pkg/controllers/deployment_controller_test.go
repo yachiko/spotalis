@@ -215,6 +215,7 @@ var _ = Describe("DeploymentReconciler", func() {
 				invalidDeployment := deployment.DeepCopy()
 				invalidDeployment.Name = "invalid-deployment"
 				invalidDeployment.ResourceVersion = "" // Clear resourceVersion for Create
+				invalidDeployment.Annotations["spotalis.io/enabled"] = "true"
 				invalidDeployment.Annotations["spotalis.io/spot-percentage"] = "invalid"
 
 				Expect(fakeClient.Create(ctx, invalidDeployment)).To(Succeed())
