@@ -84,7 +84,7 @@ var _ = Describe("DeploymentReconciler", func() {
 			Expect(newReconciler.Client).To(Equal(fakeClient))
 			Expect(newReconciler.Scheme).To(Equal(scheme))
 			Expect(newReconciler.AnnotationParser).ToNot(BeNil())
-			Expect(newReconciler.ReconcileInterval).To(Equal(30 * time.Second))
+			Expect(newReconciler.ReconcileInterval).To(Equal(5 * time.Minute)) // Updated to match new default
 			Expect(newReconciler.MaxConcurrentRecons).To(Equal(10))
 		})
 	})
@@ -134,7 +134,11 @@ var _ = Describe("DeploymentReconciler", func() {
 					},
 				},
 				Status: appsv1.DeploymentStatus{
-					Replicas: 5,
+					Replicas:            5,
+					ReadyReplicas:       5, // Make deployment appear stable
+					UpdatedReplicas:     5,
+					AvailableReplicas:   5,
+					UnavailableReplicas: 0,
 				},
 			}
 		})
@@ -204,7 +208,7 @@ var _ = Describe("DeploymentReconciler", func() {
 				result, err := reconciler.Reconcile(ctx, req)
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+				Expect(result.RequeueAfter).To(Equal(60 * time.Second)) // 2 * reconcileInterval when no action needed
 			})
 
 			It("should handle invalid annotation configuration", func() {
@@ -225,7 +229,7 @@ var _ = Describe("DeploymentReconciler", func() {
 				result, err := reconciler.Reconcile(ctx, req)
 
 				Expect(err).To(HaveOccurred())
-				Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+				Expect(result.RequeueAfter).To(Equal(30 * time.Second)) // Base interval for errors
 			})
 		})
 	})
@@ -331,7 +335,63 @@ var _ = Describe("DeploymentReconciler", func() {
 		})
 	})
 
-	Describe("performScaleUp", func() {
+	Describe("needsRebalancing", func() {
+		var replicaState *apis.ReplicaState
+
+		Context("when rebalancing is needed", func() {
+			It("should return true when spot difference exceeds tolerance", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     1,
+					CurrentOnDemand: 4,
+					DesiredSpot:     4,
+					DesiredOnDemand: 1,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeTrue())
+			})
+
+			It("should return true when on-demand difference exceeds tolerance", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     4,
+					CurrentOnDemand: 1,
+					DesiredSpot:     1,
+					DesiredOnDemand: 4,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeTrue())
+			})
+		})
+
+		Context("when rebalancing is not needed", func() {
+			It("should return false when distribution is within tolerance", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     3,
+					CurrentOnDemand: 2,
+					DesiredSpot:     3,
+					DesiredOnDemand: 2,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeFalse())
+			})
+
+			It("should return false when no pods exist", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     0,
+					CurrentOnDemand: 0,
+					DesiredSpot:     2,
+					DesiredOnDemand: 3,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeFalse())
+			})
+		})
+	})
+
+	Describe("performPodRebalancing", func() {
 		var (
 			deployment   *appsv1.Deployment
 			replicaState *apis.ReplicaState
@@ -344,7 +404,7 @@ var _ = Describe("DeploymentReconciler", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(3),
+					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"app": "test",
@@ -370,159 +430,96 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			replicaState = &apis.ReplicaState{
 				TotalReplicas:   5,
-				CurrentSpot:     2,
+				CurrentSpot:     4, // Too many spot pods
 				CurrentOnDemand: 1,
-				DesiredSpot:     3,
-				DesiredOnDemand: 2,
-			}
-
-			Expect(fakeClient.Create(ctx, deployment)).To(Succeed())
-		})
-
-		It("should scale up deployment successfully", func() {
-			err := reconciler.performScaleUp(ctx, deployment, replicaState)
-
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify deployment was updated
-			var updatedDeployment appsv1.Deployment
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name:      deployment.Name,
-				Namespace: deployment.Namespace,
-			}, &updatedDeployment)
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(*updatedDeployment.Spec.Replicas).To(Equal(int32(5)))
-		})
-	})
-
-	Describe("performScaleDown", func() {
-		var (
-			deployment   *appsv1.Deployment
-			replicaState *apis.ReplicaState
-		)
-
-		BeforeEach(func() {
-			deployment = &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
-				},
-				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(5),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "test",
-						},
-					},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"app": "test",
-							},
-						},
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "test-container",
-									Image: "nginx:latest",
-								},
-							},
-						},
-					},
-				},
-			}
-
-			replicaState = &apis.ReplicaState{
-				TotalReplicas:   3,
-				CurrentSpot:     3,
-				CurrentOnDemand: 2,
 				DesiredSpot:     2,
-				DesiredOnDemand: 1,
+				DesiredOnDemand: 3,
 			}
 
 			Expect(fakeClient.Create(ctx, deployment)).To(Succeed())
 		})
 
-		It("should scale down deployment successfully", func() {
-			err := reconciler.performScaleDown(ctx, deployment, replicaState)
-
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify deployment was updated
-			var updatedDeployment appsv1.Deployment
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name:      deployment.Name,
-				Namespace: deployment.Namespace,
-			}, &updatedDeployment)
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(*updatedDeployment.Spec.Replicas).To(Equal(int32(3)))
-		})
-	})
-
-	Describe("performRebalance", func() {
-		var (
-			deployment   *appsv1.Deployment
-			replicaState *apis.ReplicaState
-		)
-
-		BeforeEach(func() {
-			deployment = &appsv1.Deployment{
+		It("should delete excess spot pods", func() {
+			// Create nodes
+			spotNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name: "spot-node-1",
+					Labels: map[string]string{
+						"node.kubernetes.io/instance-type": "spot", // Updated to match classifier config
+					},
 				},
-				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(5),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
+			}
+			onDemandNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ondemand-node-1",
+					Labels: map[string]string{
+						"node.kubernetes.io/instance-type": "on-demand", // Updated to match classifier config
+					},
+				},
+			}
+			Expect(fakeClient.Create(ctx, spotNode)).To(Succeed())
+			Expect(fakeClient.Create(ctx, onDemandNode)).To(Succeed())
+
+			// Create pods on spot nodes (excess)
+			for i := 0; i < 4; i++ {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("test-pod-spot-%d", i),
+						Namespace: "default",
+						Labels: map[string]string{
 							"app": "test",
 						},
 					},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"app": "test",
+					Spec: corev1.PodSpec{
+						NodeName: "spot-node-1",
+						Containers: []corev1.Container{
+							{
+								Name:  "test-container",
+								Image: "nginx:latest",
 							},
 						},
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "test-container",
-									Image: "nginx:latest",
-								},
-							},
+					},
+				}
+				Expect(fakeClient.Create(ctx, pod)).To(Succeed())
+			}
+
+			// Create one pod on on-demand node
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod-ondemand-0",
+					Namespace: "default",
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "ondemand-node-1",
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "nginx:latest",
 						},
 					},
 				},
 			}
+			Expect(fakeClient.Create(ctx, pod)).To(Succeed())
 
-			replicaState = &apis.ReplicaState{
-				TotalReplicas:   5,
-				CurrentSpot:     2,
-				CurrentOnDemand: 3,
-				DesiredSpot:     3,
-				DesiredOnDemand: 2,
+			err := reconciler.performPodRebalancing(ctx, deployment, replicaState, "test/deployment")
+
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify that 1 spot pod was deleted (gradual deletion approach)
+			podList := &corev1.PodList{}
+			err = fakeClient.List(ctx, podList, client.InNamespace("default"))
+			Expect(err).ToNot(HaveOccurred())
+
+			remainingPods := 0
+			for _, p := range podList.Items {
+				if p.DeletionTimestamp == nil {
+					remainingPods++
+				}
 			}
-
-			Expect(fakeClient.Create(ctx, deployment)).To(Succeed())
-		})
-
-		It("should trigger rebalancing successfully", func() {
-			err := reconciler.performRebalance(ctx, deployment, replicaState)
-
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify deployment was updated with rebalance annotation
-			var updatedDeployment appsv1.Deployment
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name:      deployment.Name,
-				Namespace: deployment.Namespace,
-			}, &updatedDeployment)
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(updatedDeployment.Spec.Template.Annotations).To(HaveKey("spotalis.io/rebalance-timestamp"))
+			Expect(remainingPods).To(Equal(4)) // 5 - 1 deleted = 4 (gradual deletion)
 		})
 	})
 
@@ -607,7 +604,7 @@ var _ = Describe("DeploymentReconciler", func() {
 			result, err := reconciler.Reconcile(ctx, req)
 
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+			Expect(result.RequeueAfter).To(Equal(60 * time.Second)) // 2 * reconcileInterval when deployment not stable
 		})
 
 		It("should handle context cancellation gracefully", func() {

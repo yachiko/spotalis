@@ -47,9 +47,9 @@ type MetricsServer struct {
 func NewMetricsServer(collector *metricsCollector.Collector) *MetricsServer {
 	registry := prometheus.NewRegistry()
 
-	// Let the collector register its own metrics
+	// Let the collector register its own metrics with our registry
 	if collector != nil {
-		collector.RegisterMetrics()
+		collector.RegisterMetrics(registry)
 	}
 
 	return &MetricsServer{

@@ -85,7 +85,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 			Expect(newReconciler.Client).To(Equal(fakeClient))
 			Expect(newReconciler.Scheme).To(Equal(scheme))
 			Expect(newReconciler.AnnotationParser).ToNot(BeNil())
-			Expect(newReconciler.ReconcileInterval).To(Equal(30 * time.Second))
+			Expect(newReconciler.ReconcileInterval).To(Equal(5 * time.Minute)) // Updated to match new default
 			Expect(newReconciler.MaxConcurrentRecons).To(Equal(10))
 		})
 	})
@@ -136,7 +136,10 @@ var _ = Describe("StatefulSetReconciler", func() {
 					ServiceName: "test-service",
 				},
 				Status: appsv1.StatefulSetStatus{
-					Replicas: 3,
+					Replicas:        3,
+					ReadyReplicas:   3, // Make StatefulSet appear stable
+					CurrentReplicas: 3,
+					UpdatedReplicas: 3,
 				},
 			}
 		})
@@ -207,7 +210,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				result, err := reconciler.Reconcile(ctx, req)
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+				Expect(result.RequeueAfter).To(Equal(60 * time.Second)) // 2 * reconcileInterval when no action needed
 			})
 
 			It("should handle invalid annotation configuration", func() {
@@ -264,8 +267,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "spot-node-1",
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "t3.medium",
-						"karpenter.sh/capacity-type":       "spot",
+						"node.kubernetes.io/instance-type": "spot", // Updated to match classifier config
 					},
 				},
 			}
@@ -273,8 +275,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ondemand-node-1",
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "t3.medium",
-						"karpenter.sh/capacity-type":       "on-demand",
+						"node.kubernetes.io/instance-type": "on-demand", // Updated to match classifier config
 					},
 				},
 			}
@@ -333,7 +334,63 @@ var _ = Describe("StatefulSetReconciler", func() {
 		})
 	})
 
-	Describe("performScaleUp", func() {
+	Describe("needsRebalancing", func() {
+		var replicaState *apis.ReplicaState
+
+		Context("when rebalancing is needed", func() {
+			It("should return true when spot difference exceeds tolerance", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     1,
+					CurrentOnDemand: 4,
+					DesiredSpot:     4,
+					DesiredOnDemand: 1,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeTrue())
+			})
+
+			It("should return true when on-demand difference exceeds tolerance", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     4,
+					CurrentOnDemand: 1,
+					DesiredSpot:     1,
+					DesiredOnDemand: 4,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeTrue())
+			})
+		})
+
+		Context("when rebalancing is not needed", func() {
+			It("should return false when distribution is within tolerance", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     3,
+					CurrentOnDemand: 2,
+					DesiredSpot:     3,
+					DesiredOnDemand: 2,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeFalse())
+			})
+
+			It("should return false when no pods exist", func() {
+				replicaState = &apis.ReplicaState{
+					CurrentSpot:     0,
+					CurrentOnDemand: 0,
+					DesiredSpot:     2,
+					DesiredOnDemand: 3,
+				}
+
+				result := reconciler.needsRebalancing(replicaState)
+				Expect(result).To(BeFalse())
+			})
+		})
+	})
+
+	Describe("performPodRebalancing", func() {
 		var (
 			statefulSet  *appsv1.StatefulSet
 			replicaState *apis.ReplicaState
@@ -346,7 +403,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas: int32Ptr(2),
+					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"app": "test-sts",
@@ -372,156 +429,23 @@ var _ = Describe("StatefulSetReconciler", func() {
 			}
 
 			replicaState = &apis.ReplicaState{
-				TotalReplicas:   4,
-				CurrentSpot:     1,
+				TotalReplicas:   5,
+				CurrentSpot:     4, // Too many spot pods
 				CurrentOnDemand: 1,
 				DesiredSpot:     2,
-				DesiredOnDemand: 2,
+				DesiredOnDemand: 3,
 			}
 
 			Expect(fakeClient.Create(ctx, statefulSet)).To(Succeed())
 		})
 
-		It("should scale up StatefulSet successfully", func() {
-			err := reconciler.performScaleUp(ctx, statefulSet, replicaState)
-
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify StatefulSet was updated
-			var updatedStatefulSet appsv1.StatefulSet
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name:      statefulSet.Name,
-				Namespace: statefulSet.Namespace,
-			}, &updatedStatefulSet)
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(*updatedStatefulSet.Spec.Replicas).To(Equal(int32(4)))
-		})
-	})
-
-	Describe("performScaleDown", func() {
-		var (
-			statefulSet  *appsv1.StatefulSet
-			replicaState *apis.ReplicaState
-		)
-
-		BeforeEach(func() {
-			statefulSet = &appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
-				},
-				Spec: appsv1.StatefulSetSpec{
-					Replicas: int32Ptr(4),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "test-sts",
-						},
-					},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"app": "test-sts",
-							},
-						},
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "test-container",
-									Image: "nginx:latest",
-								},
-							},
-						},
-					},
-					ServiceName: "test-service",
-				},
-			}
-
-			replicaState = &apis.ReplicaState{
-				TotalReplicas:   2,
-				CurrentSpot:     2,
-				CurrentOnDemand: 2,
-				DesiredSpot:     1,
-				DesiredOnDemand: 1,
-			}
-
-			Expect(fakeClient.Create(ctx, statefulSet)).To(Succeed())
-		})
-
-		It("should scale down StatefulSet successfully", func() {
-			err := reconciler.performScaleDown(ctx, statefulSet, replicaState)
-
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify StatefulSet was updated
-			var updatedStatefulSet appsv1.StatefulSet
-			err = fakeClient.Get(ctx, types.NamespacedName{
-				Name:      statefulSet.Name,
-				Namespace: statefulSet.Namespace,
-			}, &updatedStatefulSet)
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(*updatedStatefulSet.Spec.Replicas).To(Equal(int32(2)))
-		})
-	})
-
-	Describe("performRebalance", func() {
-		var (
-			statefulSet  *appsv1.StatefulSet
-			replicaState *apis.ReplicaState
-		)
-
-		BeforeEach(func() {
-			statefulSet = &appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
-				},
-				Spec: appsv1.StatefulSetSpec{
-					Replicas: int32Ptr(4),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "test-sts",
-						},
-					},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"app": "test-sts",
-							},
-						},
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "test-container",
-									Image: "nginx:latest",
-								},
-							},
-						},
-					},
-					ServiceName: "test-service",
-				},
-			}
-
-			replicaState = &apis.ReplicaState{
-				TotalReplicas:   4,
-				CurrentSpot:     4, // All 4 pods are on spot nodes
-				CurrentOnDemand: 0, // No pods on on-demand nodes
-				DesiredSpot:     2, // Want 2 on spot
-				DesiredOnDemand: 2, // Want 2 on on-demand
-			}
-
-			Expect(fakeClient.Create(ctx, statefulSet)).To(Succeed())
-		})
-
-		It("should trigger rebalancing successfully", func() {
+		It("should delete excess spot pods and update template", func() {
 			// Create nodes
 			spotNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "spot-node-1",
 					Labels: map[string]string{
-						"karpenter.sh/capacity-type":       "spot",
-						"node.kubernetes.io/instance-type": "t3.medium",
+						"node.kubernetes.io/instance-type": "spot", // Updated to match classifier config
 					},
 				},
 			}
@@ -529,27 +453,25 @@ var _ = Describe("StatefulSetReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ondemand-node-1",
 					Labels: map[string]string{
-						"karpenter.sh/capacity-type":       "on-demand",
-						"node.kubernetes.io/instance-type": "t3.medium",
+						"node.kubernetes.io/instance-type": "on-demand", // Updated to match classifier config
 					},
 				},
 			}
-
 			Expect(fakeClient.Create(ctx, spotNode)).To(Succeed())
 			Expect(fakeClient.Create(ctx, onDemandNode)).To(Succeed())
 
-			// Create some pods that need rebalancing (all on spot nodes but we want some on on-demand)
+			// Create pods on spot nodes (excess)
 			for i := 0; i < 4; i++ {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("test-statefulset-%d", i),
 						Namespace: "default",
 						Labels: map[string]string{
-							"app": "test-sts", // Match the StatefulSet selector
+							"app": "test-sts",
 						},
 					},
 					Spec: corev1.PodSpec{
-						NodeName: "spot-node-1", // All pods on spot nodes initially
+						NodeName: "spot-node-1",
 						Containers: []corev1.Container{
 							{
 								Name:  "test-container",
@@ -561,9 +483,43 @@ var _ = Describe("StatefulSetReconciler", func() {
 				Expect(fakeClient.Create(ctx, pod)).To(Succeed())
 			}
 
-			err := reconciler.performRebalance(ctx, statefulSet, replicaState)
+			// Create one pod on on-demand node
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-statefulset-4",
+					Namespace: "default",
+					Labels: map[string]string{
+						"app": "test-sts",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "ondemand-node-1",
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "nginx:latest",
+						},
+					},
+				},
+			}
+			Expect(fakeClient.Create(ctx, pod)).To(Succeed())
+
+			err := reconciler.performPodRebalancing(ctx, statefulSet, replicaState, "test/statefulset")
 
 			Expect(err).ToNot(HaveOccurred())
+
+			// Verify that 2 spot pods were deleted (4 - 2 = 2)
+			podList := &corev1.PodList{}
+			err = fakeClient.List(ctx, podList, client.InNamespace("default"))
+			Expect(err).ToNot(HaveOccurred())
+
+			remainingPods := 0
+			for _, p := range podList.Items {
+				if p.DeletionTimestamp == nil {
+					remainingPods++
+				}
+			}
+			Expect(remainingPods).To(Equal(4)) // 5 - 1 deleted = 4 (gradual deletion)
 
 			// Verify StatefulSet was updated with rebalance annotation
 			var updatedStatefulSet appsv1.StatefulSet
@@ -672,7 +628,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				result, err := reconciler.Reconcile(ctx, req)
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+				Expect(result.RequeueAfter).To(Equal(60 * time.Second)) // 2 * reconcileInterval when no action needed
 			})
 		})
 
@@ -747,7 +703,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				result, err := reconciler.Reconcile(ctx, req)
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+				Expect(result.RequeueAfter).To(Equal(60 * time.Second)) // 2 * reconcileInterval when no action needed
 			})
 		})
 	})
@@ -788,7 +744,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 			result, err := reconciler.Reconcile(ctx, req)
 
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.RequeueAfter).To(Equal(30 * time.Second))
+			Expect(result.RequeueAfter).To(Equal(60 * time.Second)) // 2 * reconcileInterval when not stable
 		})
 
 		It("should handle context cancellation gracefully", func() {

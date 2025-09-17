@@ -11,6 +11,25 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
+limitations // GetID returns the operator's unique identifier
+func (o *Operator) GetID() string {
+	if o.leaderElectionManager != nil {
+		return o.leaderElectionManager.GetIdentity()
+	}
+	return "unknown"
+/*
+Copyright 2024 The Spotalis Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
 limitations under the License.
 */
 
@@ -30,6 +49,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/ahoma/spotalis/internal/annotations"
@@ -62,6 +82,9 @@ type Operator struct {
 
 	// Kubernetes clients
 	kubeClient kubernetes.Interface
+
+	// Leader election
+	leaderElectionManager *LeaderElectionManager
 
 	// Runtime state
 	started bool
@@ -103,8 +126,16 @@ type OperatorConfig struct {
 
 // Metrics represents operator metrics (for compatibility)
 type Metrics struct {
-	WorkloadsManaged  int
-	SpotInterruptions int
+	WorkloadsManaged      int
+	SpotInterruptions     int
+	LeaderElectionChanges int
+	LeadershipDuration    time.Duration
+}
+
+// HealthStatus represents the health status of the operator
+type HealthStatus struct {
+	Leadership string
+	Status     string
 }
 
 // DefaultOperatorConfig returns the default operator configuration
@@ -158,6 +189,198 @@ func NewWithConfig(cfg *rest.Config, operatorConfig interface{}) *Operator {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create operator with config: %v", err))
 	}
+	return operator
+}
+
+// NewWithID creates a new operator with a specific ID for testing
+func NewWithID(cfg *rest.Config, operatorID string) *Operator {
+	return NewWithIDAndPorts(cfg, operatorID, 0, 0, 0)
+}
+
+// NewForTesting creates a new operator specifically configured for integration tests
+// - Disables webhooks to avoid TLS certificate issues
+// - Uses unique controller names per instance
+func NewForTesting(cfg *rest.Config, operatorID string) *Operator {
+	config := DefaultOperatorConfig()
+	config.LeaderElectionID = "spotalis-leader-test" // Shared lease name for testing
+	config.EnableWebhook = false                     // Disable webhooks for testing
+
+	// Use auto-assigned ports
+	config.MetricsAddr = ":0"
+	config.ProbeAddr = ":0"
+
+	// Create custom manager with webhook disabled
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		panic(fmt.Sprintf("failed to add client-go scheme: %v", err))
+	}
+
+	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == "debug")))
+
+	// Create manager options without webhook server for testing
+	managerOpts := ctrl.Options{
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: "0", // Disable metrics server for testing
+		},
+		HealthProbeBindAddress: config.ProbeAddr,
+		LeaderElection:         false, // Disable built-in leader election for testing
+		// No WebhookServer for testing
+	}
+
+	mgr, err := ctrl.NewManager(cfg, managerOpts)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create manager: %v", err))
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create kubernetes client: %v", err))
+	}
+
+	operator := &Operator{
+		Manager:    mgr,
+		config:     config,
+		namespace:  config.Namespace,
+		kubeClient: kubeClient,
+	}
+
+	// Initialize leader election manager
+	leaderElectionConfig := &LeaderElectionConfig{
+		Enabled:       config.LeaderElection,
+		Identity:      operatorID,
+		ID:            config.LeaderElectionID,
+		LeaseName:     config.LeaderElectionID,
+		Namespace:     "kube-system",
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   2 * time.Second,
+	}
+
+	operator.leaderElectionManager, err = NewLeaderElectionManager(leaderElectionConfig, kubeClient, mgr)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create leader election manager: %v", err))
+	}
+
+	// Initialize core services
+	if err := operator.initializeCoreServices(); err != nil {
+		panic(fmt.Sprintf("failed to initialize core services: %v", err))
+	}
+
+	// Initialize HTTP server (but not webhook server for testing)
+	if err := operator.initializeHTTPServer(); err != nil {
+		panic(fmt.Sprintf("failed to initialize HTTP server: %v", err))
+	}
+
+	// Setup controllers with unique names for testing
+	if err := operator.setupControllers(); err != nil {
+		panic(fmt.Sprintf("failed to setup controllers: %v", err))
+	}
+
+	return operator
+}
+
+// NewWithIDAndPorts creates a new operator with a specific ID and custom ports for testing
+func NewWithIDAndPorts(cfg *rest.Config, operatorID string, metricsPort, probePort, webhookPort int) *Operator {
+	config := DefaultOperatorConfig()
+	config.LeaderElectionID = operatorID
+
+	// Use auto-assigned ports if 0 is provided
+	if metricsPort == 0 {
+		config.MetricsAddr = ":0"
+	} else {
+		config.MetricsAddr = fmt.Sprintf(":%d", metricsPort)
+	}
+
+	if probePort == 0 {
+		config.ProbeAddr = ":0"
+	} else {
+		config.ProbeAddr = fmt.Sprintf(":%d", probePort)
+	}
+
+	if webhookPort == 0 {
+		config.WebhookPort = 0 // This will auto-assign a port
+	} else {
+		config.WebhookPort = webhookPort
+	}
+
+	// Create custom manager with specific leader election ID
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		panic(fmt.Sprintf("failed to add client-go scheme: %v", err))
+	}
+
+	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == "debug")))
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: "0", // Disable metrics server for testing
+		},
+		WebhookServer:           webhook.NewServer(webhook.Options{Port: config.WebhookPort}),
+		HealthProbeBindAddress:  config.ProbeAddr,
+		LeaderElection:          config.LeaderElection,
+		LeaderElectionID:        config.LeaderElectionID,
+		LeaderElectionNamespace: config.Namespace,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("failed to create manager: %v", err))
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create kubernetes client: %v", err))
+	}
+
+	operator := &Operator{
+		Manager:    mgr,
+		config:     config,
+		namespace:  config.Namespace,
+		kubeClient: kubeClient,
+	}
+
+	// Initialize leader election manager
+	leaderElectionConfig := &LeaderElectionConfig{
+		Enabled:       config.LeaderElection,
+		Identity:      operatorID,
+		ID:            config.LeaderElectionID,
+		LeaseName:     config.LeaderElectionID,
+		Namespace:     "kube-system",
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   2 * time.Second,
+	}
+
+	operator.leaderElectionManager, err = NewLeaderElectionManager(leaderElectionConfig, kubeClient, mgr)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create leader election manager: %v", err))
+	}
+
+	// Initialize core services
+	if err := operator.initializeCoreServices(); err != nil {
+		panic(fmt.Sprintf("failed to initialize core services: %v", err))
+	}
+
+	// Initialize HTTP server
+	if err := operator.initializeHTTPServer(); err != nil {
+		panic(fmt.Sprintf("failed to initialize HTTP server: %v", err))
+	}
+
+	// Setup controllers
+	if err := operator.setupControllers(); err != nil {
+		panic(fmt.Sprintf("failed to setup controllers: %v", err))
+	}
+
+	// Setup webhooks
+	if config.EnableWebhook {
+		if err := operator.setupWebhooks(); err != nil {
+			panic(fmt.Sprintf("failed to setup webhooks: %v", err))
+		}
+	}
+
+	// Setup health and readiness checks
+	operator.setupHealthChecks()
+
 	return operator
 }
 
@@ -252,6 +475,16 @@ func (o *Operator) Start(ctx context.Context) error {
 
 	// Start the manager (includes controllers and webhooks)
 	o.started = true
+
+	// Start leader election manager if it exists (for NewWithID instances)
+	if o.leaderElectionManager != nil {
+		go func() {
+			if err := o.leaderElectionManager.Start(ctx); err != nil {
+				setupLog.Error(err, "Failed to start leader election manager")
+			}
+		}()
+	}
+
 	return o.Manager.Start(ctx)
 }
 
@@ -278,17 +511,111 @@ func (o *Operator) GetMetrics() Metrics {
 	}
 
 	// Get metrics from collector
-	_ = o.metricsCollector.GetMetricsSnapshot()
+	snapshot := o.metricsCollector.GetMetricsSnapshot()
 
-	return Metrics{
-		WorkloadsManaged:  0, // TODO: Implement proper workload counting
-		SpotInterruptions: 0, // This would need to be tracked separately
+	metrics := Metrics{
+		WorkloadsManaged:      snapshot.ManagedWorkloads,
+		SpotInterruptions:     0, // This would need to be tracked separately
+		LeaderElectionChanges: 0, // TODO: Track leader election changes
+		LeadershipDuration:    0, // TODO: Track leadership duration
 	}
+
+	// Add leader election metrics if available
+	if o.leaderElectionManager != nil {
+		info := o.leaderElectionManager.GetLeadershipInfo()
+		if info.IsLeader && !info.StartTime.IsZero() {
+			metrics.LeadershipDuration = time.Since(info.StartTime)
+		}
+	}
+
+	return metrics
 }
 
 // GetConfig returns the operator configuration
 func (o *Operator) GetConfig() *OperatorConfig {
 	return o.config
+}
+
+// IsLeader returns true if this operator instance is the current leader
+func (o *Operator) IsLeader() bool {
+	if o.leaderElectionManager != nil {
+		return o.leaderElectionManager.IsLeader()
+	}
+	// For operators without leader election manager, always consider as leader
+	return true
+}
+
+// GetLeaderElectionDebugInfo returns debug information about leader election state
+func (o *Operator) GetLeaderElectionDebugInfo() string {
+	if o.leaderElectionManager != nil {
+		return o.leaderElectionManager.GetDebugInfo()
+	}
+	return "no leader election manager"
+}
+
+// IsFollower returns true if this operator is ready but not the leader
+func (o *Operator) IsFollower() bool {
+	return o.IsReady() && !o.IsLeader()
+}
+
+// Stop gracefully stops the operator and releases leader election
+func (o *Operator) Stop() error {
+	if !o.started {
+		return nil
+	}
+
+	if o.leaderElectionManager != nil {
+		if err := o.leaderElectionManager.Resign(); err != nil {
+			return fmt.Errorf("failed to resign from leader election: %w", err)
+		}
+	}
+
+	o.started = false
+	return nil
+}
+
+// GetID returns the operator's identity/ID
+func (o *Operator) GetID() string {
+	if o.leaderElectionManager != nil {
+		return o.leaderElectionManager.GetIdentity()
+	}
+	return "unknown"
+}
+
+// SimulateNetworkPartition simulates a network partition for testing
+func (o *Operator) SimulateNetworkPartition(duration time.Duration) error {
+	// This is a test helper method - in real scenarios this would simulate network issues
+	if o.leaderElectionManager != nil {
+		return o.leaderElectionManager.Resign()
+	}
+	return nil
+}
+
+// SimulateLeaseRenewalFailure simulates lease renewal failure for testing
+func (o *Operator) SimulateLeaseRenewalFailure() error {
+	// This is a test helper method - in real scenarios this would simulate lease renewal issues
+	if o.leaderElectionManager != nil {
+		return o.leaderElectionManager.Resign()
+	}
+	return nil
+}
+
+// GetHealthStatus returns the health status of the operator
+func (o *Operator) GetHealthStatus() HealthStatus {
+	leadership := "follower"
+	if o.IsLeader() {
+		leadership = "leader"
+	}
+
+	status := "unhealthy"
+	if o.IsReady() {
+		status = "healthy"
+	}
+
+	return HealthStatus{
+		Leadership: leadership,
+		Status:     status,
+	}
 }
 
 // GetGinEngine returns the Gin HTTP engine
@@ -400,27 +727,43 @@ func (o *Operator) setupHTTPRoutes() {
 func (o *Operator) setupControllers() error {
 	// Setup Deployment controller
 	deploymentController := &controllers.DeploymentReconciler{
-		Client:            o.Manager.GetClient(),
-		Scheme:            o.Manager.GetScheme(),
-		AnnotationParser:  o.annotationParser,
-		NodeClassifier:    o.nodeClassifier,
-		ReconcileInterval: o.config.ReconcileInterval,
+		Client:                o.Manager.GetClient(),
+		Scheme:                o.Manager.GetScheme(),
+		AnnotationParser:      o.annotationParser,
+		NodeClassifier:        o.nodeClassifier,
+		ReconcileInterval:     o.config.ReconcileInterval,
+		LeaderElectionManager: o.leaderElectionManager,
+		MetricsCollector:      o.metricsCollector,
 	}
 
-	if err := deploymentController.SetupWithManager(o.Manager); err != nil {
+	// Use unique controller names based on operator ID for testing
+	deploymentName := "deployment"
+	if operatorID := o.GetID(); operatorID != "" && operatorID != "unknown" {
+		deploymentName = fmt.Sprintf("deployment-%s", operatorID)
+	}
+
+	if err := deploymentController.SetupWithManagerNamed(o.Manager, deploymentName); err != nil {
 		return fmt.Errorf("failed to setup deployment controller: %w", err)
 	}
 
 	// Setup StatefulSet controller
 	statefulSetController := &controllers.StatefulSetReconciler{
-		Client:            o.Manager.GetClient(),
-		Scheme:            o.Manager.GetScheme(),
-		AnnotationParser:  o.annotationParser,
-		NodeClassifier:    o.nodeClassifier,
-		ReconcileInterval: o.config.ReconcileInterval,
+		Client:                o.Manager.GetClient(),
+		Scheme:                o.Manager.GetScheme(),
+		AnnotationParser:      o.annotationParser,
+		NodeClassifier:        o.nodeClassifier,
+		ReconcileInterval:     o.config.ReconcileInterval,
+		LeaderElectionManager: o.leaderElectionManager,
+		MetricsCollector:      o.metricsCollector,
 	}
 
-	if err := statefulSetController.SetupWithManager(o.Manager); err != nil {
+	// Use unique controller names based on operator ID for testing
+	statefulSetName := "statefulset"
+	if operatorID := o.GetID(); operatorID != "" && operatorID != "unknown" {
+		statefulSetName = fmt.Sprintf("statefulset-%s", operatorID)
+	}
+
+	if err := statefulSetController.SetupWithManagerNamed(o.Manager, statefulSetName); err != nil {
 		return fmt.Errorf("failed to setup statefulset controller: %w", err)
 	}
 

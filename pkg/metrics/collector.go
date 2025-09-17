@@ -169,9 +169,10 @@ var (
 
 // Collector handles metrics collection for Spotalis
 type Collector struct {
-	nodeClassifier *config.NodeClassifierService
-	mutex          sync.RWMutex
-	lastUpdate     time.Time
+	nodeClassifier        *config.NodeClassifierService
+	mutex                 sync.RWMutex
+	lastUpdate            time.Time
+	managedWorkloadsCount int // Track total managed workloads
 }
 
 // NewCollector creates a new metrics collector
@@ -188,9 +189,13 @@ func (c *Collector) SetNodeClassifier(classifier *config.NodeClassifierService) 
 	c.nodeClassifier = classifier
 }
 
-// RegisterMetrics registers all Spotalis metrics with the global registry
-func (c *Collector) RegisterMetrics() {
-	metrics.Registry.MustRegister(
+// RegisterMetrics registers all Spotalis metrics with the provided registry
+func (c *Collector) RegisterMetrics(registry prometheus.Registerer) {
+	if registry == nil {
+		registry = metrics.Registry // Use global registry as fallback
+	}
+
+	registry.MustRegister(
 		totalNodes,
 		readyNodes,
 		managedWorkloads,
@@ -208,6 +213,11 @@ func (c *Collector) RegisterMetrics() {
 		controllerLastSeen,
 		leaderElectionStatus,
 	)
+}
+
+// RegisterMetricsGlobal registers all Spotalis metrics with the global registry (for backwards compatibility)
+func (c *Collector) RegisterMetricsGlobal() {
+	c.RegisterMetrics(metrics.Registry)
 }
 
 // UpdateNodeMetrics updates node-related metrics
@@ -241,18 +251,24 @@ func (c *Collector) UpdateNodeMetrics(ctx context.Context) error {
 
 // RecordWorkloadMetrics records metrics for a managed workload
 func (c *Collector) RecordWorkloadMetrics(namespace, workloadName, workloadType string, replicaState *apis.ReplicaState) {
+	c.mutex.Lock()
+	c.managedWorkloadsCount++
+	c.mutex.Unlock()
+
 	// Update managed workload count
 	managedWorkloads.WithLabelValues(namespace, workloadType).Inc()
 
-	// Update replica counts
-	workloadReplicas.WithLabelValues(namespace, workloadName, workloadType, "spot").Set(float64(replicaState.CurrentSpot))
-	workloadReplicas.WithLabelValues(namespace, workloadName, workloadType, "on-demand").Set(float64(replicaState.CurrentOnDemand))
+	if replicaState != nil {
+		// Update replica counts
+		workloadReplicas.WithLabelValues(namespace, workloadName, workloadType, "spot").Set(float64(replicaState.CurrentSpot))
+		workloadReplicas.WithLabelValues(namespace, workloadName, workloadType, "on-demand").Set(float64(replicaState.CurrentOnDemand))
 
-	// Calculate and record spot utilization percentage
-	totalReplicas := replicaState.CurrentSpot + replicaState.CurrentOnDemand
-	if totalReplicas > 0 {
-		utilizationPercent := float64(replicaState.CurrentSpot) / float64(totalReplicas) * 100
-		spotUtilization.WithLabelValues(namespace, workloadName, workloadType).Set(utilizationPercent)
+		// Calculate and record spot utilization percentage
+		totalReplicas := replicaState.CurrentSpot + replicaState.CurrentOnDemand
+		if totalReplicas > 0 {
+			utilizationPercent := float64(replicaState.CurrentSpot) / float64(totalReplicas) * 100
+			spotUtilization.WithLabelValues(namespace, workloadName, workloadType).Set(utilizationPercent)
+		}
 	}
 }
 
@@ -311,19 +327,25 @@ func (c *Collector) GetMetricsSnapshot() MetricsSnapshot {
 	defer c.mutex.RUnlock()
 
 	return MetricsSnapshot{
-		LastUpdate: c.lastUpdate,
-		Timestamp:  time.Now(),
+		LastUpdate:       c.lastUpdate,
+		Timestamp:        time.Now(),
+		ManagedWorkloads: c.managedWorkloadsCount,
 	}
 }
 
 // MetricsSnapshot represents a point-in-time snapshot of metrics
 type MetricsSnapshot struct {
-	LastUpdate time.Time `json:"lastUpdate"`
-	Timestamp  time.Time `json:"timestamp"`
+	LastUpdate       time.Time `json:"lastUpdate"`
+	Timestamp        time.Time `json:"timestamp"`
+	ManagedWorkloads int       `json:"managedWorkloads"`
 }
 
 // ResetMetrics resets all metrics (useful for testing)
 func (c *Collector) ResetMetrics() {
+	c.mutex.Lock()
+	c.managedWorkloadsCount = 0
+	c.mutex.Unlock()
+
 	totalNodes.Reset()
 	readyNodes.Reset()
 	managedWorkloads.Reset()

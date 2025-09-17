@@ -36,3 +36,8 @@ func randString(length int) string {
 	}
 	return string(b)
 }
+
+// generateRandomSuffix generates a random suffix for test resources
+func generateRandomSuffix() string {
+	return randString(6)
+}

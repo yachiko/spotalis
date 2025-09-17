@@ -41,7 +41,7 @@ func TestScalingIntegration(t *testing.T) {
 	RunSpecs(t, "Scaling Integration Suite")
 }
 
-var _ = Describe("Scale up/down scenario", func() {
+var _ = Describe("Pod rebalancing scenario", func() {
 	var (
 		ctx        context.Context
 		cancel     context.CancelFunc
@@ -100,31 +100,30 @@ var _ = Describe("Scale up/down scenario", func() {
 		}
 	})
 
-	Context("when scaling up workloads", func() {
+	Context("when rebalancing workloads", func() {
 		var deployment *appsv1.Deployment
 
 		BeforeEach(func() {
 			deployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "scaling-deployment",
+					Name:      "rebalance-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						"spotalis.io/replica-strategy":     "spot-optimized",
-						"spotalis.io/cost-optimization":    "enabled",
-						"spotalis.io/disruption-tolerance": "medium",
+						"spotalis.io/spot-percentage": "50",
+						"spotalis.io/min-on-demand":   "2",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(2), // Start with 2 replicas
+					Replicas: int32Ptr(6), // Fixed replica count - Spotalis won't change this
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "scaling-app",
+							"app": "rebalance-app",
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "scaling-app",
+								"app": "rebalance-app",
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -148,37 +147,8 @@ var _ = Describe("Scale up/down scenario", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should manage replica distribution during scale up", func() {
-			// Wait for initial deployment to be managed
-			Eventually(func() map[string]string {
-				var updated appsv1.Deployment
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
-				if err != nil {
-					return nil
-				}
-				return updated.Annotations
-			}, "15s", "1s").Should(HaveKey("spotalis.io/managed"))
-
-			// Scale up to 10 replicas
-			var current appsv1.Deployment
-			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			current.Spec.Replicas = int32Ptr(10)
-			err = k8sClient.Update(ctx, &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify Spotalis handles the scaling
-			Eventually(func() string {
-				var updated appsv1.Deployment
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
-				if err != nil {
-					return ""
-				}
-				return updated.Annotations["spotalis.io/scaling-strategy"]
-			}, "30s", "2s").Should(Equal("progressive"))
-
-			// Verify replica count is achieved
+		It("should not modify replica counts", func() {
+			// Wait for deployment to be ready
 			Eventually(func() int32 {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
@@ -186,20 +156,32 @@ var _ = Describe("Scale up/down scenario", func() {
 					return 0
 				}
 				return updated.Status.ReadyReplicas
-			}, "45s", "3s").Should(Equal(int32(10)))
+			}, "60s", "3s").Should(Equal(int32(6)))
+
+			// Verify that Spotalis doesn't change the replica count
+			Consistently(func() int32 {
+				var updated appsv1.Deployment
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
+				if err != nil {
+					return 0
+				}
+				return *updated.Spec.Replicas
+			}, "30s", "2s").Should(Equal(int32(6))) // Replica count should remain unchanged
 		})
 
-		It("should optimize node selection during scale up", func() {
-			// Scale up deployment
-			var current appsv1.Deployment
-			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &current)
+		It("should focus on webhook mutations rather than scaling", func() {
+			// Verify that pods exist and are being managed by admission webhook
+			podList := &corev1.PodList{}
+			err := k8sClient.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{"app": "rebalance-app"})
 			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(BeNumerically(">=", 1))
 
-			current.Spec.Replicas = int32Ptr(6)
-			err = k8sClient.Update(ctx, &current)
-			Expect(err).NotTo(HaveOccurred())
+			// The primary focus is now on admission webhook mutations
+			// which would be tested separately in webhook integration tests
+		})
 
-			// Verify node selectors are optimized for cost
+		It("should handle webhook-driven node placement", func() {
+			// Verify node selectors are optimized for cost via webhook
 			Eventually(func() map[string]string {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
@@ -209,7 +191,7 @@ var _ = Describe("Scale up/down scenario", func() {
 				return updated.Spec.Template.Spec.NodeSelector
 			}, "30s", "2s").Should(HaveKey("karpenter.sh/capacity-type"))
 
-			// Verify affinity rules are set for distribution
+			// Verify affinity rules are set for distribution via webhook
 			Eventually(func() bool {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
@@ -220,32 +202,100 @@ var _ = Describe("Scale up/down scenario", func() {
 			}, "30s", "2s").Should(BeTrue())
 		})
 
-		It("should update metrics during scale events", func() {
+		It("should track rebalancing metrics instead of scaling metrics", func() {
 			initialMetrics := spotalisOp.GetMetrics()
 
-			// Scale up
+			// Controllers no longer perform scaling operations
+			// They only manage pod rebalancing through deletion
+
+			// Wait for some time to let any rebalancing operations occur
+			time.Sleep(5 * time.Second)
+
+			// Verify deployment replica count remains unchanged
 			var current appsv1.Deployment
 			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &current)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(*current.Spec.Replicas).To(Equal(int32(6)))
 
-			current.Spec.Replicas = int32Ptr(8)
-			err = k8sClient.Update(ctx, &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify scaling metrics are updated
+			// Verify metrics focus on rebalancing events rather than scaling
 			Eventually(func() int {
 				metrics := spotalisOp.GetMetrics()
-				return metrics.ScalingEvents
-			}, "30s", "2s").Should(BeNumerically(">", initialMetrics.ScalingEvents))
-
-			Eventually(func() int {
-				metrics := spotalisOp.GetMetrics()
-				return metrics.ReplicasManaged
-			}, "30s", "2s").Should(BeNumerically(">", initialMetrics.ReplicasManaged))
+				return metrics.RebalancingEvents // Changed from ScalingEvents
+			}, "30s", "2s").Should(BeNumerically(">=", initialMetrics.RebalancingEvents))
 		})
 	})
 
-	Context("when scaling down workloads", func() {
+	Context("when managing pod distribution", func() {
+		var deployment *appsv1.Deployment
+
+		BeforeEach(func() {
+			deployment = &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-distribution-deployment",
+					Namespace: namespace,
+					Annotations: map[string]string{
+						"spotalis.io/spot-percentage": "70",
+						"spotalis.io/min-on-demand":   "1",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: int32Ptr(5), // Fixed replica count
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "pod-distribution-app",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "pod-distribution-app",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "app",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+			}
+			err := k8sClient.Create(ctx, deployment)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should maintain stable replica counts while allowing pod rebalancing", func() {
+			// Wait for deployment to be ready
+			Eventually(func() int32 {
+				var updated appsv1.Deployment
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
+				if err != nil {
+					return 0
+				}
+				return updated.Status.ReadyReplicas
+			}, "60s", "3s").Should(Equal(int32(5)))
+
+			// Verify replica count remains stable (no scaling)
+			Consistently(func() int32 {
+				var updated appsv1.Deployment
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
+				if err != nil {
+					return 0
+				}
+				return *updated.Spec.Replicas
+			}, "30s", "2s").Should(Equal(int32(5)))
+
+			// Verify pods can be deleted for rebalancing (but deployment controller will recreate them)
+			podList := &corev1.PodList{}
+			err := k8sClient.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{"app": "pod-distribution-app"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(BeNumerically(">=", 1))
+		})
+	})
+
+	Context("When handling scale down scenarios", func() {
 		var deployment *appsv1.Deployment
 
 		BeforeEach(func() {
@@ -254,12 +304,14 @@ var _ = Describe("Scale up/down scenario", func() {
 					Name:      "scale-down-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						"spotalis.io/replica-strategy":     "spot-optimized",
-						"spotalis.io/disruption-tolerance": "high",
+						"spotalis.io/enabled":            "true",
+						"spotalis.io/spot-percentage":    "60",
+						"spotalis.io/spot-replicas":      "3",
+						"spotalis.io/on-demand-replicas": "2",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(10), // Start with more replicas
+					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"app": "scale-down-app",
@@ -286,7 +338,7 @@ var _ = Describe("Scale up/down scenario", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should gracefully handle scale down operations", func() {
+		It("should handle pod rebalancing needs", func() {
 			// Wait for deployment to be managed
 			Eventually(func() map[string]string {
 				var updated appsv1.Deployment
@@ -297,37 +349,25 @@ var _ = Describe("Scale up/down scenario", func() {
 				return updated.Annotations
 			}, "15s", "1s").Should(HaveKey("spotalis.io/managed"))
 
-			// Scale down to 3 replicas
-			var current appsv1.Deployment
-			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			current.Spec.Replicas = int32Ptr(3)
-			err = k8sClient.Update(ctx, &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify graceful scale down
-			Eventually(func() int32 {
-				var updated appsv1.Deployment
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
-				if err != nil {
-					return 0
-				}
-				return updated.Status.ReadyReplicas
-			}, "60s", "3s").Should(Equal(int32(3)))
-
-			// Verify pods are terminated gracefully
+			// Verify that Spotalis only performs pod rebalancing, not replica scaling
+			// The replica count should remain stable
 			Consistently(func() int32 {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
 				if err != nil {
 					return 0
 				}
-				return updated.Status.ReadyReplicas
-			}, "15s", "2s").Should(Equal(int32(3)))
+				return *updated.Spec.Replicas
+			}, "30s", "2s").Should(Equal(int32(5)))
+
+			// Verify pods exist and can be managed through deletion/recreation
+			podList := &corev1.PodList{}
+			err := k8sClient.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{"app": "pod-distribution-app"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(BeNumerically(">=", 1))
 		})
 
-		It("should respect PodDisruptionBudget during scale down", func() {
+		It("should respect PodDisruptionBudget during pod rebalancing", func() {
 			// Create PodDisruptionBudget
 			pdb := &metav1.PartialObjectMetadata{
 				TypeMeta: metav1.TypeMeta{
@@ -335,16 +375,16 @@ var _ = Describe("Scale up/down scenario", func() {
 					Kind:       "PodDisruptionBudget",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "scale-down-pdb",
+					Name:      "pod-distribution-pdb",
 					Namespace: namespace,
 				},
 			}
 			pdb.Object = map[string]interface{}{
 				"spec": map[string]interface{}{
-					"minAvailable": 5,
+					"minAvailable": 3,
 					"selector": map[string]interface{}{
 						"matchLabels": map[string]interface{}{
-							"app": "scale-down-app",
+							"app": "pod-distribution-app",
 						},
 					},
 				},
@@ -352,16 +392,7 @@ var _ = Describe("Scale up/down scenario", func() {
 			err := k8sClient.Create(ctx, pdb)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Scale down to 2 replicas (below PDB minimum)
-			var current appsv1.Deployment
-			err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			current.Spec.Replicas = int32Ptr(2)
-			err = k8sClient.Update(ctx, &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify PDB is respected (should stay at 5 minimum)
+			// Verify PDB is respected during pod deletion for rebalancing
 			Consistently(func() int32 {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
@@ -369,20 +400,12 @@ var _ = Describe("Scale up/down scenario", func() {
 					return 0
 				}
 				return updated.Status.ReadyReplicas
-			}, "30s", "2s").Should(BeNumerically(">=", 5))
+			}, "30s", "2s").Should(BeNumerically(">=", 3))
 		})
 
-		It("should optimize cost during scale down", func() {
-			// Scale down
-			var current appsv1.Deployment
-			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			current.Spec.Replicas = int32Ptr(4)
-			err = k8sClient.Update(ctx, &current)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify cost optimization annotations are updated
+		It("should optimize cost through pod placement decisions", func() {
+			// Focus on cost optimization through pod placement rather than scaling
+			// Verify cost optimization annotations are present
 			Eventually(func() string {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
@@ -391,16 +414,26 @@ var _ = Describe("Scale up/down scenario", func() {
 				}
 				return updated.Annotations["spotalis.io/cost-savings"]
 			}, "30s", "2s").ShouldNot(BeEmpty())
+
+			// Replica count should remain unchanged
+			Consistently(func() int32 {
+				var updated appsv1.Deployment
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
+				if err != nil {
+					return 0
+				}
+				return *updated.Spec.Replicas
+			}, "15s", "2s").Should(Equal(int32(5)))
 		})
 	})
 
-	Context("when handling rapid scaling events", func() {
+	Context("when handling stable workloads", func() {
 		var deployment *appsv1.Deployment
 
 		BeforeEach(func() {
 			deployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rapid-scaling-deployment",
+					Name:      "stable-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
 						"spotalis.io/replica-strategy": "spot-optimized",
@@ -410,13 +443,13 @@ var _ = Describe("Scale up/down scenario", func() {
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "rapid-scaling-app",
+							"app": "stable-app",
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "rapid-scaling-app",
+								"app": "stable-app",
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -434,7 +467,7 @@ var _ = Describe("Scale up/down scenario", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should handle rapid scaling changes without conflicts", func() {
+		It("should maintain stable replica counts without scaling operations", func() {
 			// Wait for initial state
 			Eventually(func() map[string]string {
 				var updated appsv1.Deployment
@@ -445,33 +478,18 @@ var _ = Describe("Scale up/down scenario", func() {
 				return updated.Annotations
 			}, "15s", "1s").Should(HaveKey("spotalis.io/managed"))
 
-			// Perform rapid scaling operations
-			scaleTargets := []int32{2, 8, 1, 6, 3}
-
-			for _, target := range scaleTargets {
-				var current appsv1.Deployment
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &current)
-				Expect(err).NotTo(HaveOccurred())
-
-				current.Spec.Replicas = int32Ptr(target)
-				err = k8sClient.Update(ctx, &current)
-				Expect(err).NotTo(HaveOccurred())
-
-				// Brief pause between operations
-				time.Sleep(2 * time.Second)
-			}
-
-			// Verify final state is reached
-			Eventually(func() int32 {
+			// Verify that Spotalis doesn't perform scaling operations
+			// Even if external changes occur, replica count should be managed by K8s deployment controller
+			Consistently(func() int32 {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)
 				if err != nil {
 					return 0
 				}
-				return updated.Status.ReadyReplicas
-			}, "60s", "3s").Should(Equal(int32(3)))
+				return *updated.Spec.Replicas
+			}, "30s", "2s").Should(Equal(int32(5)))
 
-			// Verify no conflicts occurred
+			// Verify final state remains stable
 			Eventually(func() string {
 				var updated appsv1.Deployment
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &updated)

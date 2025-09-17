@@ -184,6 +184,12 @@ func (l *LeaderElectionManager) IsLeader() bool {
 	return l.isLeader
 }
 
+// GetDebugInfo returns detailed debug information about leader election state
+func (l *LeaderElectionManager) GetDebugInfo() string {
+	return fmt.Sprintf("Identity=%s, IsLeader=%v, CurrentLeader=%s, Enabled=%v",
+		l.config.Identity, l.isLeader, l.currentLeader, l.config.Enabled)
+}
+
 // GetCurrentLeader returns the identity of the current leader
 func (l *LeaderElectionManager) GetCurrentLeader() string {
 	return l.currentLeader

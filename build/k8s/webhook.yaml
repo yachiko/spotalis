@@ -1,5 +1,5 @@
 apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingAdmissionWebhook
+kind: MutatingWebhookConfiguration
 metadata:
   name: spotalis-mutating-webhook
   labels:
@@ -10,80 +10,20 @@ metadata:
 webhooks:
 - name: deployments.spotalis.io
   clientConfig:
+    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURJekNDQWd1Z0F3SUJBZ0lVUlFvM21Nb1pHTkhuSFFpWWFZa05mSVk5dWFBd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0lURWZNQjBHQTFVRUF3d1djM0J2ZEdGc2FYTXRZMjl1ZEhKdmJHeGxjaTFqWVRBZUZ3MHlOVEE1TVRNeQpNREV5TURsYUZ3MHlOakE1TVRNeU1ERXlNRGxhTUNFeEh6QWRCZ05WQkFNTUZuTndiM1JoYkdsekxXTnZiblJ5CmIyeHNaWEl0WTJFd2dnRWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUUNpNjFrUkZNQUMKaDVkNnNUb2M3SGhVN1RGbmpJNzJ6WUFWeDhxekw4c3N5WE1RTFphSkZkSTVGT0pER1NqZVlmYnY1a00zYVRuZwpBWWRLK3VSZjl5aTZpdDA1cG1aR2lmUFAyR3dWUWZKdkFSTWtpemhyenB3M2l4RDUyN3pZK0twdE9kSWtFbDB0Cm8rUWR0SVBIcFA0c1lpRE83NWJYaWZwV1kxRGFhRUpUNWVuV01EY3JpVnY5akdpT3NaL3FjM0VZanNWeHZxZkIKdkVZTndXMnh1SkUvUnNQUWN6ODlzOG9uTVNKOGNhMUpvU1ZLcjdwUzltU0ZhcGRrbWllMXJ4YTBlZ1l3ZEsrMgo4a0lrWnJOSW1uNzFQaURobXJYdWFWTnVyYzViMGtlWElCeTBRZFdOS25oM3lUNzlyQjhZalU5NHZvbE91RFBoCkNDR2dhbjRwQVBUUEFnTUJBQUdqVXpCUk1CMEdBMVVkRGdRV0JCUmMwZklHWTdrTGpNbXU0ODhYZkNyTjJjTXMKRmpBZkJnTlZIU01FR0RBV2dCUmMwZklHWTdrTGpNbXU0ODhYZkNyTjJjTXNGakFQQmdOVkhSTUJBZjhFQlRBRApBUUgvTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCVXJqaDJuZ1RkU0FydS92aDBOL0tHWlh4VE5hNkdZakp4CjRHK2Z3RWJ1YjJtRjBjYXVibE9PRklqTEVLY2RQWVdPVHdpcTZ5VE1BTzBNejdnQlJPWGNuSVFBUmZpWVdHQjgKK1BNMmtvbURrWGtuQU9WbGxVb1paNVhibnZha0dlKzl6RVFENzAzZnN0LzN0WHVkenlTTGN4aCtodmJVYkEzQwp3aXdpS0IrVWRzRno4aXNwVkZPeFAvQUJsMVBJRUxGU0h1Y2g1Rkk4RHdMSVB3YXBnNU9tdnFnSnpJZE9qbTU5Ck5TMFBvVU9YY3FqN1U4LzhwUEZxakVJek5jdkpHNDZhV0lTS2RLNjkxWlAyOHZ6clo5SXFBcUwzN2xrVWhYY24KS0dCYkpheEpnVityMTd2Q0JDdTFuZlF1c0N5eEpzOG9aeHNIS29oR2pOVEVkVHNnbXZzKwotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
     service:
       name: spotalis-webhook
       namespace: spotalis-system
-      path: "/mutate/deployments"
+      path: "/mutate"
   rules:
-  - operations: ["CREATE", "UPDATE"]
-    apiGroups: ["apps"]
+  - operations: ["CREATE"]
+    apiGroups: [""]
     apiVersions: ["v1"]
-    resources: ["deployments"]
-  admissionReviewVersions: ["v1", "v1beta1"]
+    resources: ["pods"]
+    scope: "*"
   sideEffects: None
   failurePolicy: Fail
-  namespaceSelector:
-    matchLabels:
-      spotalis.io/enabled: "true"
-- name: statefulsets.spotalis.io
-  clientConfig:
-    service:
-      name: spotalis-webhook
-      namespace: spotalis-system
-      path: "/mutate/statefulsets"
-  rules:
-  - operations: ["CREATE", "UPDATE"]
-    apiGroups: ["apps"]
-    apiVersions: ["v1"]
-    resources: ["statefulsets"]
   admissionReviewVersions: ["v1", "v1beta1"]
-  sideEffects: None
-  failurePolicy: Fail
-  namespaceSelector:
-    matchLabels:
-      spotalis.io/enabled: "true"
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingAdmissionWebhook
-metadata:
-  name: spotalis-validating-webhook
-  labels:
-    app.kubernetes.io/name: spotalis
-    app.kubernetes.io/instance: spotalis
-    app.kubernetes.io/component: webhook
-    app.kubernetes.io/managed-by: kubectl
-webhooks:
-- name: validate.deployments.spotalis.io
-  clientConfig:
-    service:
-      name: spotalis-webhook
-      namespace: spotalis-system
-      path: "/validate/deployments"
-  rules:
-  - operations: ["CREATE", "UPDATE"]
-    apiGroups: ["apps"]
-    apiVersions: ["v1"]
-    resources: ["deployments"]
-  admissionReviewVersions: ["v1", "v1beta1"]
-  sideEffects: None
-  failurePolicy: Fail
-  namespaceSelector:
-    matchLabels:
-      spotalis.io/enabled: "true"
-- name: validate.statefulsets.spotalis.io
-  clientConfig:
-    service:
-      name: spotalis-webhook
-      namespace: spotalis-system
-      path: "/validate/statefulsets"
-  rules:
-  - operations: ["CREATE", "UPDATE"]
-    apiGroups: ["apps"]
-    apiVersions: ["v1"]
-    resources: ["statefulsets"]
-  admissionReviewVersions: ["v1", "v1beta1"]
-  sideEffects: None
-  failurePolicy: Fail
   namespaceSelector:
     matchLabels:
       spotalis.io/enabled: "true"

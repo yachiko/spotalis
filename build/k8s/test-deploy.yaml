@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app-deployment
+  namespace: default
+  labels:
+    app: test-app
+  annotations:
+    spotalis.io/min-on-demand: "2"
+    spotalis.io/spot-percentage: "80"
+    spotalis.io/enabled: "true"
+spec:
+  replicas: 20
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+      restartPolicy: Always

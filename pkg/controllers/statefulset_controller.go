@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/ahoma/spotalis/internal/annotations"
@@ -36,14 +38,19 @@ import (
 	"github.com/ahoma/spotalis/pkg/apis"
 )
 
-// StatefulSetReconciler reconciles StatefulSet objects for spot/on-demand replica management
+// StatefulSetReconciler reconciles StatefulSet objects for spot/on-demand pod distribution management
 type StatefulSetReconciler struct {
 	client.Client
-	Scheme              *runtime.Scheme
-	AnnotationParser    *annotations.AnnotationParser
-	NodeClassifier      *config.NodeClassifierService
-	ReconcileInterval   time.Duration
-	MaxConcurrentRecons int
+	Scheme                *runtime.Scheme
+	AnnotationParser      *annotations.AnnotationParser
+	NodeClassifier        *config.NodeClassifierService
+	ReconcileInterval     time.Duration
+	MaxConcurrentRecons   int
+	LeaderElectionManager LeaderChecker   // Interface for checking leader status
+	MetricsCollector      MetricsRecorder // Interface for recording metrics
+
+	// Track last pod deletion time per statefulset to implement cooldown
+	lastDeletionTimes sync.Map // map[string]time.Time
 }
 
 // NewStatefulSetReconciler creates a new StatefulSetReconciler
@@ -52,7 +59,7 @@ func NewStatefulSetReconciler(client client.Client, scheme *runtime.Scheme) *Sta
 		Client:              client,
 		Scheme:              scheme,
 		AnnotationParser:    annotations.NewAnnotationParser(),
-		ReconcileInterval:   30 * time.Second,
+		ReconcileInterval:   5 * time.Minute, // Increased from 30s - pod rebalancing is less time-sensitive
 		MaxConcurrentRecons: 10,
 	}
 }
@@ -62,9 +69,8 @@ func (r *StatefulSetReconciler) SetNodeClassifier(classifier *config.NodeClassif
 	r.NodeClassifier = classifier
 }
 
-//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch
+//+kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;delete
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 
@@ -72,11 +78,19 @@ func (r *StatefulSetReconciler) SetNodeClassifier(classifier *config.NodeClassif
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("statefulset", req.NamespacedName)
 
+	// Only process workloads if we're the leader
+	if r.LeaderElectionManager != nil && !r.LeaderElectionManager.IsLeader() {
+		logger.V(1).Info("Not leader, skipping reconcile")
+		return ctrl.Result{}, nil
+	}
+
 	// Fetch the StatefulSet
 	var statefulSet appsv1.StatefulSet
 	if err := r.Get(ctx, req.NamespacedName, &statefulSet); err != nil {
 		if errors.IsNotFound(err) {
 			logger.Info("StatefulSet not found, ignoring")
+			// Clean up tracking data for deleted statefulset
+			r.lastDeletionTimes.Delete(req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "Failed to get StatefulSet")
@@ -87,6 +101,41 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if !r.AnnotationParser.HasSpotalisAnnotations(&statefulSet) {
 		logger.V(1).Info("StatefulSet has no Spotalis annotations, skipping")
 		return ctrl.Result{}, nil
+	}
+
+	// Add managed annotation if not already present
+	if err := r.ensureManagedAnnotation(ctx, &statefulSet); err != nil {
+		logger.Error(err, "Failed to add managed annotation")
+		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
+	}
+
+	// Implement cooldown period after pod deletion to avoid constant rescheduling
+	statefulsetKey := req.NamespacedName.String()
+	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(statefulsetKey); exists {
+		lastDeletion := lastDeletionInterface.(time.Time)
+		cooldownPeriod := 3 * time.Minute // Wait 3 minutes after deleting a pod
+		timeSinceLastDeletion := time.Since(lastDeletion)
+
+		if timeSinceLastDeletion < cooldownPeriod {
+			remainingCooldown := cooldownPeriod - timeSinceLastDeletion
+			logger.Info("In cooldown period after recent pod deletion, skipping rebalancing",
+				"lastDeletion", lastDeletion,
+				"timeSince", timeSinceLastDeletion,
+				"remainingCooldown", remainingCooldown)
+			return ctrl.Result{RequeueAfter: remainingCooldown}, nil
+		}
+	}
+
+	// Check if StatefulSet is stable and ready for rebalancing
+	if !r.isStatefulSetStableAndReady(&statefulSet) {
+		logger.Info("StatefulSet is not stable or ready, skipping rebalancing",
+			"replicas", statefulSet.Status.Replicas,
+			"readyReplicas", statefulSet.Status.ReadyReplicas,
+			"currentReplicas", statefulSet.Status.CurrentReplicas,
+			"updatedReplicas", statefulSet.Status.UpdatedReplicas)
+
+		// Requeue with longer interval when StatefulSet is not stable
+		return ctrl.Result{RequeueAfter: 2 * r.ReconcileInterval}, nil
 	}
 
 	logger.Info("Reconciling StatefulSet with Spotalis annotations")
@@ -114,53 +163,32 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	replicaState.TotalReplicas = desiredReplicas
 	replicaState.CalculateDesiredDistribution(*workloadConfig)
 
-	// Determine if reconciliation is needed
-	action := replicaState.GetNextAction()
+	// Check if rebalancing is needed by comparing current vs desired state
+	needsRebalancing := r.needsRebalancing(replicaState)
 
-	switch action {
-	case apis.ReplicaActionNone:
-		logger.V(1).Info("No reconciliation action needed")
-		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, nil
-
-	case apis.ReplicaActionScaleUpOnDemand, apis.ReplicaActionScaleUpSpot:
-		logger.Info("Scaling up StatefulSet",
+	if needsRebalancing {
+		logger.Info("Rebalancing StatefulSet pods",
 			"currentSpot", replicaState.CurrentSpot,
 			"currentOnDemand", replicaState.CurrentOnDemand,
 			"desiredSpot", replicaState.DesiredSpot,
 			"desiredOnDemand", replicaState.DesiredOnDemand)
 
-		if err := r.performScaleUp(ctx, &statefulSet, replicaState); err != nil {
-			logger.Error(err, "Failed to scale up StatefulSet")
+		if err := r.performPodRebalancing(ctx, &statefulSet, replicaState, statefulsetKey); err != nil {
+			logger.Error(err, "Failed to rebalance StatefulSet pods")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
 
-	case apis.ReplicaActionScaleDownOnDemand, apis.ReplicaActionScaleDownSpot:
-		logger.Info("Scaling down StatefulSet",
-			"currentSpot", replicaState.CurrentSpot,
-			"currentOnDemand", replicaState.CurrentOnDemand,
-			"desiredSpot", replicaState.DesiredSpot,
-			"desiredOnDemand", replicaState.DesiredOnDemand)
-
-		if err := r.performScaleDown(ctx, &statefulSet, replicaState); err != nil {
-			logger.Error(err, "Failed to scale down StatefulSet")
-			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
-		}
-
-	case apis.ReplicaActionMigrateToSpot, apis.ReplicaActionMigrateToOnDemand:
-		logger.Info("Rebalancing StatefulSet",
-			"currentSpot", replicaState.CurrentSpot,
-			"currentOnDemand", replicaState.CurrentOnDemand,
-			"desiredSpot", replicaState.DesiredSpot,
-			"desiredOnDemand", replicaState.DesiredOnDemand)
-
-		if err := r.performRebalance(ctx, &statefulSet, replicaState); err != nil {
-			logger.Error(err, "Failed to rebalance StatefulSet")
-			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
-		}
+		// After performing rebalancing, requeue sooner to check the results
+		logger.Info("Pod rebalancing initiated, will check status sooner")
+		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
+	} else {
+		logger.V(1).Info("No pod rebalancing needed")
 	}
 
 	logger.Info("StatefulSet reconciliation completed successfully")
-	return ctrl.Result{RequeueAfter: r.ReconcileInterval}, nil
+
+	// Use longer interval when no action is needed to reduce load
+	return ctrl.Result{RequeueAfter: r.ReconcileInterval * 2}, nil
 }
 
 // calculateCurrentReplicaState analyzes the current state of StatefulSet replicas
@@ -216,129 +244,33 @@ func (r *StatefulSetReconciler) calculateCurrentReplicaState(ctx context.Context
 	}, nil
 }
 
-// performScaleUp handles scaling up the StatefulSet with proper spot/on-demand distribution
-func (r *StatefulSetReconciler) performScaleUp(ctx context.Context, statefulSet *appsv1.StatefulSet, desiredState *apis.ReplicaState) error {
-	// For StatefulSets, we can control replica placement more precisely
-	// by updating individual pod specs as they are created
-
-	newReplicaCount := desiredState.DesiredSpot + desiredState.DesiredOnDemand
-
-	// Update the replica count
-	statefulSet.Spec.Replicas = &newReplicaCount
-
-	// Ensure proper node affinity and tolerations are set for spot instances
-	if err := r.updatePodTemplateForNodePlacement(statefulSet, desiredState); err != nil {
-		return fmt.Errorf("failed to update pod template: %w", err)
+// needsRebalancing checks if pod rebalancing is needed based on target distribution
+func (r *StatefulSetReconciler) needsRebalancing(state *apis.ReplicaState) bool {
+	// Check if current distribution significantly differs from desired
+	currentTotal := state.CurrentSpot + state.CurrentOnDemand
+	if currentTotal == 0 {
+		return false // No pods to rebalance
 	}
 
-	if err := r.Update(ctx, statefulSet); err != nil {
-		return fmt.Errorf("failed to update StatefulSet replicas: %w", err)
+	// Calculate tolerance (allow some variance to avoid constant rebalancing)
+	tolerance := int32(1)
+	if currentTotal > 10 {
+		tolerance = currentTotal / 10 // 10% tolerance for larger StatefulSets
 	}
 
-	return nil
+	spotDiff := state.DesiredSpot - state.CurrentSpot
+	onDemandDiff := state.DesiredOnDemand - state.CurrentOnDemand
+
+	// Need rebalancing if difference exceeds tolerance
+	return (spotDiff > tolerance || spotDiff < -tolerance) ||
+		(onDemandDiff > tolerance || onDemandDiff < -tolerance)
 }
 
-// performScaleDown handles scaling down the StatefulSet while maintaining distribution
-func (r *StatefulSetReconciler) performScaleDown(ctx context.Context, statefulSet *appsv1.StatefulSet, desiredState *apis.ReplicaState) error {
-	currentTotal := desiredState.CurrentSpot + desiredState.CurrentOnDemand
-	desiredTotal := desiredState.DesiredSpot + desiredState.DesiredOnDemand
-
-	if currentTotal <= desiredTotal {
-		return nil // Nothing to scale down
-	}
-
+// performPodRebalancing deletes pods that are on wrong node types to achieve target distribution
+func (r *StatefulSetReconciler) performPodRebalancing(ctx context.Context, statefulSet *appsv1.StatefulSet, desiredState *apis.ReplicaState, statefulsetKey string) error {
 	logger := log.FromContext(ctx)
 
-	// For StatefulSets, we might want to delete specific pods rather than just reducing replica count
-	// This allows us to control which type of instances are removed first
-	if err := r.deleteExcessPods(ctx, statefulSet, desiredState); err != nil {
-		logger.Error(err, "Failed to delete excess pods, falling back to replica count update")
-	}
-
-	// Update the replica count
-	statefulSet.Spec.Replicas = &desiredTotal
-
-	if err := r.Update(ctx, statefulSet); err != nil {
-		return fmt.Errorf("failed to update StatefulSet replicas: %w", err)
-	}
-
-	return nil
-}
-
-// performRebalance handles rebalancing pods between spot and on-demand nodes
-func (r *StatefulSetReconciler) performRebalance(ctx context.Context, statefulSet *appsv1.StatefulSet, desiredState *apis.ReplicaState) error {
-	logger := log.FromContext(ctx)
-
-	// For StatefulSets, we can be more surgical about rebalancing
-	// by deleting specific pods that are on the "wrong" node type
-
-	// Get current pods and their node assignments
-	podList := &corev1.PodList{}
-	selector, err := statefulSetLabelSelector(statefulSet)
-	if err != nil {
-		return fmt.Errorf("failed to get selector: %w", err)
-	}
-
-	if err := r.List(ctx, podList, &client.ListOptions{
-		Namespace: statefulSet.Namespace,
-	}, selector); err != nil {
-		return fmt.Errorf("failed to list pods for rebalancing: %w", err)
-	}
-
-	// Identify pods that need to be moved
-	var podsToDelete []corev1.Pod
-
-	for _, pod := range podList.Items {
-		if pod.Spec.NodeName == "" {
-			continue // Skip pending pods
-		}
-
-		// Get the node for this pod
-		var node corev1.Node
-		if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-			continue // Skip if we can't get the node
-		}
-
-		nodeType := r.NodeClassifier.ClassifyNode(&node)
-
-		// Determine if this pod should be moved based on desired distribution
-		shouldMove := r.shouldMovePod(&pod, nodeType, desiredState)
-		if shouldMove {
-			podsToDelete = append(podsToDelete, pod)
-		}
-	}
-
-	// Delete pods that need to be rebalanced (StatefulSet controller will recreate them)
-	for _, pod := range podsToDelete {
-		logger.Info("Deleting pod for rebalancing", "pod", pod.Name, "node", pod.Spec.NodeName)
-		if err := r.Delete(ctx, &pod); err != nil {
-			logger.Error(err, "Failed to delete pod for rebalancing", "pod", pod.Name)
-		}
-	}
-
-	// Update pod template to ensure proper placement for new pods
-	if err := r.updatePodTemplateForNodePlacement(statefulSet, desiredState); err != nil {
-		return fmt.Errorf("failed to update pod template: %w", err)
-	}
-
-	// Trigger a rolling update if needed
-	if len(podsToDelete) > 0 {
-		if statefulSet.Spec.Template.Annotations == nil {
-			statefulSet.Spec.Template.Annotations = make(map[string]string)
-		}
-		statefulSet.Spec.Template.Annotations["spotalis.io/rebalance-timestamp"] = time.Now().Format(time.RFC3339)
-
-		if err := r.Update(ctx, statefulSet); err != nil {
-			return fmt.Errorf("failed to update StatefulSet for rebalancing: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// deleteExcessPods deletes specific pods to achieve desired distribution
-func (r *StatefulSetReconciler) deleteExcessPods(ctx context.Context, statefulSet *appsv1.StatefulSet, desiredState *apis.ReplicaState) error {
-	// Get current pods and prioritize which ones to delete
+	// Get all pods for this StatefulSet
 	podList := &corev1.PodList{}
 	selector, err := statefulSetLabelSelector(statefulSet)
 	if err != nil {
@@ -351,78 +283,81 @@ func (r *StatefulSetReconciler) deleteExcessPods(ctx context.Context, statefulSe
 		return fmt.Errorf("failed to list pods: %w", err)
 	}
 
-	currentSpot := desiredState.CurrentSpot
-	currentOnDemand := desiredState.CurrentOnDemand
-	desiredSpot := desiredState.DesiredSpot
-	desiredOnDemand := desiredState.DesiredOnDemand
-
-	excessSpot := currentSpot - desiredSpot
-	excessOnDemand := currentOnDemand - desiredOnDemand
-
-	logger := log.FromContext(ctx)
-
-	// Delete excess spot pods first (if any)
-	if excessSpot > 0 {
-		deleted := r.deletePodsByNodeType(ctx, podList.Items, apis.NodeTypeSpot, int(excessSpot))
-		logger.Info("Deleted excess spot pods", "count", deleted)
-	}
-
-	// Delete excess on-demand pods (if any)
-	if excessOnDemand > 0 {
-		deleted := r.deletePodsByNodeType(ctx, podList.Items, apis.NodeTypeOnDemand, int(excessOnDemand))
-		logger.Info("Deleted excess on-demand pods", "count", deleted)
-	}
-
-	return nil
-}
-
-// deletePodsByNodeType deletes a specific number of pods running on the specified node type
-func (r *StatefulSetReconciler) deletePodsByNodeType(ctx context.Context, pods []corev1.Pod, nodeType apis.NodeType, count int) int {
-	deleted := 0
-
-	for _, pod := range pods {
-		if deleted >= count {
-			break
-		}
-
-		if pod.Spec.NodeName == "" {
-			continue
+	// Categorize pods by current node type
+	var spotPods, onDemandPods []corev1.Pod
+	for _, pod := range podList.Items {
+		if pod.Spec.NodeName == "" || pod.DeletionTimestamp != nil {
+			continue // Skip pending or terminating pods
 		}
 
 		// Get the node for this pod
 		var node corev1.Node
 		if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
+			logger.V(1).Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
 			continue
 		}
 
-		if r.NodeClassifier.ClassifyNode(&node) == nodeType {
-			if err := r.Delete(ctx, &pod); err == nil {
-				deleted++
-			}
+		// Classify the node
+		nodeType := r.NodeClassifier.ClassifyNode(&node)
+		switch nodeType {
+		case apis.NodeTypeSpot:
+			spotPods = append(spotPods, pod)
+		case apis.NodeTypeOnDemand:
+			onDemandPods = append(onDemandPods, pod)
 		}
 	}
 
-	return deleted
-}
+	// Delete excess pods from over-represented node types
+	var podsToDelete []corev1.Pod
 
-// shouldMovePod determines if a pod should be moved to achieve desired distribution
-func (r *StatefulSetReconciler) shouldMovePod(pod *corev1.Pod, currentNodeType apis.NodeType, desiredState *apis.ReplicaState) bool {
-	// Simple heuristic: if we have too many of this type, consider moving some
-
-	currentSpot := desiredState.CurrentSpot
-	currentOnDemand := desiredState.CurrentOnDemand
-	desiredSpot := desiredState.DesiredSpot
-	desiredOnDemand := desiredState.DesiredOnDemand
-
-	if currentNodeType == apis.NodeTypeSpot && currentSpot > desiredSpot {
-		return true
+	// If we have too many spot pods, delete the excess
+	if int32(len(spotPods)) > desiredState.DesiredSpot {
+		excess := int32(len(spotPods)) - desiredState.DesiredSpot
+		for i := int32(0); i < excess && i < int32(len(spotPods)); i++ {
+			podsToDelete = append(podsToDelete, spotPods[i])
+		}
 	}
 
-	if currentNodeType == apis.NodeTypeOnDemand && currentOnDemand > desiredOnDemand {
-		return true
+	// If we have too many on-demand pods, delete the excess
+	if int32(len(onDemandPods)) > desiredState.DesiredOnDemand {
+		excess := int32(len(onDemandPods)) - desiredState.DesiredOnDemand
+		for i := int32(0); i < excess && i < int32(len(onDemandPods)); i++ {
+			podsToDelete = append(podsToDelete, onDemandPods[i])
+		}
 	}
 
-	return false
+	// Delete the selected pods - but only one at a time to avoid chaos
+	if len(podsToDelete) > 0 {
+		// Only delete the first pod to avoid overwhelming the system
+		pod := podsToDelete[0]
+		logger.Info("Deleting one pod for rebalancing (gradual approach)", "pod", pod.Name, "node", pod.Spec.NodeName, "remaining", len(podsToDelete)-1)
+		if err := r.Delete(ctx, &pod); err != nil {
+			logger.Error(err, "Failed to delete pod for rebalancing", "pod", pod.Name)
+			return err
+		}
+
+		// Record the deletion time for cooldown tracking
+		r.lastDeletionTimes.Store(statefulsetKey, time.Now())
+
+		logger.Info("Deleted one pod for rebalancing - will continue with remaining pods in next reconcile", "deleted", pod.Name)
+
+		// Update pod template to ensure proper placement for new pods
+		if err := r.updatePodTemplateForNodePlacement(statefulSet, desiredState); err != nil {
+			return fmt.Errorf("failed to update pod template: %w", err)
+		}
+
+		// Trigger a rolling update annotation
+		if statefulSet.Spec.Template.Annotations == nil {
+			statefulSet.Spec.Template.Annotations = make(map[string]string)
+		}
+		statefulSet.Spec.Template.Annotations["spotalis.io/rebalance-timestamp"] = time.Now().Format(time.RFC3339)
+
+		if err := r.Update(ctx, statefulSet); err != nil {
+			return fmt.Errorf("failed to update StatefulSet for rebalancing: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // updatePodTemplateForNodePlacement updates pod template with appropriate node placement
@@ -449,7 +384,18 @@ func (r *StatefulSetReconciler) updatePodTemplateForNodePlacement(statefulSet *a
 			},
 		}
 
-		template.Spec.Tolerations = append(template.Spec.Tolerations, spotTolerations...)
+		// Check if tolerations already exist before adding
+		existingKeys := make(map[string]bool)
+		for _, toleration := range template.Spec.Tolerations {
+			existingKeys[toleration.Key] = true
+		}
+
+		for _, toleration := range spotTolerations {
+			if !existingKeys[toleration.Key] {
+				template.Spec.Tolerations = append(template.Spec.Tolerations, toleration)
+				existingKeys[toleration.Key] = true
+			}
+		}
 	}
 
 	// Add scheduling annotations for the desired distribution
@@ -463,11 +409,77 @@ func (r *StatefulSetReconciler) updatePodTemplateForNodePlacement(statefulSet *a
 	return nil
 }
 
+// isStatefulSetStableAndReady checks if StatefulSet is in a stable state for rebalancing
+func (r *StatefulSetReconciler) isStatefulSetStableAndReady(statefulSet *appsv1.StatefulSet) bool {
+	// Don't rebalance if StatefulSet doesn't have desired replica count set
+	if statefulSet.Spec.Replicas == nil {
+		return false
+	}
+
+	desiredReplicas := *statefulSet.Spec.Replicas
+
+	// Don't rebalance if there are no desired replicas
+	if desiredReplicas == 0 {
+		return false
+	}
+
+	status := statefulSet.Status
+
+	// Check if StatefulSet is fully ready:
+	// 1. All replicas are ready
+	// 2. All replicas are current (no ongoing rollout)
+	// 3. Updated replicas match desired (rollout complete)
+	// StatefulSet doesn't have UnavailableReplicas or AvailableReplicas like Deployment
+	isStable := status.ReadyReplicas == desiredReplicas &&
+		status.CurrentReplicas == desiredReplicas &&
+		status.UpdatedReplicas == desiredReplicas
+
+	return isStable
+}
+
 // SetupWithManager sets up the controller with the Manager
 func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}).
 		Complete(r)
+}
+
+// SetupWithManagerNamed sets up the controller with the Manager using a custom name
+func (r *StatefulSetReconciler) SetupWithManagerNamed(mgr ctrl.Manager, name string) error {
+	skipNameValidation := true
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1.StatefulSet{}).
+		Named(name).
+		WithOptions(controller.Options{
+			SkipNameValidation: &skipNameValidation,
+		}).
+		Complete(r)
+}
+
+// ensureManagedAnnotation adds the "spotalis.io/managed" annotation if not already present
+func (r *StatefulSetReconciler) ensureManagedAnnotation(ctx context.Context, statefulSet *appsv1.StatefulSet) error {
+	logger := log.FromContext(ctx).WithValues("statefulset", client.ObjectKeyFromObject(statefulSet))
+
+	// Check if the annotation is already present
+	if statefulSet.Annotations["spotalis.io/managed"] == "true" {
+		return nil
+	}
+
+	// Create a copy for the update
+	updated := statefulSet.DeepCopy()
+	if updated.Annotations == nil {
+		updated.Annotations = make(map[string]string)
+	}
+	updated.Annotations["spotalis.io/managed"] = "true"
+
+	// Update the statefulset
+	if err := r.Update(ctx, updated); err != nil {
+		logger.Error(err, "Failed to add managed annotation")
+		return err
+	}
+
+	logger.Info("Added managed annotation to statefulset")
+	return nil
 }
 
 // statefulSetLabelSelector returns the label selector for a StatefulSet

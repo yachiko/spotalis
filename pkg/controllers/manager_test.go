@@ -107,7 +107,7 @@ var _ = Describe("ControllerManager", func() {
 			Expect(newManager).ToNot(BeNil())
 			Expect(newManager.config).ToNot(BeNil())
 			// Should use default configuration
-			Expect(newManager.config.MaxConcurrentReconciles).To(Equal(10))
+			Expect(newManager.config.MaxConcurrentReconciles).To(Equal(1)) // Conservative default
 			Expect(newManager.config.ReconcileTimeout).To(Equal(5 * time.Minute))
 		})
 	})
@@ -116,9 +116,9 @@ var _ = Describe("ControllerManager", func() {
 		It("should return sensible defaults", func() {
 			defaults := DefaultManagerConfig()
 
-			Expect(defaults.MaxConcurrentReconciles).To(Equal(10))
+			Expect(defaults.MaxConcurrentReconciles).To(Equal(1)) // Conservative default
 			Expect(defaults.ReconcileTimeout).To(Equal(5 * time.Minute))
-			Expect(defaults.ReconcileInterval).To(Equal(30 * time.Second))
+			Expect(defaults.ReconcileInterval).To(Equal(5 * time.Minute)) // Updated to match new default
 			Expect(defaults.EnableDeployments).To(BeTrue())
 			Expect(defaults.EnableStatefulSets).To(BeTrue())
 			Expect(defaults.EnableDaemonSets).To(BeFalse())

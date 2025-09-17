@@ -86,7 +86,11 @@ func NewWebhookServer(config WebhookServerConfig, mutateHandler *webhookMutate.M
 
 // MutateHandler implements the /mutate webhook endpoint
 func (w *WebhookServer) MutateHandler(c *gin.Context) {
+	// Always log webhook requests for debugging
+	fmt.Printf("[WEBHOOK] Received mutation request: %s %s\n", c.Request.Method, c.Request.URL.Path)
+
 	if w.readOnly {
+		fmt.Printf("[WEBHOOK] In read-only mode, allowing without mutations\n")
 		w.sendAdmissionResponse(c, &v1.AdmissionResponse{
 			UID:     "",
 			Allowed: true,
@@ -100,6 +104,7 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 	// Parse admission request
 	body, err := c.GetRawData()
 	if err != nil {
+		fmt.Printf("[WEBHOOK] Failed to read request body: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "failed to read request body",
 			"code":  "INVALID_REQUEST_BODY",
@@ -107,8 +112,11 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("[WEBHOOK] Processing admission request, body length: %d\n", len(body))
+
 	var admissionReview v1.AdmissionReview
 	if err := w.deserializeAdmissionRequest(body, &admissionReview); err != nil {
+		fmt.Printf("[WEBHOOK] Failed to deserialize admission request: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "failed to deserialize admission request",
 			"code":    "INVALID_ADMISSION_REQUEST",

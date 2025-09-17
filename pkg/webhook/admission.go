@@ -125,8 +125,7 @@ type AdmissionController struct {
 	manager    manager.Manager
 
 	// TLS configuration
-	tlsConfig   *tls.Config
-	certWatcher *CertificateWatcher
+	tlsConfig *tls.Config
 
 	// Webhook handlers
 	mutatingHandler   admission.Handler
@@ -180,11 +179,6 @@ func (a *AdmissionController) Start(ctx context.Context) error {
 		"cert-dir", a.config.CertDir,
 		"webhook-name", a.config.WebhookName,
 	)
-
-	// Start certificate watcher if configured
-	if a.certWatcher != nil {
-		go a.certWatcher.Start(ctx)
-	}
 
 	// Register webhook configuration
 	if err := a.registerWebhookConfiguration(ctx); err != nil {
@@ -243,11 +237,6 @@ func (a *AdmissionController) initializeTLS() error {
 		CipherSuites:             a.getCipherSuites(),
 		PreferServerCipherSuites: true,
 	}
-
-	// Setup certificate watcher
-	a.certWatcher = NewCertificateWatcher(certPath, keyPath, func(cert tls.Certificate) {
-		a.tlsConfig.Certificates = []tls.Certificate{cert}
-	})
 
 	return nil
 }

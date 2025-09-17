@@ -62,9 +62,9 @@ type ManagerConfig struct {
 // DefaultManagerConfig returns the default manager configuration
 func DefaultManagerConfig() *ManagerConfig {
 	return &ManagerConfig{
-		MaxConcurrentReconciles: 10,
+		MaxConcurrentReconciles: 1, // Low concurrency + single pod deletion = very gradual changes
 		ReconcileTimeout:        5 * time.Minute,
-		ReconcileInterval:       30 * time.Second,
+		ReconcileInterval:       5 * time.Minute, // Increased from 30s for less aggressive rebalancing
 		EnableDeployments:       true,
 		EnableStatefulSets:      true,
 		EnableDaemonSets:        false,
