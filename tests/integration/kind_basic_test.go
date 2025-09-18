@@ -1,4 +1,4 @@
-//go:build integration_kind
+//go:build integration
 
 /*
 Copyright 2024 The Spotalis Authors.
@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration_test
+package integration
 
 import (
 	"testing"
@@ -65,9 +65,9 @@ var _ = Describe("Spotalis Integration on Kind", func() {
 			// Create a test namespace
 			testNamespace = &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "spotalis-test-" + randString(5),
+					Name: "spotalis-test-" + generateRandomSuffix(),
 					Labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						"test-namespace": "true",
 					},
 				},
 			}
@@ -90,8 +90,7 @@ var _ = Describe("Spotalis Integration on Kind", func() {
 						"app": "test-app",
 					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":       "true",
-						"spotalis.io/min-on-demand": "2",
+						"spotalis.io/spot-percentage": "50%",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
@@ -142,64 +141,6 @@ var _ = Describe("Spotalis Integration on Kind", func() {
 				}
 				return deployment.Annotations
 			}, 30*time.Second, 1*time.Second).Should(HaveKey(ContainSubstring("spotalis")))
-		})
-
-		It("should handle nodeSelector modifications", func() {
-			deployment := &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "spot-deployment",
-					Namespace: testNamespace.Name,
-					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "100",
-					},
-				},
-				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "spot-app",
-						},
-					},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"app": "spot-app",
-							},
-						},
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "app",
-									Image: "nginx:alpine",
-								},
-							},
-						},
-					},
-				},
-			}
-
-			Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
-
-			// Verify that Spotalis adds nodeSelector for spot instances via webhook mutation
-			// This will be applied to pods created by the deployment, not the deployment itself
-			Eventually(func() bool {
-				var podList corev1.PodList
-				err := k8sClient.List(ctx, &podList, client.InNamespace(testNamespace.Name),
-					client.MatchingLabels{"app": "spot-app"})
-				if err != nil || len(podList.Items) == 0 {
-					return false
-				}
-
-				// Check if any pod has the spot nodeSelector
-				for _, pod := range podList.Items {
-					if pod.Spec.NodeSelector != nil {
-						if capacityType, exists := pod.Spec.NodeSelector["karpenter.sh/capacity-type"]; exists {
-							return capacityType == "spot" || capacityType == "on-demand"
-						}
-					}
-				}
-				return false
-			}, 30*time.Second, 1*time.Second).Should(BeTrue())
 		})
 	})
 

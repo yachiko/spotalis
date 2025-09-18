@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration_test
+package integration
 
 import (
 	"context"
@@ -30,8 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-
-	"github.com/ahoma/spotalis/pkg/operator"
 )
 
 func TestBasicDeploymentIntegration(t *testing.T) {
@@ -41,12 +39,11 @@ func TestBasicDeploymentIntegration(t *testing.T) {
 
 var _ = Describe("Basic workload deployment with annotations", func() {
 	var (
-		ctx        context.Context
-		cancel     context.CancelFunc
-		testEnv    *envtest.Environment
-		k8sClient  client.Client
-		spotalisOp *operator.Operator
-		namespace  string
+		ctx       context.Context
+		cancel    context.CancelFunc
+		testEnv   *envtest.Environment
+		k8sClient client.Client
+		namespace string
 	)
 
 	BeforeEach(func() {
@@ -71,25 +68,15 @@ var _ = Describe("Basic workload deployment with annotations", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
 				Labels: map[string]string{
-					"spotalis.io/enabled": "true",
+					"test-namespace": "true",
 				},
 			},
 		}
 		err = k8sClient.Create(ctx, ns)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Start Spotalis operator
-		spotalisOp = operator.New(cfg)
-		go func() {
-			defer GinkgoRecover()
-			err := spotalisOp.Start(ctx)
-			Expect(err).NotTo(HaveOccurred())
-		}()
-
-		// Wait for operator to be ready
-		Eventually(func() bool {
-			return spotalisOp.IsReady()
-		}, "30s", "1s").Should(BeTrue())
+		// For Kind cluster tests, we don't need to create an operator
+		// The Kind cluster already has Spotalis controller running
 	})
 
 	AfterEach(func() {
@@ -110,8 +97,7 @@ var _ = Describe("Basic workload deployment with annotations", func() {
 					Name:      "test-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70",
-						"spotalis.io/min-on-demand":   "1",
+						"spotalis.io/spot-percentage": "70%",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{

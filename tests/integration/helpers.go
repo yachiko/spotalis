@@ -1,3 +1,6 @@
+//go:build integration || integration_kind
+// +build integration integration_kind
+
 /*
 Copyright 2024 The Spotalis Authors.
 
@@ -14,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration_test
+package integration
 
 import (
 	"math/rand"
