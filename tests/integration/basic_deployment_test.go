@@ -29,7 +29,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	"github.com/ahoma/spotalis/tests/integration/shared"
 )
 
 func TestBasicDeploymentIntegration(t *testing.T) {
@@ -39,52 +40,39 @@ func TestBasicDeploymentIntegration(t *testing.T) {
 
 var _ = Describe("Basic workload deployment with annotations", func() {
 	var (
-		ctx       context.Context
-		cancel    context.CancelFunc
-		testEnv   *envtest.Environment
-		k8sClient client.Client
-		namespace string
+		ctx        context.Context
+		cancel     context.CancelFunc
+		kindHelper *shared.KindClusterHelper
+		k8sClient  client.Client
+		namespace  string
 	)
 
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(context.Background())
 
-		// Setup test environment - this will fail until we have proper setup
-		testEnv = &envtest.Environment{
-			CRDDirectoryPaths: []string{"../../configs/crd/bases"},
-		}
-
-		cfg, err := testEnv.Start()
+		// Connect to existing Kind cluster
+		var err error
+		kindHelper, err = shared.NewKindClusterHelper(ctx)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(cfg).NotTo(BeNil())
 
-		// Setup clients
-		k8sClient, err = client.New(cfg, client.Options{})
-		Expect(err).NotTo(HaveOccurred())
+		k8sClient = kindHelper.Client
+
+		// Wait for Spotalis controller to be ready
+		kindHelper.WaitForSpotalisController()
 
 		// Create test namespace
-		namespace = "spotalis-test-" + randString(8)
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-				Labels: map[string]string{
-					"test-namespace": "true",
-				},
-			},
-		}
-		err = k8sClient.Create(ctx, ns)
+		namespace, err = kindHelper.CreateTestNamespace()
 		Expect(err).NotTo(HaveOccurred())
-
-		// For Kind cluster tests, we don't need to create an operator
-		// The Kind cluster already has Spotalis controller running
 	})
 
 	AfterEach(func() {
-		// Cleanup
-		cancel()
-		if testEnv != nil {
-			err := testEnv.Stop()
+		// Cleanup namespace
+		if namespace != "" && kindHelper != nil {
+			err := kindHelper.CleanupNamespace(namespace)
 			Expect(err).NotTo(HaveOccurred())
+		}
+		if cancel != nil {
+			cancel()
 		}
 	})
 
@@ -97,7 +85,8 @@ var _ = Describe("Basic workload deployment with annotations", func() {
 					Name:      "test-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70%",
+						"spotalis.io/enabled":         "true",
+						"spotalis.io/spot-percentage": "70",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
@@ -133,6 +122,10 @@ var _ = Describe("Basic workload deployment with annotations", func() {
 			// Verify deployment exists
 			var created appsv1.Deployment
 			err = k8sClient.Get(ctx, client.ObjectKeyFromObject(deployment), &created)
+
+			// Log the created deployment for debugging
+			// fmt.Printf("Created Deployment: %+v\n", created)
+
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -151,6 +144,9 @@ var _ = Describe("Basic workload deployment with annotations", func() {
 
 				// Check if any pod has the spot/on-demand nodeSelector from webhook
 				for _, pod := range podList.Items {
+					// Log pod spec for debugging
+					// fmt.Printf("Pod %s spec: %+v\n", pod.Name, pod.Spec)
+
 					if pod.Spec.NodeSelector != nil {
 						if capacityType, exists := pod.Spec.NodeSelector["karpenter.sh/capacity-type"]; exists {
 							return capacityType == "spot" || capacityType == "on-demand"

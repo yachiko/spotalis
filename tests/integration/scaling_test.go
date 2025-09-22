@@ -32,9 +32,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	"github.com/ahoma/spotalis/pkg/operator"
+	"github.com/ahoma/spotalis/tests/integration/shared"
 )
 
 func TestScalingIntegration(t *testing.T) {
@@ -44,55 +43,41 @@ func TestScalingIntegration(t *testing.T) {
 
 var _ = Describe("Pod rebalancing scenario", func() {
 	var (
-		ctx       context.Context
-		cancel    context.CancelFunc
-		testEnv   *envtest.Environment
-		k8sClient client.Client
-		namespace string
+		ctx        context.Context
+		cancel     context.CancelFunc
+		kindHelper *shared.KindClusterHelper
+		k8sClient  client.Client
+		namespace  string
 	)
 
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(context.Background())
 
-		testEnv = &envtest.Environment{
-			CRDDirectoryPaths: []string{"../../configs/crd/bases"},
-		}
-
-		cfg, err := testEnv.Start()
+		// Connect to existing Kind cluster
+		var err error
+		kindHelper, err = shared.NewKindClusterHelper(ctx)
 		Expect(err).NotTo(HaveOccurred())
 
-		k8sClient, err = client.New(cfg, client.Options{})
+		k8sClient = kindHelper.Client
+
+		// Wait for Spotalis controller to be ready
+		kindHelper.WaitForSpotalisController()
+
+		// Create test namespace
+		namespace, err = kindHelper.CreateTestNamespace()
 		Expect(err).NotTo(HaveOccurred())
 
-		namespace = "spotalis-scaling-test-" + randString(6)
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-				Labels: map[string]string{
-					"test-namespace": "true",
-				},
-			},
-		}
-		err = k8sClient.Create(ctx, ns)
-		Expect(err).NotTo(HaveOccurred())
-
-		// For Kind cluster tests, create operator with disabled services to avoid conflicts
-		operatorConfig := &operator.OperatorConfig{
-			MetricsAddr:   ":0",  // Disable metrics server
-			ProbeAddr:     ":0",  // Disable health probes
-			EnableWebhook: false, // Disable webhook
-		}
-		_, err = operator.NewOperator(operatorConfig)
-		Expect(err).NotTo(HaveOccurred())
-
-		// NOTE: We don't start this operator since Kind cluster has its own
+		// Kind cluster already has Spotalis controller running
 	})
 
 	AfterEach(func() {
-		cancel()
-		if testEnv != nil {
-			err := testEnv.Stop()
+		// Cleanup namespace
+		if namespace != "" && kindHelper != nil {
+			err := kindHelper.CleanupNamespace(namespace)
 			Expect(err).NotTo(HaveOccurred())
+		}
+		if cancel != nil {
+			cancel()
 		}
 	})
 
@@ -105,6 +90,7 @@ var _ = Describe("Pod rebalancing scenario", func() {
 					Name:      "rebalance-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50%",
 					},
 				},
@@ -207,6 +193,7 @@ var _ = Describe("Pod rebalancing scenario", func() {
 					Name:      "pod-distribution-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70%",
 					},
 				},
@@ -276,6 +263,7 @@ var _ = Describe("Pod rebalancing scenario", func() {
 					Name:      "scale-down-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "60%",
 					},
 				},
@@ -305,11 +293,6 @@ var _ = Describe("Pod rebalancing scenario", func() {
 			}
 			err := k8sClient.Create(ctx, deployment)
 			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should handle pod rebalancing needs", func() {
-			// Skip this test - managed annotation not supported
-			Skip("Test skipped - managed annotation not supported")
 		})
 
 		It("should respect PodDisruptionBudget during pod rebalancing", func() {
@@ -360,6 +343,7 @@ var _ = Describe("Pod rebalancing scenario", func() {
 					Name:      "stable-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "80%",
 					},
 				},
@@ -402,8 +386,6 @@ var _ = Describe("Pod rebalancing scenario", func() {
 				return updated.Annotations
 			}, "15s", "1s").Should(HaveKey("spotalis.io/spot-percentage"))
 
-			Skip("Test skipped - managed annotation not supported")
-
 			// Verify that Spotalis doesn't perform scaling operations
 			// Even if external changes occur, replica count should be managed by K8s deployment controller
 			Consistently(func() int32 {
@@ -414,8 +396,6 @@ var _ = Describe("Pod rebalancing scenario", func() {
 				}
 				return *updated.Spec.Replicas
 			}, "30s", "2s").Should(Equal(int32(5)))
-
-			Skip("Test skipped - status annotation not supported")
 		})
 	})
 })

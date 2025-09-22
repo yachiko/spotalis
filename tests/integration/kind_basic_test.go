@@ -90,6 +90,7 @@ var _ = Describe("Spotalis Integration on Kind", func() {
 						"app": "test-app",
 					},
 					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50%",
 					},
 				},

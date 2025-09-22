@@ -88,6 +88,7 @@ var _ = Describe("Configuration change scenario", func() {
 					Name:      "config-test-deployment",
 					Namespace: namespace,
 					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70%",
 					},
 				},
@@ -128,6 +129,7 @@ var _ = Describe("Configuration change scenario", func() {
 					Name:      "annotation-test",
 					Namespace: namespace,
 					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "80%",
 					},
 				},
@@ -189,6 +191,7 @@ func createTestDeployment(name, namespace string) *appsv1.Deployment {
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
+				"spotalis.io/enabled":         "true",
 				"spotalis.io/spot-percentage": "70%",
 			},
 		},
