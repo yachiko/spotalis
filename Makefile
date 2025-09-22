@@ -1,9 +1,8 @@
 # Build variables
 GO_VERSION ?= 1.21
-REGISTRY ?= ghcr.io/ahoma
 IMG_NAME ?= spotalis
 IMG_TAG ?= latest
-IMG ?= $(REGISTRY)/$(IMG_NAME):$(IMG_TAG)
+IMG ?= $(IMG_NAME):$(IMG_TAG)
 
 # Go variables
 GOOS ?= $(shell go env GOOS)
@@ -62,10 +61,22 @@ test-integration: generate fmt vet ## Run integration tests with Kind
 	go test ./tests/integration/... -v -tags=integration
 
 .PHONY: test-integration-kind
-test-integration-kind: ## Run integration tests against Kind cluster with Spotalis deployed
+test-integration-kind: test-integration-cleanup ## Run integration tests against Kind cluster with Spotalis deployed
 	@echo "Running integration tests against Kind cluster..."
 	@kubectl config current-context | grep -q "kind-" || (echo "Error: Not connected to a Kind cluster. Run 'kubectl config use-context kind-spotalis'" && exit 1)
 	go test ./tests/integration/... -v -tags=integration_kind -timeout=10m
+
+.PHONY: test-integration-cleanup
+test-integration-cleanup: ## Clean up integration test resources from Kind cluster
+	@echo "Cleaning up integration test resources..."
+	@kubectl config current-context | grep -q "kind-" || (echo "Error: Not connected to a Kind cluster. Run 'kubectl config use-context kind-spotalis'" && exit 1)
+	@echo "Deleting test namespaces..."
+	@kubectl delete namespaces -l spotalis.io/test=true --ignore-not-found=true
+	@echo "Deleting legacy test namespaces..."
+	@kubectl get namespaces -o name | grep -E "(managed-|unmanaged-|spotalis-managed-)" | xargs -r kubectl delete --ignore-not-found=true
+	@echo "Deleting test deployments..."
+	@kubectl delete deployments -A -l spotalis.io/test=true --ignore-not-found=true
+	@echo "Cleanup completed"
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests
@@ -90,18 +101,15 @@ docker-push: ## Push docker image
 
 ##@ Deployment
 
-.PHONY: deploy
-deploy: generate ## Deploy to current kubectl context
-	kubectl apply -f configs/crd/bases/
-	kubectl apply -f configs/samples/
-
-.PHONY: undeploy
-undeploy: ## Remove from current kubectl context
-	kubectl delete -f configs/samples/ --ignore-not-found=true
-	kubectl delete -f configs/crd/bases/ --ignore-not-found=true
+.PHONY: build-deploy
+build-deploy: ## Build and deploy to Kind cluster with unique tag
+	@generated_tag=$$(openssl rand -hex 3); \
+	echo "Generated tag: $$generated_tag"; \
+	docker buildx build -t spotalis:$$generated_tag -f build/docker/Dockerfile .; \
+	kind load docker-image spotalis:$$generated_tag --name spotalis || true; \
+	kubectl set image deployment/spotalis-controller controller=spotalis:$$generated_tag -n spotalis-system || true
 
 ##@ Kind
-
 .PHONY: kind-create
 kind-create: ## Create Kind cluster for testing
 	kind create cluster --name spotalis --config build/kind/cluster.yaml
@@ -126,6 +134,29 @@ kind-integration-full: kind-create docker-build kind-load generate-certs ## Full
 	kubectl wait --for=condition=available --timeout=300s deployment/spotalis-controller -n spotalis-system
 	@echo "Running integration tests..."
 	$(MAKE) test-integration-kind
+
+.PHONY: kind-cleanup-all
+kind-cleanup-all: ## Comprehensive cleanup of Kind cluster test resources
+	@echo "Performing comprehensive cleanup of Kind cluster..."
+	@kubectl config current-context | grep -q "kind-" || (echo "Error: Not connected to a Kind cluster. Run 'kubectl config use-context kind-spotalis'" && exit 1)
+	@echo "Deleting all test namespaces..."
+	@kubectl delete namespaces -l spotalis.io/test=true --ignore-not-found=true --timeout=60s
+	@echo "Deleting legacy test namespaces..."
+	@for ns in $$(kubectl get namespaces -o name | grep -E "(managed-|unmanaged-|spotalis-managed-)" | cut -d/ -f2); do \
+		echo "Deleting namespace: $$ns"; \
+		kubectl delete namespace "$$ns" --ignore-not-found=true --timeout=30s || true; \
+	done
+	@echo "Deleting test deployments from all namespaces..."
+	@kubectl delete deployments -A -l spotalis.io/test=true --ignore-not-found=true --timeout=30s
+	@echo "Deleting test pods from all namespaces..."
+	@kubectl delete pods -A -l spotalis.io/test=true --ignore-not-found=true --timeout=30s
+	@echo "Force cleanup any remaining test namespaces..."
+	@for ns in $$(kubectl get namespaces -o name | grep -E "(managed-|unmanaged-|spotalis-managed-|spotalis-test-)" | cut -d/ -f2); do \
+		echo "Force deleting namespace: $$ns"; \
+		kubectl patch namespace "$$ns" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true; \
+		kubectl delete namespace "$$ns" --ignore-not-found=true --force --grace-period=0 2>/dev/null || true; \
+	done
+	@echo "Cleanup completed"
 
 ##@ Tools
 
