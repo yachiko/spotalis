@@ -23,10 +23,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/ahoma/spotalis/internal/annotations"
 	"github.com/ahoma/spotalis/internal/config"
@@ -233,75 +231,6 @@ func (cm *ControllerManager) setupStatefulSetController() error {
 
 	cm.controllersRegistered["statefulset"] = true
 	return nil
-}
-
-// createPodPredicates creates predicates for pod watching
-func (cm *ControllerManager) createPodPredicates() predicate.Predicate {
-	return predicate.And(
-		predicate.ResourceVersionChangedPredicate{},
-		predicate.NewPredicateFuncs(func(object client.Object) bool {
-			// Only watch pods in allowed namespaces
-			return cm.isNamespaceAllowed(object.GetNamespace()) &&
-				cm.hasSpotatisAnnotations(object)
-		}),
-	)
-}
-
-// createNodePredicates creates predicates for node watching
-func (cm *ControllerManager) createNodePredicates() predicate.Predicate {
-	return predicate.And(
-		predicate.ResourceVersionChangedPredicate{},
-		predicate.Or(
-			predicate.LabelChangedPredicate{},
-			predicate.AnnotationChangedPredicate{},
-		),
-	)
-}
-
-// isNamespaceAllowed checks if a namespace is allowed for watching
-func (cm *ControllerManager) isNamespaceAllowed(namespace string) bool {
-	// If no watch namespaces specified, watch all except ignored
-	if len(cm.config.WatchNamespaces) == 0 {
-		// Check if namespace is in ignore list
-		for _, ignored := range cm.config.IgnoreNamespaces {
-			if namespace == ignored {
-				return false
-			}
-		}
-		return true
-	}
-
-	// If watch namespaces specified, only watch those
-	for _, watched := range cm.config.WatchNamespaces {
-		if namespace == watched {
-			return true
-		}
-	}
-	return false
-}
-
-// hasSpotatisAnnotations checks if an object has Spotalis annotations
-func (cm *ControllerManager) hasSpotatisAnnotations(object client.Object) bool {
-	annotations := object.GetAnnotations()
-	if annotations == nil {
-		return false
-	}
-
-	// Check for any Spotalis annotation
-	spotatisAnnotations := []string{
-		"spotalis.io/spot-replicas",
-		"spotalis.io/on-demand-replicas",
-		"spotalis.io/spot-percentage",
-		"spotalis.io/enabled",
-	}
-
-	for _, annotation := range spotatisAnnotations {
-		if _, exists := annotations[annotation]; exists {
-			return true
-		}
-	}
-
-	return false
 }
 
 // GetManagerMetrics returns metrics about the controller manager
