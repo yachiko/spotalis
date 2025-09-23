@@ -80,7 +80,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Only process workloads if we're the leader
 	if r.LeaderElectionManager != nil && !r.LeaderElectionManager.IsLeader() {
-		logger.V(1).Info("Not leader, skipping reconcile")
+		logger.Info("Not leader, skipping reconcile")
 		return ctrl.Result{}, nil
 	}
 
@@ -99,7 +99,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Check if this StatefulSet has Spotalis annotations
 	if !r.AnnotationParser.HasSpotalisAnnotations(&statefulSet) {
-		logger.V(1).Info("StatefulSet has no Spotalis annotations, skipping")
+		logger.Info("StatefulSet has no Spotalis annotations, skipping")
 		return ctrl.Result{}, nil
 	}
 
@@ -182,7 +182,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Info("Pod rebalancing initiated, will check status sooner")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
 	} else {
-		logger.V(1).Info("No pod rebalancing needed")
+		logger.Info("No pod rebalancing needed")
 	}
 
 	logger.Info("StatefulSet reconciliation completed successfully")
@@ -293,7 +293,7 @@ func (r *StatefulSetReconciler) performPodRebalancing(ctx context.Context, state
 		// Get the node for this pod
 		var node corev1.Node
 		if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-			logger.V(1).Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
+			logger.Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
 			continue
 		}
 

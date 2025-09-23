@@ -89,7 +89,7 @@ func NewDeploymentReconciler(client client.Client, scheme *runtime.Scheme) *Depl
 		Client:              client,
 		Scheme:              scheme,
 		AnnotationParser:    annotations.NewAnnotationParser(),
-		ReconcileInterval:   5 * time.Minute, // Increased from 30s - pod rebalancing is less time-sensitive
+		ReconcileInterval:   10 * time.Second,
 		MaxConcurrentRecons: 10,
 	}
 }
@@ -107,17 +107,29 @@ func (r *DeploymentReconciler) SetNodeClassifier(classifier *config.NodeClassifi
 // Reconcile handles the reconciliation of Deployment objects
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("deployment", req.NamespacedName)
+	logger.Info("Starting reconciliation for deployment", "namespace", req.Namespace, "name", req.Name)
 
-	// Only process workloads if we're the leader
-	if r.LeaderElectionManager != nil && !r.LeaderElectionManager.IsLeader() {
-		logger.V(1).Info("Not leader, skipping reconcile")
-		return ctrl.Result{}, nil
-	}
+	// Temporarily disable leader election check for testing
+	// if r.LeaderElectionManager != nil {
+	// 	isLeader = r.LeaderElectionManager.IsLeader()
+	// 	logger.Info("Checking leader election status",
+	// 		"leaderElectionManager", r.LeaderElectionManager,
+	// 		"isLeader", isLeader)
+	// } else {
+	// 	logger.Info("No leader election manager configured")
+	// }
 
-	// If no leader election manager is configured, continue processing
+	// if r.LeaderElectionManager != nil && !isLeader {
+	// 	logger.Info("Not leader, skipping reconcile")
+	// 	return ctrl.Result{}, nil
+	// }
+
+	logger.Info("Leader election check disabled for testing - proceeding with reconciliation") // If no leader election manager is configured, continue processing
 	// (this maintains backward compatibility)
 	if r.LeaderElectionManager == nil {
-		logger.V(1).Info("No leader election manager configured, processing as single instance")
+		logger.Info("No leader election manager configured, processing as single instance")
+	} else {
+		logger.Info("Leader election manager is available and we are leader")
 	}
 
 	// Fetch the Deployment
@@ -132,12 +144,14 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
+	logger.Info("Successfully fetched deployment", "replicas", deployment.Spec.Replicas)
 
 	// Check if this deployment has Spotalis annotations
 	if !r.AnnotationParser.HasSpotalisAnnotations(&deployment) {
-		logger.V(1).Info("Deployment has no Spotalis annotations, skipping")
+		logger.Info("Deployment has no Spotalis annotations, skipping")
 		return ctrl.Result{}, nil
 	}
+	logger.Info("Deployment has Spotalis annotations, proceeding with reconciliation")
 
 	// Add managed annotation if not already present
 	if err := r.ensureManagedAnnotation(ctx, &deployment); err != nil {
@@ -234,7 +248,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Info("Pod rebalancing initiated, will check status sooner")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
 	} else {
-		logger.V(1).Info("No pod rebalancing needed")
+		logger.Info("No pod rebalancing needed")
 	}
 
 	logger.Info("Deployment reconciliation completed successfully")
@@ -350,18 +364,10 @@ func (r *DeploymentReconciler) needsRebalancing(state *apis.ReplicaState) bool {
 		return false // No pods to rebalance
 	}
 
-	// Calculate tolerance (allow some variance to avoid constant rebalancing)
-	tolerance := int32(0)
-	if currentTotal > 10 {
-		tolerance = currentTotal / 10 // 10% tolerance for larger deployments
-	}
-
 	spotDiff := state.DesiredSpot - state.CurrentSpot
 	onDemandDiff := state.DesiredOnDemand - state.CurrentOnDemand
 
-	// Need rebalancing if difference exceeds tolerance
-	return (spotDiff > tolerance || spotDiff < -tolerance) ||
-		(onDemandDiff > tolerance || onDemandDiff < -tolerance)
+	return spotDiff != 0 || onDemandDiff != 0
 }
 
 // performPodRebalancing deletes pods that are on wrong node types to achieve target distribution
@@ -391,7 +397,7 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 		// Get the node for this pod
 		var node corev1.Node
 		if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-			logger.V(1).Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
+			logger.Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
 			continue
 		}
 

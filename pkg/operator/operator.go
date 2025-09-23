@@ -408,11 +408,11 @@ func NewOperator(config *OperatorConfig) (*Operator, error) {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		// MetricsBindAddress:      config.MetricsAddr, // TODO: Fix metrics configuration for controller-runtime
-		WebhookServer:           webhook.NewServer(webhook.Options{Port: config.WebhookPort}),
-		HealthProbeBindAddress:  config.ProbeAddr,
-		LeaderElection:          config.LeaderElection,
-		LeaderElectionID:        config.LeaderElectionID,
-		LeaderElectionNamespace: config.Namespace,
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: config.WebhookPort}),
+		HealthProbeBindAddress: config.ProbeAddr,
+		LeaderElection:         false, // Disable built-in leader election - we use our custom implementation
+		// LeaderElectionID:        config.LeaderElectionID, // Not needed when leader election is disabled
+		// LeaderElectionNamespace: config.Namespace, // Not needed when leader election is disabled
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manager: %w", err)
@@ -429,6 +429,25 @@ func NewOperator(config *OperatorConfig) (*Operator, error) {
 		config:     config,
 		namespace:  config.Namespace,
 		kubeClient: kubeClient,
+	}
+
+	// Initialize leader election manager if leader election is enabled
+	if config.LeaderElection {
+		leaderElectionConfig := &LeaderElectionConfig{
+			Enabled:       config.LeaderElection,
+			ID:            config.LeaderElectionID,
+			LeaseName:     config.LeaderElectionID,
+			Namespace:     config.Namespace,
+			LeaseDuration: 15 * time.Second,
+			RenewDeadline: 10 * time.Second,
+			RetryPeriod:   2 * time.Second,
+		}
+
+		var err error
+		operator.leaderElectionManager, err = NewLeaderElectionManager(leaderElectionConfig, kubeClient, mgr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create leader election manager: %w", err)
+		}
 	}
 
 	// Initialize core services
@@ -725,6 +744,16 @@ func (o *Operator) setupHTTPRoutes() {
 
 // setupControllers sets up the Kubernetes controllers
 func (o *Operator) setupControllers() error {
+	setupLog := ctrl.Log.WithName("setup")
+	setupLog.Info("Setting up controllers")
+
+	// Debug leader election manager state
+	if o.leaderElectionManager == nil {
+		setupLog.Info("WARNING: Leader election manager is nil!")
+	} else {
+		setupLog.Info("Leader election manager is available", "identity", o.leaderElectionManager.GetIdentity())
+	}
+
 	// Setup Deployment controller
 	deploymentController := &controllers.DeploymentReconciler{
 		Client:                o.Manager.GetClient(),
@@ -742,9 +771,11 @@ func (o *Operator) setupControllers() error {
 		deploymentName = fmt.Sprintf("deployment-%s", operatorID)
 	}
 
+	setupLog.Info("Setting up deployment controller", "name", deploymentName)
 	if err := deploymentController.SetupWithManagerNamed(o.Manager, deploymentName); err != nil {
 		return fmt.Errorf("failed to setup deployment controller: %w", err)
 	}
+	setupLog.Info("Successfully set up deployment controller")
 
 	// Setup StatefulSet controller
 	statefulSetController := &controllers.StatefulSetReconciler{
@@ -763,10 +794,13 @@ func (o *Operator) setupControllers() error {
 		statefulSetName = fmt.Sprintf("statefulset-%s", operatorID)
 	}
 
+	setupLog.Info("Setting up statefulset controller", "name", statefulSetName)
 	if err := statefulSetController.SetupWithManagerNamed(o.Manager, statefulSetName); err != nil {
 		return fmt.Errorf("failed to setup statefulset controller: %w", err)
 	}
+	setupLog.Info("Successfully set up statefulset controller")
 
+	setupLog.Info("All controllers set up successfully")
 	return nil
 }
 

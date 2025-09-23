@@ -95,7 +95,7 @@ func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request) 
 	}
 
 	if workloadConfig == nil {
-		logger.V(1).Info("Pod does not belong to a Spotalis-managed workload")
+		logger.Info("Pod does not belong to a Spotalis-managed workload")
 		return admission.Allowed("not managed by Spotalis")
 	}
 
