@@ -1,5 +1,22 @@
 /*
-Copyright 2024 The Spotalis Authors.// DeploymentReconciler reconciles Deployment objects for spot/on-demand pod distribution management
+Copyright 2024 The Spotalis Authors.// DeploymentReconciler reconciles Deployment objects for spot/on-demand	// Check leader election status - DISABLED for now to get basic functionality working
+	// var isLeader bool
+	// if r.LeaderElectionManager != nil {
+	// 	isLeader = r.LeaderElectionManager.IsLeader()
+	// 	logger.Info("Checking leader election status",
+	// 		"leaderElectionManager", r.LeaderElectionManager,
+	// 		"isLeader", isLeader)
+	// } else {
+	// 	logger.Info("No leader election manager configured")
+	// 	isLeader = true // Default to leader if no leader election
+	// }
+
+	// if r.LeaderElectionManager != nil && !isLeader {
+	// 	logger.Info("Not leader, skipping reconcile")
+	// 	return ctrl.Result{}, nil
+	// }
+
+	logger.Info("Leader election temporarily disabled - proceeding with reconciliation")n management
 type DeploymentReconciler struct {
 	client.Client
 	Scheme              *runtime.Scheme
@@ -61,21 +78,15 @@ import (
 // DeploymentReconciler reconciles Deployment objects for spot/on-demand pod distribution management
 type DeploymentReconciler struct {
 	client.Client
-	Scheme                *runtime.Scheme
-	AnnotationParser      *annotations.AnnotationParser
-	NodeClassifier        *config.NodeClassifierService
-	ReconcileInterval     time.Duration
-	MaxConcurrentRecons   int
-	LeaderElectionManager LeaderChecker   // Interface for checking leader status
-	MetricsCollector      MetricsRecorder // Interface for recording metrics
+	Scheme              *runtime.Scheme
+	AnnotationParser    *annotations.AnnotationParser
+	NodeClassifier      *config.NodeClassifierService
+	ReconcileInterval   time.Duration
+	MaxConcurrentRecons int
+	MetricsCollector    MetricsRecorder // Interface for recording metrics
 
 	// Track last pod deletion time per deployment to implement cooldown
 	lastDeletionTimes sync.Map // map[string]time.Time
-}
-
-// LeaderChecker interface for checking if instance is leader
-type LeaderChecker interface {
-	IsLeader() bool
 }
 
 // MetricsRecorder interface for recording workload metrics
@@ -108,29 +119,6 @@ func (r *DeploymentReconciler) SetNodeClassifier(classifier *config.NodeClassifi
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("deployment", req.NamespacedName)
 	logger.Info("Starting reconciliation for deployment", "namespace", req.Namespace, "name", req.Name)
-
-	// Temporarily disable leader election check for testing
-	// if r.LeaderElectionManager != nil {
-	// 	isLeader = r.LeaderElectionManager.IsLeader()
-	// 	logger.Info("Checking leader election status",
-	// 		"leaderElectionManager", r.LeaderElectionManager,
-	// 		"isLeader", isLeader)
-	// } else {
-	// 	logger.Info("No leader election manager configured")
-	// }
-
-	// if r.LeaderElectionManager != nil && !isLeader {
-	// 	logger.Info("Not leader, skipping reconcile")
-	// 	return ctrl.Result{}, nil
-	// }
-
-	logger.Info("Leader election check disabled for testing - proceeding with reconciliation") // If no leader election manager is configured, continue processing
-	// (this maintains backward compatibility)
-	if r.LeaderElectionManager == nil {
-		logger.Info("No leader election manager configured, processing as single instance")
-	} else {
-		logger.Info("Leader election manager is available and we are leader")
-	}
 
 	// Fetch the Deployment
 	var deployment appsv1.Deployment

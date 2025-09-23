@@ -41,13 +41,12 @@ import (
 // StatefulSetReconciler reconciles StatefulSet objects for spot/on-demand pod distribution management
 type StatefulSetReconciler struct {
 	client.Client
-	Scheme                *runtime.Scheme
-	AnnotationParser      *annotations.AnnotationParser
-	NodeClassifier        *config.NodeClassifierService
-	ReconcileInterval     time.Duration
-	MaxConcurrentRecons   int
-	LeaderElectionManager LeaderChecker   // Interface for checking leader status
-	MetricsCollector      MetricsRecorder // Interface for recording metrics
+	Scheme              *runtime.Scheme
+	AnnotationParser    *annotations.AnnotationParser
+	NodeClassifier      *config.NodeClassifierService
+	ReconcileInterval   time.Duration
+	MaxConcurrentRecons int
+	MetricsCollector    MetricsRecorder // Interface for recording metrics
 
 	// Track last pod deletion time per statefulset to implement cooldown
 	lastDeletionTimes sync.Map // map[string]time.Time
@@ -78,11 +77,8 @@ func (r *StatefulSetReconciler) SetNodeClassifier(classifier *config.NodeClassif
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("statefulset", req.NamespacedName)
 
-	// Only process workloads if we're the leader
-	if r.LeaderElectionManager != nil && !r.LeaderElectionManager.IsLeader() {
-		logger.Info("Not leader, skipping reconcile")
-		return ctrl.Result{}, nil
-	}
+	// With controller-runtime's built-in leader election, only the leader will receive reconcile events
+	// so we don't need manual leader election checks here
 
 	// Fetch the StatefulSet
 	var statefulSet appsv1.StatefulSet

@@ -181,10 +181,7 @@ func (l *LeaderElectionManager) Start(ctx context.Context) error {
 
 // IsLeader returns true if this instance is the current leader
 func (l *LeaderElectionManager) IsLeader() bool {
-	result := l.isLeader
-	setupLog := ctrl.Log.WithName("leader-election-check")
-	setupLog.Info("IsLeader check", "identity", l.config.Identity, "isLeader", result, "currentLeader", l.currentLeader)
-	return result
+	return l.isLeader
 }
 
 // GetDebugInfo returns detailed debug information about leader election state

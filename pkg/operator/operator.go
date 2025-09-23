@@ -408,11 +408,11 @@ func NewOperator(config *OperatorConfig) (*Operator, error) {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		// MetricsBindAddress:      config.MetricsAddr, // TODO: Fix metrics configuration for controller-runtime
-		WebhookServer:          webhook.NewServer(webhook.Options{Port: config.WebhookPort}),
-		HealthProbeBindAddress: config.ProbeAddr,
-		LeaderElection:         false, // Disable built-in leader election - we use our custom implementation
-		// LeaderElectionID:        config.LeaderElectionID, // Not needed when leader election is disabled
-		// LeaderElectionNamespace: config.Namespace, // Not needed when leader election is disabled
+		WebhookServer:           webhook.NewServer(webhook.Options{Port: config.WebhookPort}),
+		HealthProbeBindAddress:  config.ProbeAddr,
+		LeaderElection:          config.LeaderElection, // Use controller-runtime's built-in leader election
+		LeaderElectionID:        config.LeaderElectionID,
+		LeaderElectionNamespace: config.Namespace,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manager: %w", err)
@@ -433,21 +433,8 @@ func NewOperator(config *OperatorConfig) (*Operator, error) {
 
 	// Initialize leader election manager if leader election is enabled
 	if config.LeaderElection {
-		leaderElectionConfig := &LeaderElectionConfig{
-			Enabled:       config.LeaderElection,
-			ID:            config.LeaderElectionID,
-			LeaseName:     config.LeaderElectionID,
-			Namespace:     config.Namespace,
-			LeaseDuration: 15 * time.Second,
-			RenewDeadline: 10 * time.Second,
-			RetryPeriod:   2 * time.Second,
-		}
-
-		var err error
-		operator.leaderElectionManager, err = NewLeaderElectionManager(leaderElectionConfig, kubeClient, mgr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create leader election manager: %w", err)
-		}
+		// Using controller-runtime's built-in leader election instead of custom implementation
+		ctrl.Log.WithName("setup").Info("Using controller-runtime's built-in leader election")
 	}
 
 	// Initialize core services
@@ -495,15 +482,7 @@ func (o *Operator) Start(ctx context.Context) error {
 	// Start the manager (includes controllers and webhooks)
 	o.started = true
 
-	// Start leader election manager if it exists (for NewWithID instances)
-	if o.leaderElectionManager != nil {
-		go func() {
-			if err := o.leaderElectionManager.Start(ctx); err != nil {
-				setupLog.Error(err, "Failed to start leader election manager")
-			}
-		}()
-	}
-
+	// Controller-runtime handles leader election automatically when configured
 	return o.Manager.Start(ctx)
 }
 
@@ -747,22 +726,14 @@ func (o *Operator) setupControllers() error {
 	setupLog := ctrl.Log.WithName("setup")
 	setupLog.Info("Setting up controllers")
 
-	// Debug leader election manager state
-	if o.leaderElectionManager == nil {
-		setupLog.Info("WARNING: Leader election manager is nil!")
-	} else {
-		setupLog.Info("Leader election manager is available", "identity", o.leaderElectionManager.GetIdentity())
-	}
-
 	// Setup Deployment controller
 	deploymentController := &controllers.DeploymentReconciler{
-		Client:                o.Manager.GetClient(),
-		Scheme:                o.Manager.GetScheme(),
-		AnnotationParser:      o.annotationParser,
-		NodeClassifier:        o.nodeClassifier,
-		ReconcileInterval:     o.config.ReconcileInterval,
-		LeaderElectionManager: o.leaderElectionManager,
-		MetricsCollector:      o.metricsCollector,
+		Client:            o.Manager.GetClient(),
+		Scheme:            o.Manager.GetScheme(),
+		AnnotationParser:  o.annotationParser,
+		NodeClassifier:    o.nodeClassifier,
+		ReconcileInterval: o.config.ReconcileInterval,
+		MetricsCollector:  o.metricsCollector,
 	}
 
 	// Use unique controller names based on operator ID for testing
@@ -779,13 +750,12 @@ func (o *Operator) setupControllers() error {
 
 	// Setup StatefulSet controller
 	statefulSetController := &controllers.StatefulSetReconciler{
-		Client:                o.Manager.GetClient(),
-		Scheme:                o.Manager.GetScheme(),
-		AnnotationParser:      o.annotationParser,
-		NodeClassifier:        o.nodeClassifier,
-		ReconcileInterval:     o.config.ReconcileInterval,
-		LeaderElectionManager: o.leaderElectionManager,
-		MetricsCollector:      o.metricsCollector,
+		Client:            o.Manager.GetClient(),
+		Scheme:            o.Manager.GetScheme(),
+		AnnotationParser:  o.annotationParser,
+		NodeClassifier:    o.nodeClassifier,
+		ReconcileInterval: o.config.ReconcileInterval,
+		MetricsCollector:  o.metricsCollector,
 	}
 
 	// Use unique controller names based on operator ID for testing
