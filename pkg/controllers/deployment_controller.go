@@ -158,7 +158,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	deploymentKey := req.NamespacedName.String()
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(deploymentKey); exists {
 		lastDeletion := lastDeletionInterface.(time.Time)
-		cooldownPeriod := 20 * time.Second // Wait 10 seconds after deleting a pod
+		cooldownPeriod := 5 * time.Second // Wait 10 seconds after deleting a pod
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
 		if timeSinceLastDeletion < cooldownPeriod {
@@ -349,7 +349,16 @@ func (r *DeploymentReconciler) needsRebalancing(state *apis.ReplicaState) bool {
 	spotDiff := state.DesiredSpot - state.CurrentSpot
 	onDemandDiff := state.DesiredOnDemand - state.CurrentOnDemand
 
-	return spotDiff != 0 || onDemandDiff != 0
+	needsRebalancing := spotDiff != 0 || onDemandDiff != 0
+
+	// Add debug logging to help diagnose the issue
+	log.Log.Info("needsRebalancing check",
+		"spotDiff", spotDiff,
+		"onDemandDiff", onDemandDiff,
+		"needsRebalancing", needsRebalancing,
+		"currentTotal", currentTotal)
+
+	return needsRebalancing
 }
 
 // performPodRebalancing deletes pods that are on wrong node types to achieve target distribution
