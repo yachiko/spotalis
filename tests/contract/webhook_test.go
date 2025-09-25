@@ -237,7 +237,7 @@ var _ = Describe("POST /mutate webhook", func() {
 			Expect(response.Response.Allowed).To(BeTrue())
 		})
 
-		It("should add spotalis annotations when replica strategy is specified", func() {
+		It("should add node selector patches when replica strategy is specified", func() {
 			admissionReview := &admissionv1.AdmissionReview{
 				Request: admissionRequest,
 			}
@@ -256,7 +256,12 @@ var _ = Describe("POST /mutate webhook", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			if response.Response.Patch != nil {
-				Expect(string(response.Response.Patch)).To(ContainSubstring("spotalis.io/managed"))
+				// The webhook should apply node scheduling mutations like nodeSelector
+				patch := string(response.Response.Patch)
+				Expect(patch).To(Or(
+					ContainSubstring("nodeSelector"),
+					ContainSubstring("tolerations"),
+				))
 			}
 		})
 	})

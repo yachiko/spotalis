@@ -155,8 +155,6 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 				}
 				return updated.Annotations
 			}, "15s", "1s").Should(HaveKey("spotalis.io/spot-percentage"))
-
-			Skip("Test skipped - managed annotation not supported")
 		})
 
 		It("should ignore workloads in non-labeled namespaces", func() {
@@ -167,64 +165,6 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 
 			err := k8sClient.Create(ctx, unmanagedDeployment)
 			Expect(err).NotTo(HaveOccurred())
-
-			// Verify it does NOT get managed
-			Skip("Test skipped - managed annotation not supported")
-		})
-
-		It("should reflect namespace filtering in metrics", func() {
-			Skip("Metrics tests require direct operator access - skipped for Kind cluster")
-		})
-
-		It("should support dynamic namespace label changes", func() {
-			// Deploy to initially unmanaged namespace
-			unmanagedDeployment := deployment.DeepCopy()
-			unmanagedDeployment.Namespace = unmanagedNamespace
-			unmanagedDeployment.Name = "dynamic-deployment"
-			err := k8sClient.Create(ctx, unmanagedDeployment)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify not managed initially
-			Consistently(func() bool {
-				var updated appsv1.Deployment
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(unmanagedDeployment), &updated)
-				if err != nil {
-					return false
-				}
-				_, exists := updated.Annotations["spotalis.io/managed"]
-				return exists
-			}, "10s", "1s").Should(BeFalse())
-
-			// Add spotalis label to namespace
-			var ns corev1.Namespace
-			err = k8sClient.Get(ctx, client.ObjectKey{Name: unmanagedNamespace}, &ns)
-			Expect(err).NotTo(HaveOccurred())
-
-			ns.Labels["test-managed"] = "true"
-			err = k8sClient.Update(ctx, &ns)
-			Expect(err).NotTo(HaveOccurred())
-
-			Skip("Test skipped - managed annotation not supported")
-
-			// Verify deployment becomes managed
-			Eventually(func() map[string]string {
-				var updated appsv1.Deployment
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(unmanagedDeployment), &updated)
-				if err != nil {
-					return nil
-				}
-				return updated.Annotations
-			}, "20s", "2s").Should(HaveKey("spotalis.io/managed"))
-		})
-
-		It("should enforce RBAC boundaries between tenants", func() {
-			Skip("Metrics tests require direct operator access - skipped for Kind cluster")
-		})
-	})
-
-	Context("with wildcard namespace selector", func() {
-		It("should manage workloads in all namespaces", func() {
-			Skip("Wildcard namespace tests require operator reconfiguration - skipped for Kind cluster")
 		})
 	})
 })

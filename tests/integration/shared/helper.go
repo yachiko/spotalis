@@ -114,7 +114,7 @@ func (h *KindClusterHelper) CreateTestNamespace() (string, error) {
 			Name: namespace,
 			Labels: map[string]string{
 				"spotalis.io/test":           "true", // Mark as test resource
-				"spotalis.io/managed":        "true", // Enable Spotalis management
+				"spotalis.io/enabled":        "true", // Enable Spotalis features
 				"test.spotalis.io/cleanup":   "auto", // Enable automatic cleanup
 				"test.spotalis.io/component": "integration-test",
 			},
@@ -131,8 +131,8 @@ func (h *KindClusterHelper) CreateTestNamespaceWithLabels(customLabels map[strin
 	// Start with standard test labels
 	labels := map[string]string{
 		"spotalis.io/test":           "true",
-		"spotalis.io/managed":        "true",
 		"test.spotalis.io/cleanup":   "auto",
+		"spotalis.io/enabled":        "true", // Enable Spotalis features
 		"test.spotalis.io/component": "integration-test",
 	}
 
