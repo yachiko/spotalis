@@ -515,36 +515,3 @@ var _ = Describe("Rate Limiter", func() {
 		})
 	})
 })
-
-// Helper functions for testing
-
-func validateRateLimiterConfig(config *RateLimiterConfig) bool {
-	if config == nil {
-		return false
-	}
-
-	// Validate basic rate limiting parameters
-	if config.QPS < 0 || config.Burst < 0 {
-		return false
-	}
-
-	// Validate backoff parameters
-	if config.BaseDelay <= 0 || config.MaxDelay <= 0 {
-		return false
-	}
-
-	if config.MaxDelay <= config.BaseDelay {
-		return false
-	}
-
-	if config.BackoffMultiplier <= 1.0 {
-		return false
-	}
-
-	// Validate circuit breaker parameters
-	if config.FailureThreshold <= 0 || config.RecoveryTimeout <= 0 || config.HalfOpenRequests <= 0 {
-		return false
-	}
-
-	return true
-}

@@ -127,8 +127,7 @@ type AdmissionController struct {
 	tlsConfig *tls.Config
 
 	// Webhook handlers
-	mutatingHandler   admission.Handler
-	validatingHandler admission.Handler
+	mutatingHandler admission.Handler
 
 	// State
 	webhookServer webhook.Server

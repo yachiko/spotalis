@@ -60,14 +60,6 @@ import (
 	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 )
 
-const (
-	// Log levels
-	logLevelDebug = "debug"
-
-	// Environment values
-	envValueTrue = "true"
-)
-
 // Operator represents the main Spotalis operator following Karpenter architecture pattern
 type Operator struct {
 	manager.Manager

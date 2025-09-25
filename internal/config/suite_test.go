@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -38,49 +37,3 @@ var _ = AfterSuite(func() {
 	// Clean up any global test configuration
 	By("Tearing down the test environment")
 })
-
-// Helper function to set environment variables for testing
-func setEnvVars(envVars map[string]string) {
-	for key, value := range envVars {
-		err := os.Setenv(key, value)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
-// Helper function to clean up environment variables after testing
-func cleanupEnvVars(envVars map[string]string) {
-	for key := range envVars {
-		err := os.Unsetenv(key)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
-// Helper function to create a temporary YAML config file for testing
-func createTempConfigFile(content string) (*os.File, error) {
-	tmpFile, err := os.CreateTemp("", "config-test-*.yaml")
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = tmpFile.WriteString(content)
-	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return nil, err
-	}
-
-	err = tmpFile.Close()
-	if err != nil {
-		os.Remove(tmpFile.Name())
-		return nil, err
-	}
-
-	return tmpFile, nil
-}
-
-// Helper function to clean up temporary files
-func cleanupTempFile(file *os.File) {
-	if file != nil {
-		os.Remove(file.Name())
-	}
-}

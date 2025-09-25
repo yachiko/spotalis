@@ -25,9 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -421,35 +419,3 @@ var _ = Describe("Mock Integration", func() {
 		Expect(resp.Result.Message).To(Equal("mock handler"))
 	})
 })
-
-// Helper functions for testing
-
-func createTestCertificates(certPath, keyPath string) error {
-	// In a real test, you would generate valid test certificates
-	// For now, we'll create placeholder files
-	certContent := []byte(`-----BEGIN CERTIFICATE-----
-MIIC...placeholder certificate content...
------END CERTIFICATE-----`)
-
-	keyContent := []byte(`-----BEGIN PRIVATE KEY-----
-MIIE...placeholder private key content...
------END PRIVATE KEY-----`)
-
-	if err := os.WriteFile(certPath, certContent, 0600); err != nil {
-		return err
-	}
-
-	return os.WriteFile(keyPath, keyContent, 0600)
-}
-
-func setupTestManager() (manager.Manager, error) {
-	// Create a test manager for webhook testing
-	scheme := runtime.NewScheme()
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:         scheme,
-		LeaderElection: false,
-	})
-
-	return mgr, err
-}

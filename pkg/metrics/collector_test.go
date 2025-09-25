@@ -23,8 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 
 	"github.com/ahoma/spotalis/pkg/apis"
 )
@@ -560,22 +558,3 @@ var _ = Describe("Metrics Integration", func() {
 		})
 	})
 })
-
-// Helper function to get metric value (would need actual Prometheus client integration)
-func getMetricValue(metric prometheus.Metric) float64 {
-	// In a real test, we'd extract the actual metric value
-	// This is a placeholder implementation
-	var dtoMetric dto.Metric
-	if err := metric.Write(&dtoMetric); err != nil {
-		return 0
-	}
-
-	if dtoMetric.Gauge != nil {
-		return dtoMetric.Gauge.GetValue()
-	}
-	if dtoMetric.Counter != nil {
-		return dtoMetric.Counter.GetValue()
-	}
-
-	return 0
-}
