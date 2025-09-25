@@ -36,7 +36,7 @@ linters-settings:
   revive:
     min-confidence: 0.8
   
-  gomnd:
+  mnd:
     checks:
       - argument
       - case
@@ -45,7 +45,8 @@ linters-settings:
       - return
   
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   
   misspell:
     locale: US
@@ -59,7 +60,7 @@ linters:
   enable:
     - bodyclose
     - errcheck
-    - exportloopref
+    - copyloopvar
     - exhaustive
     - funlen
     - gochecknoinits
@@ -68,7 +69,7 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - gomnd
+    - mnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -91,7 +92,7 @@ issues:
     # Exclude some linters from running on tests files.
     - path: _test\.go
       linters:
-        - gomnd
+        - mnd
         - funlen
         - gochecknoinits
     
