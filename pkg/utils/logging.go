@@ -31,6 +31,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+const (
+	// Log levels
+	logLevelDebug = "debug"
+	logLevelInfo  = "info"
+	logLevelWarn  = "warn"
+	logLevelError = "error"
+
+	// Log formats
+	logFormatText = "text"
+)
+
 // LoggerConfig contains logging configuration
 type LoggerConfig struct {
 	// Basic configuration
@@ -62,7 +73,7 @@ type LoggerConfig struct {
 // DefaultLoggerConfig returns default logger configuration
 func DefaultLoggerConfig() *LoggerConfig {
 	return &LoggerConfig{
-		Level:            "info",
+		Level:            logLevelInfo,
 		Format:           "json",
 		Development:      false,
 		Output:           os.Stdout,
@@ -106,7 +117,7 @@ func NewLogger(config *LoggerConfig) (*Logger, error) {
 	switch strings.ToLower(config.Format) {
 	case "json":
 		handler = slog.NewJSONHandler(config.Output, opts)
-	case "text":
+	case logFormatText:
 		handler = slog.NewTextHandler(config.Output, opts)
 	case "console":
 		handler = NewConsoleHandler(config.Output, opts)
@@ -307,13 +318,13 @@ func (l *Logger) LogLeaderElection(ctx context.Context, event, identity, leaderI
 // parseLogLevel parses string log level to slog.Level
 func parseLogLevel(level string) slog.Level {
 	switch strings.ToLower(level) {
-	case "debug":
+	case logLevelDebug:
 		return slog.LevelDebug
-	case "info":
+	case logLevelInfo:
 		return slog.LevelInfo
-	case "warn", "warning":
+	case logLevelWarn, "warning":
 		return slog.LevelWarn
-	case "error":
+	case logLevelError:
 		return slog.LevelError
 	default:
 		return slog.LevelInfo

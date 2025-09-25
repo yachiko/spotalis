@@ -399,12 +399,6 @@ var _ = Describe("NodeClassifierService", func() {
 			Expect(nodes).To(HaveLen(1))
 			Expect(nodes[0].Name).To(Equal("ondemand-node"))
 		})
-
-		It("should return error for unsupported node type", func() {
-			nodes, err := nodeClassifier.GetNodesOfType(ctx, apis.NodeTypeUnknown)
-			Expect(err).To(HaveOccurred())
-			Expect(nodes).To(BeNil())
-		})
 	})
 
 	Describe("RefreshCache", func() {

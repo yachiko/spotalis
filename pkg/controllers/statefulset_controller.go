@@ -1,8 +1,12 @@
 /*
 Copyright 2024 The Spotalis Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
+Licensed under the Apache License, Version 2.0 (the "License")	if lastDeletionInterface, exists := r.lastPodDeletions.Load(statefulSetKey); exists {
+		lastDeletion, ok := lastDeletionInterface.(time.Time)
+		if !ok {
+			logger.Error(nil, "Invalid type for last deletion time", "statefulSetKey", statefulSetKey)
+			return fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+		}you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
@@ -102,7 +106,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Implement cooldown period after pod deletion to avoid constant rescheduling
 	statefulsetKey := req.NamespacedName.String()
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(statefulsetKey); exists {
-		lastDeletion := lastDeletionInterface.(time.Time)
+		lastDeletion, ok := lastDeletionInterface.(time.Time)
+		if !ok {
+			logger.Error(nil, "Invalid type for last deletion time", "statefulsetKey", statefulsetKey)
+			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+		}
 		cooldownPeriod := 3 * time.Minute // Wait 3 minutes after deleting a pod
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
@@ -217,6 +225,10 @@ func (r *StatefulSetReconciler) calculateCurrentReplicaState(ctx context.Context
 			spotReplicas++
 		case apis.NodeTypeOnDemand:
 			onDemandReplicas++
+		case apis.NodeTypeUnknown:
+			// Unknown node type - treat as on-demand for safety
+			onDemandReplicas++
+			// Note: pod.Name node.Name has unknown type, treating as on-demand
 		}
 	}
 
@@ -293,6 +305,9 @@ func (r *StatefulSetReconciler) performPodRebalancing(ctx context.Context, state
 		case apis.NodeTypeSpot:
 			spotPods = append(spotPods, pod)
 		case apis.NodeTypeOnDemand:
+			onDemandPods = append(onDemandPods, pod)
+		case apis.NodeTypeUnknown:
+			// Unknown node type - treat as on-demand for safety
 			onDemandPods = append(onDemandPods, pod)
 		}
 	}

@@ -40,7 +40,8 @@ var _ = Describe("MutationHandler", func() {
 		ctx = context.Background()
 		// Create a scheme with the necessary types
 		testScheme := runtime.NewScheme()
-		_ = scheme.AddToScheme(testScheme)
+		err := scheme.AddToScheme(testScheme)
+		Expect(err).NotTo(HaveOccurred())
 		handler = NewMutationHandler(nil, testScheme)
 	})
 

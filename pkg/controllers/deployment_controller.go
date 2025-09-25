@@ -1,5 +1,19 @@
 /*
-Copyright 2024 The Spotalis Authors.// DeploymentReconciler reconciles Deployment objects for spot/on-demand	// Check leader election status - DISABLED for now to get basic functionality working
+Copyright 2024 The Spotalis Authors.// DeploymentReconciler reconciles Deployment objects for spot/on-demand	// Check leader election status - DISABLED for	if lastDeletionInterface, exists := r.lastPodDeletions.Load(deploymentKey); exists {
+		lastDeletion, ok := lastDeletionInterface.(time.Time)
+		if !ok {
+			logger.Error(nil, "Invalid type for last deletion time", "deploymentKey", deploymentKe		nodeType := r.nodeClassifier.ClassifyPod(pod)
+		switch nodeType {
+		case apis.NodeTypeSpot:
+			spotPods = append(spotPods, pod)
+		case apis.NodeTypeOnDemand:
+			onDemandPods = append(onDemandPods, pod)
+		case apis.NodeTypeUnknown:
+			// Unknown node type - treat as on-demand for safety
+			onDemandPods = append(onDemandPods, pod)
+			// Note: pod.Name in pod.Namespace has unknown node type, treating as on-demand
+		}eturn fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+		}ow to get basic functionality working
 	// var isLeader bool
 	// if r.LeaderElectionManager != nil {
 	// 	isLeader = r.LeaderElectionManager.IsLeader()
@@ -100,7 +114,7 @@ func NewDeploymentReconciler(client client.Client, scheme *runtime.Scheme) *Depl
 		Client:              client,
 		Scheme:              scheme,
 		AnnotationParser:    annotations.NewAnnotationParser(),
-		ReconcileInterval:   10 * time.Second,
+		ReconcileInterval:   5 * time.Minute,
 		MaxConcurrentRecons: 10,
 	}
 }
@@ -157,7 +171,11 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Implement cooldown period after pod deletion to avoid constant rescheduling
 	deploymentKey := req.NamespacedName.String()
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(deploymentKey); exists {
-		lastDeletion := lastDeletionInterface.(time.Time)
+		lastDeletion, ok := lastDeletionInterface.(time.Time)
+		if !ok {
+			logger.Error(nil, "Invalid type for last deletion time", "deploymentKey", deploymentKey)
+			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+		}
 		cooldownPeriod := 5 * time.Second // Wait 10 seconds after deleting a pod
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
@@ -321,6 +339,9 @@ func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context,
 			spotReplicas++
 		case apis.NodeTypeOnDemand:
 			onDemandReplicas++
+		case apis.NodeTypeUnknown:
+			// Treat unknown nodes as on-demand for safety
+			onDemandReplicas++
 		}
 	}
 
@@ -399,6 +420,10 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 			spotPods = append(spotPods, pod)
 		case apis.NodeTypeOnDemand:
 			onDemandPods = append(onDemandPods, pod)
+		case apis.NodeTypeUnknown:
+			// Unknown node type - treat as on-demand for safety
+			onDemandPods = append(onDemandPods, pod)
+			// Note: pod.Name on node.Name has unknown type, treating as on-demand
 		}
 	}
 
@@ -406,17 +431,19 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 	var podsToDelete []corev1.Pod
 
 	// If we have too many spot pods, delete the excess
-	if int32(len(spotPods)) > desiredState.DesiredSpot {
-		excess := int32(len(spotPods)) - desiredState.DesiredSpot
-		for i := int32(0); i < excess && i < int32(len(spotPods)); i++ {
+	spotPodsCount := int32(len(spotPods))
+	if spotPodsCount > desiredState.DesiredSpot {
+		excess := spotPodsCount - desiredState.DesiredSpot
+		for i := int32(0); i < excess && i < spotPodsCount; i++ {
 			podsToDelete = append(podsToDelete, spotPods[i])
 		}
 	}
 
 	// If we have too many on-demand pods, delete the excess
-	if int32(len(onDemandPods)) > desiredState.DesiredOnDemand {
-		excess := int32(len(onDemandPods)) - desiredState.DesiredOnDemand
-		for i := int32(0); i < excess && i < int32(len(onDemandPods)); i++ {
+	onDemandPodsCount := int32(len(onDemandPods))
+	if onDemandPodsCount > desiredState.DesiredOnDemand {
+		excess := onDemandPodsCount - desiredState.DesiredOnDemand
+		for i := int32(0); i < excess && i < onDemandPodsCount; i++ {
 			podsToDelete = append(podsToDelete, onDemandPods[i])
 		}
 	}

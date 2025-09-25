@@ -19,7 +19,6 @@ package webhook
 import (
 	"context"
 	"crypto/tls"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -48,7 +47,7 @@ var _ = Describe("AdmissionController", func() {
 
 		// Create temporary directory for certificates
 		var err error
-		tempDir, err = ioutil.TempDir("", "webhook-test-*")
+		tempDir, err = os.MkdirTemp("", "webhook-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
 		certPath = filepath.Join(tempDir, "tls.crt")
@@ -326,9 +325,10 @@ var _ = Describe("AdmissionController", func() {
 
 			// This should attempt to delete the webhook configuration
 			// In our fake client, this might not exist, so it could error
-			_ = controller.Cleanup(ctx)
+			err := controller.Cleanup(ctx)
 			// The error behavior depends on the fake client implementation
 			// In some cases it might succeed, in others it might fail
+			_ = err // Explicitly ignore error since this is expected in tests
 		})
 	})
 
@@ -351,7 +351,7 @@ var _ = Describe("AdmissionController", func() {
 		It("should handle invalid certificate content", func() {
 			// Create a file with invalid certificate content
 			invalidCert := []byte("invalid certificate content")
-			err := ioutil.WriteFile(certPath, invalidCert, 0644)
+			err := os.WriteFile(certPath, invalidCert, 0600)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = controller.ValidateCertificates()
@@ -435,11 +435,11 @@ MIIC...placeholder certificate content...
 MIIE...placeholder private key content...
 -----END PRIVATE KEY-----`)
 
-	if err := ioutil.WriteFile(certPath, certContent, 0644); err != nil {
+	if err := os.WriteFile(certPath, certContent, 0600); err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(keyPath, keyContent, 0600)
+	return os.WriteFile(keyPath, keyContent, 0600)
 }
 
 func setupTestManager() (manager.Manager, error) {

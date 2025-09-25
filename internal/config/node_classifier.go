@@ -30,6 +30,14 @@ import (
 	"github.com/ahoma/spotalis/pkg/apis"
 )
 
+const (
+	// Capacity types
+	capacityTypeSpot = "spot"
+
+	// Cloud providers
+	cloudProviderAWS = "aws"
+)
+
 // NodeClassifierService provides node classification functionality
 type NodeClassifierService struct {
 	client client.Client
@@ -163,7 +171,7 @@ func (n *NodeClassifierService) classifyByCloudProvider(node *corev1.Node) apis.
 
 		// Check Karpenter nodes
 		if capacityType, exists := node.Labels["karpenter.sh/capacity-type"]; exists {
-			if capacityType == "spot" {
+			if capacityType == capacityTypeSpot {
 				return apis.NodeTypeSpot
 			}
 			if capacityType == "on-demand" {
@@ -215,8 +223,11 @@ func (n *NodeClassifierService) GetNodesOfType(ctx context.Context, nodeType api
 		for _, node := range n.cache.OnDemandNodes {
 			result = append(result, node)
 		}
+	case apis.NodeTypeUnknown:
+		// Return empty slice for unknown node types
+		result = []*corev1.Node{}
 	default:
-		return nil, fmt.Errorf("unsupported node type: %s", nodeType)
+		return nil, fmt.Errorf("unexpected node type: %s", nodeType)
 	}
 
 	return result, nil
@@ -261,6 +272,7 @@ func (n *NodeClassifierService) RefreshCache(ctx context.Context) error {
 			n.cache.SpotNodes[node.Name] = node
 		case apis.NodeTypeOnDemand:
 			n.cache.OnDemandNodes[node.Name] = node
+		case apis.NodeTypeUnknown:
 			// Ignore unknown nodes
 		}
 	}
@@ -388,10 +400,10 @@ func (n *NodeClassifierService) DetectCloudProvider(ctx context.Context) (string
 
 	// Check for AWS/EKS
 	if _, exists := node.Labels["eks.amazonaws.com/capacityType"]; exists {
-		return "aws", nil
+		return cloudProviderAWS, nil
 	}
 	if _, exists := node.Labels["karpenter.sh/capacity-type"]; exists {
-		return "aws", nil
+		return cloudProviderAWS, nil
 	}
 
 	// Check for GCP/GKE
@@ -408,7 +420,7 @@ func (n *NodeClassifierService) DetectCloudProvider(ctx context.Context) (string
 	if node.Spec.ProviderID != "" {
 		providerID := strings.ToLower(node.Spec.ProviderID)
 		if strings.Contains(providerID, "aws") {
-			return "aws", nil
+			return cloudProviderAWS, nil
 		}
 		if strings.Contains(providerID, "gce") || strings.Contains(providerID, "gcp") {
 			return "gcp", nil

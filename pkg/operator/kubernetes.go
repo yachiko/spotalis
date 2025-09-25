@@ -32,6 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// RBAC verbs
+	verbGet = "get"
+)
+
 // KubernetesConfig contains Kubernetes client configuration
 type KubernetesConfig struct {
 	// Client configuration
@@ -162,19 +167,19 @@ func (k *KubernetesClientManager) ValidatePermissions(ctx context.Context) error
 		group    string
 	}{
 		{"nodes", "list", ""},
-		{"nodes", "get", ""},
+		{"nodes", verbGet, ""},
 		{"pods", "list", ""},
-		{"pods", "get", ""},
+		{"pods", verbGet, ""},
 		{"pods", "patch", ""},
 		{"deployments", "list", "apps"},
-		{"deployments", "get", "apps"},
+		{"deployments", verbGet, "apps"},
 		{"deployments", "patch", "apps"},
 		{"statefulsets", "list", "apps"},
-		{"statefulsets", "get", "apps"},
+		{"statefulsets", verbGet, "apps"},
 		{"statefulsets", "patch", "apps"},
 		{"events", "create", ""},
 		{"leases", "create", "coordination.k8s.io"},
-		{"leases", "get", "coordination.k8s.io"},
+		{"leases", verbGet, "coordination.k8s.io"},
 		{"leases", "update", "coordination.k8s.io"},
 	}
 
@@ -446,12 +451,12 @@ func (k *KubernetesClientManager) validatePermission(ctx context.Context, resour
 	// we'll just try to perform a basic operation
 	switch resource {
 	case "nodes":
-		if verb == "list" || verb == "get" {
+		if verb == "list" || verb == verbGet {
 			_, err := k.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
 	case "pods":
-		if verb == "list" || verb == "get" {
+		if verb == "list" || verb == verbGet {
 			_, err := k.kubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}

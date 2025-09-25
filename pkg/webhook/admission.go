@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -331,7 +330,7 @@ func (a *AdmissionController) createClientConfig() admissionv1.WebhookClientConf
 
 // extractCABundle extracts CA bundle from certificate file
 func (a *AdmissionController) extractCABundle(certPath string) error {
-	certPEM, err := ioutil.ReadFile(certPath)
+	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
 		return fmt.Errorf("failed to read certificate file: %w", err)
 	}
@@ -384,12 +383,15 @@ func (a *AdmissionController) getCipherSuites() []uint16 {
 func (a *AdmissionController) ValidateCertificates() error {
 	certPath := filepath.Join(a.config.CertDir, a.config.CertName)
 
-	certPEM, err := ioutil.ReadFile(certPath)
+	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
 		return fmt.Errorf("failed to read certificate: %w", err)
 	}
 
-	block, _ := x509.ParseCertificate(certPEM)
+	block, err := x509.ParseCertificate(certPEM)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %w", err)
+	}
 	if block == nil {
 		return fmt.Errorf("failed to parse certificate")
 	}

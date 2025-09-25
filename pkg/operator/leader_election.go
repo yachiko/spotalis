@@ -30,6 +30,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+const (
+	// Default values
+	defaultHostname = "unknown"
+
+	// Channel buffer sizes
+	leaderChangedChannelBuffer = 10
+)
+
 // LeaderElectionConfig contains leader election configuration
 type LeaderElectionConfig struct {
 	// Basic configuration
@@ -56,7 +64,7 @@ type LeaderElectionConfig struct {
 func DefaultLeaderElectionConfig() *LeaderElectionConfig {
 	hostname, _ := os.Hostname()
 	if hostname == "" {
-		hostname = "unknown"
+		hostname = defaultHostname
 	}
 
 	return &LeaderElectionConfig{
@@ -99,7 +107,7 @@ func NewLeaderElectionManager(config *LeaderElectionConfig, kubeClient kubernete
 	if config.Identity == "" {
 		hostname, _ := os.Hostname()
 		if hostname == "" {
-			hostname = "unknown"
+			hostname = defaultHostname
 		}
 		config.Identity = hostname
 	}
@@ -110,7 +118,7 @@ func NewLeaderElectionManager(config *LeaderElectionConfig, kubeClient kubernete
 		manager:       mgr,
 		started:       make(chan struct{}),
 		stopped:       make(chan struct{}),
-		leaderChanged: make(chan string, 10),
+		leaderChanged: make(chan string, leaderChangedChannelBuffer),
 	}, nil
 }
 

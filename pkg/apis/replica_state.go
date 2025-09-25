@@ -65,12 +65,12 @@ func (r *ReplicaState) CalculateDesiredDistribution(config WorkloadConfiguration
 	}
 
 	// Apply minimum on-demand first (safety constraint)
-	r.DesiredOnDemand = max(config.MinOnDemand, 0)
+	r.DesiredOnDemand = maxInt32(config.MinOnDemand, 0)
 
 	// Calculate spot replicas from percentage
 	if config.SpotPercentage > 0 {
 		spotReplicas := (r.TotalReplicas * config.SpotPercentage) / 100
-		r.DesiredSpot = min(spotReplicas, r.TotalReplicas-r.DesiredOnDemand)
+		r.DesiredSpot = minInt32(spotReplicas, r.TotalReplicas-r.DesiredOnDemand)
 	} else {
 		r.DesiredSpot = 0
 	}
@@ -216,14 +216,14 @@ func (r *ReplicaState) GetDesiredSpotPercentage() int32 {
 }
 
 // Helper functions
-func max(a, b int32) int32 {
+func maxInt32(a, b int32) int32 {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func min(a, b int32) int32 {
+func minInt32(a, b int32) int32 {
 	if a < b {
 		return a
 	}

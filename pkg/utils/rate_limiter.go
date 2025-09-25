@@ -391,6 +391,8 @@ func (cb *CircuitBreaker) RecordSuccess() {
 		}
 	case CircuitBreakerStateClosed:
 		cb.failures = 0
+	case CircuitBreakerStateOpen:
+		// No action needed for open state on success
 	}
 }
 
@@ -409,6 +411,8 @@ func (cb *CircuitBreaker) RecordFailure() {
 		}
 	case CircuitBreakerStateHalfOpen:
 		cb.state = CircuitBreakerStateOpen
+	case CircuitBreakerStateOpen:
+		// Already open, no state change needed
 	}
 }
 
@@ -596,8 +600,8 @@ func (m *RateLimiterMetrics) GetResourceMetrics(resource string) *ResourceMetric
 
 	if metrics, exists := m.resourceMetrics[resource]; exists {
 		// Return a copy to avoid race conditions
-		copy := *metrics
-		return &copy
+		metricsCopy := *metrics
+		return &metricsCopy
 	}
 	return nil
 }

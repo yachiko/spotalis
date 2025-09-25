@@ -158,6 +158,11 @@ func (nf *NamespaceFilter) IsStale(maxAge time.Duration) bool {
 	nf.mutex.RLock()
 	defer nf.mutex.RUnlock()
 
+	// If maxAge is 0, always consider it stale
+	if maxAge == 0 {
+		return true
+	}
+
 	return time.Since(nf.LastUpdated) > maxAge
 }
 

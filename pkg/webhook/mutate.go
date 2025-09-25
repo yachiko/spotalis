@@ -35,6 +35,20 @@ import (
 	"github.com/ahoma/spotalis/pkg/apis"
 )
 
+const (
+	// Workload types
+	workloadTypeReplicaSet  = "ReplicaSet"
+	workloadTypeStatefulSet = "StatefulSet"
+	workloadTypeDeployment  = "Deployment"
+
+	// Capacity types
+	capacityTypeOnDemand = "on-demand"
+	capacityTypeSpot     = "spot"
+
+	// Math constants
+	percentageBase = 100.0
+)
+
 // MutationHandler handles admission webhook requests for pod and workload mutation
 type MutationHandler struct {
 	Client           client.Client
@@ -136,16 +150,16 @@ func (m *MutationHandler) getWorkloadConfigForPod(ctx context.Context, pod *core
 	// Check if pod has owner references to a Deployment or StatefulSet
 	for _, ownerRef := range pod.OwnerReferences {
 		switch ownerRef.Kind {
-		case "ReplicaSet":
+		case workloadTypeReplicaSet:
 			// For deployments, we need to get the ReplicaSet's owner (Deployment)
 			if config, err := m.getConfigFromReplicaSet(ctx, pod.Namespace, ownerRef.Name); err == nil && config != nil {
 				return config, nil
 			}
-		case "StatefulSet":
+		case workloadTypeStatefulSet:
 			if config, err := m.getConfigFromStatefulSet(ctx, pod.Namespace, ownerRef.Name); err == nil && config != nil {
 				return config, nil
 			}
-		case "Deployment":
+		case workloadTypeDeployment:
 			if config, err := m.getConfigFromDeployment(ctx, pod.Namespace, ownerRef.Name); err == nil && config != nil {
 				return config, nil
 			}
@@ -164,7 +178,7 @@ func (m *MutationHandler) getConfigFromReplicaSet(ctx context.Context, namespace
 
 	// Get the Deployment that owns this ReplicaSet
 	for _, ownerRef := range rs.OwnerReferences {
-		if ownerRef.Kind == "Deployment" {
+		if ownerRef.Kind == workloadTypeDeployment {
 			return m.getConfigFromDeployment(ctx, namespace, ownerRef.Name)
 		}
 	}
@@ -226,7 +240,7 @@ func (m *MutationHandler) generateNodeSelectorPatches(pod *corev1.Pod, config *a
 	capacityType, err := m.determineTargetCapacityType(pod, config)
 	if err != nil {
 		// If we can't determine the state, default to on-demand for safety
-		capacityType = "on-demand"
+		capacityType = capacityTypeOnDemand
 	}
 
 	nodeSelector := map[string]string{
@@ -261,13 +275,13 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 	// Get the workload that owns this pod
 	workloadName, workloadKind, err := m.getWorkloadInfo(pod)
 	if err != nil {
-		return "on-demand", err
+		return capacityTypeOnDemand, err
 	}
 
 	// Count current pods for this workload
 	spotCount, onDemandCount, err := m.countCurrentPods(ctx, pod.Namespace, workloadName, workloadKind)
 	if err != nil {
-		return "on-demand", err
+		return capacityTypeOnDemand, err
 	}
 
 	// Calculate totals
@@ -278,32 +292,32 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 
 	// If we haven't met the minimum on-demand requirement, schedule on on-demand
 	if onDemandCount < requiredOnDemand {
-		return "on-demand", nil
+		return capacityTypeOnDemand, nil
 	}
 
 	// Calculate the target distribution based on spot percentage
-	targetSpotCount := int(float64(totalPods) * float64(config.SpotPercentage) / 100.0)
+	targetSpotCount := int(float64(totalPods) * float64(config.SpotPercentage) / percentageBase)
 	targetOnDemandCount := totalPods - targetSpotCount
 
 	// Prioritize on-demand: if we need more on-demand pods, schedule there
 	if onDemandCount < targetOnDemandCount {
-		return "on-demand", nil
+		return capacityTypeOnDemand, nil
 	}
 
 	// If we have enough on-demand pods and need more spot pods, schedule on spot
 	if spotCount < targetSpotCount {
-		return "spot", nil
+		return capacityTypeSpot, nil
 	}
 
 	// Default to on-demand for safety
-	return "on-demand", nil
+	return capacityTypeOnDemand, nil
 }
 
 // getWorkloadInfo extracts workload information from pod owner references
 func (m *MutationHandler) getWorkloadInfo(pod *corev1.Pod) (string, string, error) {
 	for _, ownerRef := range pod.OwnerReferences {
 		switch ownerRef.Kind {
-		case "ReplicaSet":
+		case workloadTypeReplicaSet:
 			// For deployments, we need to get the ReplicaSet's owner (Deployment)
 			ctx := context.Background()
 			var rs appsv1.ReplicaSet
@@ -312,14 +326,14 @@ func (m *MutationHandler) getWorkloadInfo(pod *corev1.Pod) (string, string, erro
 			}
 
 			for _, rsOwnerRef := range rs.OwnerReferences {
-				if rsOwnerRef.Kind == "Deployment" {
-					return rsOwnerRef.Name, "Deployment", nil
+				if rsOwnerRef.Kind == workloadTypeDeployment {
+					return rsOwnerRef.Name, workloadTypeDeployment, nil
 				}
 			}
-		case "StatefulSet":
-			return ownerRef.Name, "StatefulSet", nil
-		case "Deployment":
-			return ownerRef.Name, "Deployment", nil
+		case workloadTypeStatefulSet:
+			return ownerRef.Name, workloadTypeStatefulSet, nil
+		case workloadTypeDeployment:
+			return ownerRef.Name, workloadTypeDeployment, nil
 		}
 	}
 
@@ -349,9 +363,9 @@ func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workl
 		capacityType := m.getPodCapacityType(&pod)
 
 		switch capacityType {
-		case "spot":
+		case capacityTypeSpot:
 			spotCount++
-		case "on-demand":
+		case capacityTypeOnDemand:
 			onDemandCount++
 		}
 	}
@@ -363,8 +377,8 @@ func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workl
 func (m *MutationHandler) podBelongsToWorkload(pod *corev1.Pod, workloadName, workloadKind string) bool {
 	for _, ownerRef := range pod.OwnerReferences {
 		switch workloadKind {
-		case "Deployment":
-			if ownerRef.Kind == "ReplicaSet" {
+		case workloadTypeDeployment:
+			if ownerRef.Kind == workloadTypeReplicaSet {
 				// Check if the ReplicaSet belongs to our deployment
 				ctx := context.Background()
 				var rs appsv1.ReplicaSet
@@ -373,13 +387,13 @@ func (m *MutationHandler) podBelongsToWorkload(pod *corev1.Pod, workloadName, wo
 				}
 
 				for _, rsOwnerRef := range rs.OwnerReferences {
-					if rsOwnerRef.Kind == "Deployment" && rsOwnerRef.Name == workloadName {
+					if rsOwnerRef.Kind == workloadTypeDeployment && rsOwnerRef.Name == workloadName {
 						return true
 					}
 				}
 			}
-		case "StatefulSet":
-			if ownerRef.Kind == "StatefulSet" && ownerRef.Name == workloadName {
+		case workloadTypeStatefulSet:
+			if ownerRef.Kind == workloadTypeStatefulSet && ownerRef.Name == workloadName {
 				return true
 			}
 		}
@@ -435,7 +449,7 @@ func (m *MutationHandler) getPodCapacityType(pod *corev1.Pod) string {
 	}
 
 	// If we can't determine, assume on-demand (safer default)
-	return "on-demand"
+	return capacityTypeOnDemand
 }
 
 // InjectDecoder injects the decoder into the handler
