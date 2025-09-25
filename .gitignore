@@ -48,3 +48,5 @@ coverage.html
 
 # Generated certificates (contains sensitive data)
 build/k8s/secret.yaml
+output
+test-deployment.yaml
