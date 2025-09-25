@@ -143,7 +143,8 @@ var _ = Describe("POST /mutate webhook", func() {
 				},
 			}
 
-			deploymentJSON, _ := json.Marshal(deployment)
+			deploymentJSON, err := json.Marshal(deployment)
+			Expect(err).NotTo(HaveOccurred())
 			admissionRequest = &admissionv1.AdmissionRequest{
 				UID: "test-uid",
 				Kind: metav1.GroupVersionKind{

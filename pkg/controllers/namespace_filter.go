@@ -563,9 +563,10 @@ func (nf *NamespaceFilter) isSystemNamespace(namespace string) bool {
 	// Check common system namespace patterns
 	systemPatterns := []string{"^kube-", "^openshift-", "^istio-"}
 	for _, pattern := range systemPatterns {
-		if matched, _ := regexp.MatchString(pattern, namespace); matched {
+		if matched, err := regexp.MatchString(pattern, namespace); err == nil && matched {
 			return true
 		}
+		// If regexp fails, continue to next pattern
 	}
 
 	return false

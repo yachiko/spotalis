@@ -53,7 +53,8 @@ var _ = Describe("WebhookServer", func() {
 
 	BeforeEach(func() {
 		scheme = runtime.NewScheme()
-		_ = appsv1.AddToScheme(scheme)
+		err := appsv1.AddToScheme(scheme)
+		Expect(err).NotTo(HaveOccurred())
 
 		// Create a proper mutation handler with fake client
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
@@ -298,7 +299,8 @@ var _ = Describe("WebhookServer", func() {
 
 		BeforeEach(func() {
 			scheme = runtime.NewScheme()
-			_ = appsv1.AddToScheme(scheme)
+			err := appsv1.AddToScheme(scheme)
+			Expect(err).NotTo(HaveOccurred())
 
 			// Create a proper mutation handler with fake client
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()

@@ -227,7 +227,8 @@ var _ = Describe("ControllerManager", func() {
 			Expect(metrics["reconcile_timeout_seconds"]).To(Equal(120.0)) // 2 minutes
 			Expect(metrics["reconcile_interval_seconds"]).To(Equal(15.0)) // 15 seconds
 
-			controllersEnabled := metrics["controllers_enabled"].(map[string]bool)
+			controllersEnabled, ok := metrics["controllers_enabled"].(map[string]bool)
+			Expect(ok).To(BeTrue(), "controllers_enabled should be a map[string]bool")
 			Expect(controllersEnabled["deployments"]).To(BeTrue())
 			Expect(controllersEnabled["statefulsets"]).To(BeTrue())
 			Expect(controllersEnabled["daemonsets"]).To(BeFalse())

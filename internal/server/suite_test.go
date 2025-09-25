@@ -52,7 +52,10 @@ func performRequest(engine *gin.Engine, method, path string, body interface{}) *
 	var err error
 
 	if body != nil {
-		jsonBody, _ := json.Marshal(body)
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			panic(err) // This is a test helper, panic is acceptable
+		}
 		req, err = http.NewRequest(method, path, bytes.NewBuffer(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 	} else {
@@ -73,7 +76,10 @@ func performRequestWithHeaders(engine *gin.Engine, method, path string, body int
 	var err error
 
 	if body != nil {
-		jsonBody, _ := json.Marshal(body)
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			panic(err) // This is a test helper, panic is acceptable
+		}
 		req, err = http.NewRequest(method, path, bytes.NewBuffer(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 	} else {

@@ -264,7 +264,8 @@ var _ = Describe("Rate Limiter", func() {
 			})
 
 			It("should create resource-specific limiters", func() {
-				rateLimiter.WaitForResource(ctx, "pods")
+				err := rateLimiter.WaitForResource(ctx, "pods")
+				Expect(err).NotTo(HaveOccurred())
 
 				rateLimiter.limiterMutex.RLock()
 				limiter, exists := rateLimiter.resourceLimiters["pods"]
@@ -411,7 +412,8 @@ var _ = Describe("Rate Limiter", func() {
 				wg.Add(1)
 				go func(res string) {
 					defer wg.Done()
-					rateLimiter.WaitForResource(ctx, res)
+					err := rateLimiter.WaitForResource(ctx, res)
+					Expect(err).NotTo(HaveOccurred())
 				}(resource)
 			}
 

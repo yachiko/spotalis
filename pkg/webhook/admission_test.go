@@ -326,7 +326,10 @@ var _ = Describe("AdmissionController", func() {
 			err := controller.Cleanup(ctx)
 			// The error behavior depends on the fake client implementation
 			// In some cases it might succeed, in others it might fail
-			_ = err // Explicitly ignore error since this is expected in tests
+			// Explicitly ignore error since this is expected in tests with fake clients
+			if err != nil {
+				// Expected with fake clients - resource may not exist
+			}
 		})
 	})
 

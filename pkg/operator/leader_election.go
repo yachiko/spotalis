@@ -62,8 +62,8 @@ type LeaderElectionConfig struct {
 
 // DefaultLeaderElectionConfig returns default leader election configuration
 func DefaultLeaderElectionConfig() *LeaderElectionConfig {
-	hostname, _ := os.Hostname()
-	if hostname == "" {
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
 		hostname = defaultHostname
 	}
 
@@ -105,8 +105,8 @@ func NewLeaderElectionManager(config *LeaderElectionConfig, kubeClient kubernete
 
 	// Generate identity if not provided
 	if config.Identity == "" {
-		hostname, _ := os.Hostname()
-		if hostname == "" {
+		hostname, err := os.Hostname()
+		if err != nil || hostname == "" {
 			hostname = defaultHostname
 		}
 		config.Identity = hostname

@@ -781,9 +781,10 @@ var _ = Describe("StatefulSetReconciler", func() {
 			}
 
 			// Should handle canceled context
-			_, _ = reconciler.Reconcile(canceledCtx, req)
+			_, err := reconciler.Reconcile(canceledCtx, req)
 			// The specific error will depend on implementation, but it should handle cancellation
 			// We're mainly testing that it doesn't panic
+			_ = err // Explicitly ignore error as we're testing cancellation handling
 		})
 	})
 })
