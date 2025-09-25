@@ -10,7 +10,7 @@ metadata:
     spotalis.io/spot-percentage: "80"
     spotalis.io/enabled: "true"
 spec:
-  replicas: 20
+  replicas: 0
   selector:
     matchLabels:
       app: test-app

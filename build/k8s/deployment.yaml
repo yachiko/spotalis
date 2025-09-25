@@ -64,20 +64,22 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: SPOTALIS_CONFIG_PATH
-          value: "/etc/spotalis/config.yaml"
+        - name: SPOTALIS_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         args:
-        - --config=/etc/spotalis/config.yaml
-        - --health-addr=:8081
-        - --metrics-addr=:8080
-        - --webhook-port=9443
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=:8080
+        - --webhook-bind-address=:9443
         - --webhook-cert-dir=/tmp/k8s-webhook-server/serving-certs
         - --leader-elect=true
-        - --v=2
+        - --log-level=info
+        - --namespace=spotalis-system
+        - --enable-webhook=true
+        - --max-concurrent-reconciles=4
+        - --reconcile-interval=30s
         volumeMounts:
-        - name: config
-          mountPath: /etc/spotalis
-          readOnly: true
         - name: webhook-certs
           mountPath: /tmp/k8s-webhook-server/serving-certs
           readOnly: true
@@ -109,9 +111,6 @@ spec:
             cpu: 500m
             memory: 512Mi
       volumes:
-      - name: config
-        configMap:
-          name: spotalis-config
       - name: webhook-certs
         secret:
           secretName: spotalis-webhook-certs
