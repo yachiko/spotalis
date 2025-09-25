@@ -407,7 +407,9 @@ func NewOperator(config *OperatorConfig) (*Operator, error) {
 	// Create manager
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
-		// MetricsBindAddress:      config.MetricsAddr, // TODO: Fix metrics configuration for controller-runtime
+		Metrics: metricsserver.Options{
+			BindAddress: config.MetricsAddr,
+		},
 		WebhookServer:           webhook.NewServer(webhook.Options{Port: config.WebhookPort}),
 		HealthProbeBindAddress:  config.ProbeAddr,
 		LeaderElection:          config.LeaderElection, // Use controller-runtime's built-in leader election

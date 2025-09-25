@@ -141,12 +141,6 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	logger.Info("Deployment has Spotalis annotations, proceeding with reconciliation")
 
-	// Add managed annotation if not already present
-	if err := r.ensureManagedAnnotation(ctx, &deployment); err != nil {
-		logger.Error(err, "Failed to add managed annotation")
-		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
-	}
-
 	// Record that this workload is now managed (for metrics) - do this early
 	// so we count all deployments with Spotalis annotations, not just stable ones
 	if r.MetricsCollector != nil {
@@ -454,32 +448,6 @@ func (r *DeploymentReconciler) SetupWithManagerNamed(mgr ctrl.Manager, name stri
 			SkipNameValidation: &skipNameValidation,
 		}).
 		Complete(r)
-}
-
-// ensureManagedAnnotation adds the "spotalis.io/managed" annotation if not already present
-func (r *DeploymentReconciler) ensureManagedAnnotation(ctx context.Context, deployment *appsv1.Deployment) error {
-	logger := log.FromContext(ctx).WithValues("deployment", client.ObjectKeyFromObject(deployment))
-
-	// Check if the annotation is already present
-	if deployment.Annotations["spotalis.io/managed"] == "true" {
-		return nil
-	}
-
-	// Create a copy for the update
-	updated := deployment.DeepCopy()
-	if updated.Annotations == nil {
-		updated.Annotations = make(map[string]string)
-	}
-	updated.Annotations["spotalis.io/managed"] = "true"
-
-	// Update the deployment
-	if err := r.Update(ctx, updated); err != nil {
-		logger.Error(err, "Failed to add managed annotation")
-		return err
-	}
-
-	logger.Info("Added managed annotation to deployment")
-	return nil
 }
 
 // deploymentLabelSelector returns the label selector for a deployment

@@ -99,12 +99,6 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Add managed annotation if not already present
-	if err := r.ensureManagedAnnotation(ctx, &statefulSet); err != nil {
-		logger.Error(err, "Failed to add managed annotation")
-		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
-	}
-
 	// Implement cooldown period after pod deletion to avoid constant rescheduling
 	statefulsetKey := req.NamespacedName.String()
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(statefulsetKey); exists {
@@ -450,32 +444,6 @@ func (r *StatefulSetReconciler) SetupWithManagerNamed(mgr ctrl.Manager, name str
 			SkipNameValidation: &skipNameValidation,
 		}).
 		Complete(r)
-}
-
-// ensureManagedAnnotation adds the "spotalis.io/managed" annotation if not already present
-func (r *StatefulSetReconciler) ensureManagedAnnotation(ctx context.Context, statefulSet *appsv1.StatefulSet) error {
-	logger := log.FromContext(ctx).WithValues("statefulset", client.ObjectKeyFromObject(statefulSet))
-
-	// Check if the annotation is already present
-	if statefulSet.Annotations["spotalis.io/managed"] == "true" {
-		return nil
-	}
-
-	// Create a copy for the update
-	updated := statefulSet.DeepCopy()
-	if updated.Annotations == nil {
-		updated.Annotations = make(map[string]string)
-	}
-	updated.Annotations["spotalis.io/managed"] = "true"
-
-	// Update the statefulset
-	if err := r.Update(ctx, updated); err != nil {
-		logger.Error(err, "Failed to add managed annotation")
-		return err
-	}
-
-	logger.Info("Added managed annotation to statefulset")
-	return nil
 }
 
 // statefulSetLabelSelector returns the label selector for a StatefulSet
