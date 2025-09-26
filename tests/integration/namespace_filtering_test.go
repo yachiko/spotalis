@@ -21,7 +21,9 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -146,15 +148,32 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 			err := k8sClient.Create(ctx, managedDeployment)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify it gets managed
-			Eventually(func() map[string]string {
-				var updated appsv1.Deployment
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(managedDeployment), &updated)
-				if err != nil {
-					return nil
+			// Wait 20 seconds for pods to be created and processed by Spotalis webhook
+			time.Sleep(20 * time.Second)
+
+			// Check that pods in the managed namespace DO have Spotalis-specific nodeSelector
+			podList := &corev1.PodList{}
+			err = k8sClient.List(ctx, podList, client.InNamespace(managedNamespace))
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify that pods have been processed by Spotalis webhook
+			Expect(len(podList.Items)).To(BeNumerically(">", 0), "Expected pods to be created by K8s deployment controller")
+
+			// At least one pod should have Spotalis-specific node selectors
+			hasSpotalisNodeSelector := false
+			for _, pod := range podList.Items {
+				fmt.Printf("Managed pod %s nodeSelector: %v\n", pod.Name, pod.Spec.NodeSelector)
+
+				if pod.Spec.NodeSelector != nil {
+					// Check for Spotalis-specific node selectors
+					if _, hasCapacityType := pod.Spec.NodeSelector["karpenter.sh/capacity-type"]; hasCapacityType {
+						hasSpotalisNodeSelector = true
+						break
+					}
 				}
-				return updated.Annotations
-			}, "15s", "1s").Should(HaveKey("spotalis.io/spot-percentage"))
+			}
+
+			Expect(hasSpotalisNodeSelector).To(BeTrue(), "Expected at least one pod to have Spotalis-specific nodeSelector in managed namespace")
 		})
 
 		It("should ignore workloads in non-labeled namespaces", func() {
@@ -165,6 +184,110 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 
 			err := k8sClient.Create(ctx, unmanagedDeployment)
 			Expect(err).NotTo(HaveOccurred())
+
+			// Wait 20 seconds for pods to be created and stabilize
+			time.Sleep(20 * time.Second)
+
+			// Check that pods in the unmanaged namespace don't have Spotalis-specific nodeSelector
+			podList := &corev1.PodList{}
+			err = k8sClient.List(ctx, podList, client.InNamespace(unmanagedNamespace))
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify that no pods have Spotalis-specific node selectors
+			for _, pod := range podList.Items {
+				fmt.Printf("Pod %s nodeSelector: %v\n", pod.Name, pod.Spec.NodeSelector)
+
+				if pod.Spec.NodeSelector != nil {
+					// Pods should NOT have Spotalis-specific node selectors
+					Expect(pod.Spec.NodeSelector).NotTo(HaveKey("karpenter.sh/capacity-type"))
+					Expect(pod.Spec.NodeSelector).NotTo(HaveKey("spotalis.io/node-type"))
+					Expect(pod.Spec.NodeSelector).NotTo(HaveKey("kubernetes.io/arch")) // Common Spotalis selector
+				}
+			}
+
+			// Also verify that the pods list is not empty (deployment controller should create pods)
+			Expect(len(podList.Items)).To(BeNumerically(">", 0), "Expected pods to be created by K8s deployment controller")
+		})
+
+		It("should not manage deployment with spotalis annotations in namespace without spotalis.io/enabled", func() {
+			// This test verifies that the Spotalis controller respects namespace-level permissions.
+			// Even if a deployment has valid Spotalis annotations, it should NOT be managed
+			// if the namespace doesn't have the required "spotalis.io/enabled": "true" annotation.
+
+			// Create a namespace without the required spotalis.io/enabled annotation
+			restrictedNamespace := "restricted-" + randString(6)
+			restrictedNS := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: restrictedNamespace,
+					Labels: map[string]string{
+						"environment": "test",
+						// Deliberately omitting "spotalis.io/enabled": "true"
+					},
+				},
+			}
+			err := k8sClient.Create(ctx, restrictedNS)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create a deployment with Spotalis annotations in the restricted namespace
+			restrictedDeployment := deployment.DeepCopy()
+			restrictedDeployment.Namespace = restrictedNamespace
+			restrictedDeployment.Name = "restricted-deployment"
+			restrictedDeployment.Annotations = map[string]string{
+				"spotalis.io/enabled":         "true",
+				"spotalis.io/spot-percentage": "80",
+				"spotalis.io/min-on-demand":   "1",
+			}
+
+			err = k8sClient.Create(ctx, restrictedDeployment)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify that Spotalis controller does NOT manage this deployment
+			Consistently(func() bool {
+				var updated appsv1.Deployment
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(restrictedDeployment), &updated)
+				if err != nil {
+					return false
+				}
+
+				// Deployment should remain unprocessed by Spotalis:
+				// 1. No Spotalis finalizers should be added
+				// 2. Status should remain minimal (no managed replicas)
+				// 3. No pods should be actively managed for spot/on-demand distribution
+				hasSpotalisFinalizers := false
+				for _, finalizer := range updated.Finalizers {
+					if finalizer == "spotalis.io/finalizer" {
+						hasSpotalisFinalizers = true
+						break
+					}
+				}
+
+				return !hasSpotalisFinalizers &&
+					updated.Status.ObservedGeneration <= 1 // Should not be actively reconciled
+			}, "15s", "2s").Should(BeTrue())
+
+			// Also verify that pods (if any get created by K8s deployment controller)
+			// don't get mutated with Spotalis-specific node selectors
+			Eventually(func() int {
+				podList := &corev1.PodList{}
+				err := k8sClient.List(ctx, podList, client.InNamespace(restrictedNamespace))
+				if err != nil {
+					return -1
+				}
+
+				// Count pods that have Spotalis-specific node selectors
+				spotalisModifiedPods := 0
+				for _, pod := range podList.Items {
+					if pod.Spec.NodeSelector != nil {
+						if _, hasCapacityType := pod.Spec.NodeSelector["karpenter.sh/capacity-type"]; hasCapacityType {
+							spotalisModifiedPods++
+						}
+						if _, hasInstanceCategory := pod.Spec.NodeSelector["node.kubernetes.io/instance-type"]; hasInstanceCategory {
+							spotalisModifiedPods++
+						}
+					}
+				}
+				return spotalisModifiedPods
+			}, "10s", "2s").Should(Equal(0)) // No pods should be modified by Spotalis webhook
 		})
 	})
 })
