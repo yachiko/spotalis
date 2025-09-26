@@ -26,11 +26,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/ahoma/spotalis/pkg/operator"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/ahoma/spotalis/pkg/di"
 )
 
 var (
@@ -42,25 +42,8 @@ var (
 
 func main() {
 	var (
-		metricsAddr          = flag.String("metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-		probeAddr            = flag.String("health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-		webhookAddr          = flag.String("webhook-bind-address", ":9443", "The address the webhook endpoint binds to.")
-		enableLeaderElection = flag.Bool("leader-elect", true, "Enable leader election for controller manager.")
-		leaderElectionID     = flag.String("leader-election-id", "spotalis-controller-leader", "The name of the leader election configmap.")
-		namespace            = flag.String("namespace", "spotalis-system", "The namespace to run the controller in.")
-		logLevel             = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
-		enableWebhook        = flag.Bool("enable-webhook", true, "Enable admission webhook.")
-		reconcileInterval    = flag.Duration("reconcile-interval", 5*time.Minute, "The interval at which controllers reconcile resources.")
-		readOnlyMode         = flag.Bool("read-only", false, "Run in read-only mode (no mutations).")
-		enablePprof          = flag.Bool("enable-pprof", false, "Enable pprof endpoints for debugging.")
-		maxConcurrent        = flag.Int("max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles.")
-		webhookCertDir       = flag.String("webhook-cert-dir", "/tmp/k8s-webhook-server/serving-certs", "Directory containing webhook certificates.")
-		webhookCertName      = flag.String("webhook-cert-name", "tls.crt", "Name of the webhook certificate file.")
-		webhookKeyName       = flag.String("webhook-key-name", "tls.key", "Name of the webhook private key file.")
-		webhookPort          = flag.Int("webhook-port", 9443, "Port for the webhook server.")
-		apiQPSLimit          = flag.Float64("api-qps-limit", 20.0, "QPS limit for Kubernetes API calls.")
-		apiBurstLimit        = flag.Int("api-burst-limit", 30, "Burst limit for Kubernetes API calls.")
-		showVersion          = flag.Bool("version", false, "Show version information and exit.")
+		configFile  = flag.String("config", "", "Path to configuration file. If not specified, uses environment variables and defaults.")
+		showVersion = flag.Bool("version", false, "Show version information and exit.")
 	)
 
 	flag.Parse()
@@ -74,9 +57,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Setup logger
+	// Create context for application lifecycle
+	ctx := context.Background()
+
+	// Create application using DI system
+	var app *di.Application
+	var err error
+
+	if *configFile != "" {
+		app, err = di.NewApplicationWithConfig(ctx, *configFile)
+	} else {
+		app, err = di.NewApplication(ctx)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create application: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Setup logger based on configuration
+	config := app.GetConfig()
 	opts := zap.Options{
-		Development: *logLevel == "debug",
+		Development: config.Observability.Logging.Level == "debug",
 	}
 	logger := zap.New(zap.UseFlagOptions(&opts))
 	ctrl.SetLogger(logger)
@@ -86,56 +88,26 @@ func main() {
 		"version", version,
 		"commit", commit,
 		"buildDate", buildDate,
-		"namespace", *namespace,
-		"metrics-addr", *metricsAddr,
-		"probe-addr", *probeAddr,
-		"webhook-addr", *webhookAddr,
-		"leader-election", *enableLeaderElection,
-		"webhook-enabled", *enableWebhook,
-		"read-only", *readOnlyMode,
-		"log-level", *logLevel,
+		"namespace", config.Operator.Namespace,
+		"metrics-addr", config.Observability.Metrics.BindAddress,
+		"health-addr", config.Observability.Health.BindAddress,
+		"webhook-port", config.Webhook.Port,
+		"leader-election", config.Operator.LeaderElection.Enabled,
+		"webhook-enabled", config.Webhook.Enabled,
+		"read-only", config.Operator.ReadOnlyMode,
+		"log-level", config.Observability.Logging.Level,
 	)
-
-	// Create operator configuration
-	config := &operator.Config{
-		MetricsAddr:             *metricsAddr,
-		ProbeAddr:               *probeAddr,
-		WebhookAddr:             *webhookAddr,
-		LeaderElection:          *enableLeaderElection,
-		LeaderElectionID:        *leaderElectionID,
-		Namespace:               *namespace,
-		ReconcileInterval:       *reconcileInterval,
-		MaxConcurrentReconciles: *maxConcurrent,
-		WebhookCertDir:          *webhookCertDir,
-		WebhookCertName:         *webhookCertName,
-		WebhookKeyName:          *webhookKeyName,
-		WebhookPort:             *webhookPort,
-		LogLevel:                *logLevel,
-		EnablePprof:             *enablePprof,
-		EnableWebhook:           *enableWebhook,
-		ReadOnlyMode:            *readOnlyMode,
-		APIQPSLimit:             float32(*apiQPSLimit),
-		APIBurstLimit:           *apiBurstLimit,
-	}
-
-	// Create operator
-	op, err := operator.NewOperator(config)
-	if err != nil {
-		setupLog.Error(err, "failed to create operator")
-		os.Exit(1)
-	}
 
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
-	// Start the operator
+	// Start the application
 	setupLog.Info("Starting operator")
-	if err := op.Start(ctx); err != nil {
+	if err := app.Start(ctx); err != nil {
 		setupLog.Error(err, "failed to start operator")
-		cancel() // Ensure cleanup before exit
 		os.Exit(1)
 	}
 
-	cancel() // Clean shutdown
 	setupLog.Info("Operator stopped")
 }
