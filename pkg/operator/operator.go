@@ -736,12 +736,26 @@ func (o *Operator) setupControllers() error {
 	setupLog := ctrl.Log.WithName("setup")
 	setupLog.Info("Setting up controllers")
 
+	// Setup namespace filter for deployment controller
+	namespaceFilterConfig := controllers.DefaultNamespaceFilterConfig()
+	namespaceFilterConfig.RequiredAnnotations = map[string]string{
+		"spotalis.io/enabled": "true",
+	}
+	namespaceFilter, err := controllers.NewNamespaceFilter(namespaceFilterConfig, o.Manager.GetClient())
+	if err != nil {
+		setupLog.Error(err, "Failed to create namespace filter, proceeding without namespace filtering")
+		namespaceFilter = nil
+	} else {
+		setupLog.Info("Successfully created namespace filter")
+	}
+
 	// Setup Deployment controller
 	deploymentController := &controllers.DeploymentReconciler{
 		Client:            o.Manager.GetClient(),
 		Scheme:            o.Manager.GetScheme(),
 		AnnotationParser:  o.annotationParser,
 		NodeClassifier:    o.nodeClassifier,
+		NamespaceFilter:   namespaceFilter,
 		ReconcileInterval: o.config.ReconcileInterval,
 		MetricsCollector:  o.metricsCollector,
 	}
@@ -758,12 +772,13 @@ func (o *Operator) setupControllers() error {
 	}
 	setupLog.Info("Successfully set up deployment controller")
 
-	// Setup StatefulSet controller
+	// Setup StatefulSet controller (reuse the same namespace filter)
 	statefulSetController := &controllers.StatefulSetReconciler{
 		Client:            o.Manager.GetClient(),
 		Scheme:            o.Manager.GetScheme(),
 		AnnotationParser:  o.annotationParser,
 		NodeClassifier:    o.nodeClassifier,
+		NamespaceFilter:   namespaceFilter,
 		ReconcileInterval: o.config.ReconcileInterval,
 		MetricsCollector:  o.metricsCollector,
 	}

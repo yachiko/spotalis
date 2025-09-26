@@ -112,6 +112,27 @@ func (p *AnnotationParser) HasSpotalisAnnotations(obj metav1.Object) bool {
 	return false
 }
 
+// IsSpotalisEnabled checks if Spotalis is enabled for the object
+// If spotalis.io/enabled exists, it must be "true"
+// If spotalis.io/enabled doesn't exist, but other Spotalis annotations exist, it's enabled by default
+func (p *AnnotationParser) IsSpotalisEnabled(obj metav1.Object) bool {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return false
+	}
+
+	// Check if spotalis.io/enabled annotation exists
+	enabled, exists := annotations[EnabledAnnotation]
+	if exists {
+		// If explicit enabled annotation exists, it must be "true"
+		return strings.ToLower(enabled) == "true"
+	}
+
+	// If no explicit enabled annotation, check if any other Spotalis annotations exist
+	// This maintains backward compatibility
+	return p.HasSpotalisAnnotations(obj)
+}
+
 // GetAnnotationValue safely retrieves an annotation value
 func (p *AnnotationParser) GetAnnotationValue(obj metav1.Object, key string) (string, bool) {
 	annotations := obj.GetAnnotations()

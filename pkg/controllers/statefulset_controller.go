@@ -48,6 +48,7 @@ type StatefulSetReconciler struct {
 	Scheme              *runtime.Scheme
 	AnnotationParser    *annotations.AnnotationParser
 	NodeClassifier      *config.NodeClassifierService
+	NamespaceFilter     *NamespaceFilter // Filter for namespace-level permissions
 	ReconcileInterval   time.Duration
 	MaxConcurrentRecons int
 	MetricsCollector    MetricsRecorder // Interface for recording metrics
@@ -97,10 +98,27 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Check if this StatefulSet has Spotalis annotations
-	if !r.AnnotationParser.HasSpotalisAnnotations(&statefulSet) {
-		logger.Info("StatefulSet has no Spotalis annotations, skipping")
+	// Check if Spotalis is explicitly enabled for this StatefulSet
+	if !r.AnnotationParser.IsSpotalisEnabled(&statefulSet) {
+		logger.Info("StatefulSet does not have spotalis.io/enabled=true, skipping")
 		return ctrl.Result{}, nil
+	}
+
+	// Check if the namespace is allowed for Spotalis management
+	if r.NamespaceFilter != nil {
+		logger.Info("Checking namespace permissions with namespace filter", "namespace", statefulSet.Namespace)
+		result, err := r.NamespaceFilter.IsNamespaceAllowed(ctx, statefulSet.Namespace)
+		if err != nil {
+			logger.Error(err, "Failed to check namespace permissions")
+			return ctrl.Result{}, err
+		}
+		if !result.Allowed {
+			logger.Info("Namespace is not allowed for Spotalis management", "reason", result.Reason, "rule", result.MatchedRule)
+			return ctrl.Result{}, nil
+		}
+		logger.Info("Namespace is allowed for Spotalis management", "rule", result.MatchedRule)
+	} else {
+		logger.Info("No namespace filter configured, allowing all namespaces")
 	}
 
 	// Implement cooldown period after pod deletion to avoid constant rescheduling

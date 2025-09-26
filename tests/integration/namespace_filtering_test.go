@@ -82,8 +82,8 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: managedNamespace,
 					Labels: map[string]string{
-						"test-managed":       "true",
-						"spotali.io/enabled": "true",
+						"test-managed":        "true",
+						"spotalis.io/enabled": "true",
 					},
 				},
 			}

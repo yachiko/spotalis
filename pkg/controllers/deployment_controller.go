@@ -96,6 +96,7 @@ type DeploymentReconciler struct {
 	Scheme              *runtime.Scheme
 	AnnotationParser    *annotations.AnnotationParser
 	NodeClassifier      *config.NodeClassifierService
+	NamespaceFilter     *NamespaceFilter // Filter for namespace-level permissions
 	ReconcileInterval   time.Duration
 	MaxConcurrentRecons int
 	MetricsCollector    MetricsRecorder // Interface for recording metrics
@@ -149,12 +150,29 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	logger.Info("Successfully fetched deployment", "replicas", deployment.Spec.Replicas)
 
-	// Check if this deployment has Spotalis annotations
-	if !r.AnnotationParser.HasSpotalisAnnotations(&deployment) {
-		logger.Info("Deployment has no Spotalis annotations, skipping")
+	// Check if Spotalis is explicitly enabled for this deployment
+	if !r.AnnotationParser.IsSpotalisEnabled(&deployment) {
+		logger.Info("Deployment does not have spotalis.io/enabled=true, skipping")
 		return ctrl.Result{}, nil
 	}
-	logger.Info("Deployment has Spotalis annotations, proceeding with reconciliation")
+	logger.Info("Deployment has Spotalis enabled, checking namespace permissions")
+
+	// Check if the namespace is allowed for Spotalis management
+	if r.NamespaceFilter != nil {
+		logger.Info("Checking namespace permissions with namespace filter", "namespace", deployment.Namespace)
+		result, err := r.NamespaceFilter.IsNamespaceAllowed(ctx, deployment.Namespace)
+		if err != nil {
+			logger.Error(err, "Failed to check namespace permissions")
+			return ctrl.Result{}, err
+		}
+		if !result.Allowed {
+			logger.Info("Namespace is not allowed for Spotalis management", "reason", result.Reason, "rule", result.MatchedRule)
+			return ctrl.Result{}, nil
+		}
+		logger.Info("Namespace is allowed for Spotalis management", "rule", result.MatchedRule)
+	} else {
+		logger.Info("No namespace filter configured, allowing all namespaces")
+	}
 
 	// Record that this workload is now managed (for metrics) - do this early
 	// so we count all deployments with Spotalis annotations, not just stable ones

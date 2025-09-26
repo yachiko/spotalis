@@ -83,6 +83,7 @@ type ControllerManager struct {
 	kubeClient       kubernetes.Interface
 	annotationParser *annotations.AnnotationParser
 	nodeClassifier   *config.NodeClassifierService
+	namespaceFilter  *NamespaceFilter
 	metricsCollector *metrics.Collector
 
 	// Controllers
@@ -107,12 +108,32 @@ func NewControllerManager(
 		config = DefaultManagerConfig()
 	}
 
+	// Create a default namespace filter that requires spotalis.io/enabled annotation on namespaces
+	// Only create if we have a valid manager with a client
+	var namespaceFilter *NamespaceFilter
+	if mgr != nil {
+		client := mgr.GetClient()
+		if client != nil {
+			namespaceFilterConfig := DefaultNamespaceFilterConfig()
+			namespaceFilterConfig.RequiredAnnotations = map[string]string{
+				"spotalis.io/enabled": "true",
+			}
+			var err error
+			namespaceFilter, err = NewNamespaceFilter(namespaceFilterConfig, client)
+			if err != nil {
+				// If namespace filter creation fails, create a nil filter (no filtering)
+				namespaceFilter = nil
+			}
+		}
+	}
+
 	return &ControllerManager{
 		manager:               mgr,
 		config:                config,
 		kubeClient:            kubeClient,
 		annotationParser:      annotationParser,
 		nodeClassifier:        nodeClassifier,
+		namespaceFilter:       namespaceFilter,
 		metricsCollector:      metricsCollector,
 		controllersRegistered: make(map[string]bool),
 	}
@@ -188,6 +209,7 @@ func (cm *ControllerManager) setupDeploymentController() error {
 		Scheme:            cm.manager.GetScheme(),
 		AnnotationParser:  cm.annotationParser,
 		NodeClassifier:    cm.nodeClassifier,
+		NamespaceFilter:   cm.namespaceFilter,
 		ReconcileInterval: cm.config.ReconcileInterval,
 	}
 
@@ -214,6 +236,7 @@ func (cm *ControllerManager) setupStatefulSetController() error {
 		Scheme:            cm.manager.GetScheme(),
 		AnnotationParser:  cm.annotationParser,
 		NodeClassifier:    cm.nodeClassifier,
+		NamespaceFilter:   cm.namespaceFilter,
 		ReconcileInterval: cm.config.ReconcileInterval,
 	}
 
