@@ -334,11 +334,11 @@ func parseLogLevel(level string) slog.Level {
 // parseZapLogLevel parses string log level to zap level (for controller-runtime)
 func parseZapLogLevel(level string) zapcore.Level {
 	switch strings.ToLower(level) {
-	case "debug":
+	case logLevelDebug:
 		return zapcore.DebugLevel
-	case "info":
+	case logLevelInfo:
 		return zapcore.InfoLevel
-	case "warn", "warning":
+	case logLevelWarn, "warning":
 		return zapcore.WarnLevel
 	case "error":
 		return zapcore.ErrorLevel

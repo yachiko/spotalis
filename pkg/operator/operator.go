@@ -60,6 +60,14 @@ import (
 	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 )
 
+const (
+	// Log levels
+	logLevelDebug = "debug"
+
+	// Environment variable values
+	envValueTrue = "true"
+)
+
 // Operator represents the main Spotalis operator following Karpenter architecture pattern
 type Operator struct {
 	manager.Manager
@@ -215,7 +223,7 @@ func NewForTesting(cfg *rest.Config, operatorID string) *Operator {
 		panic(fmt.Sprintf("failed to add client-go scheme: %v", err))
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == "debug")))
+	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == logLevelDebug)))
 
 	// Create manager options without webhook server for testing
 	managerOpts := ctrl.Options{
@@ -310,7 +318,7 @@ func NewWithIDAndPorts(cfg *rest.Config, operatorID string, metricsPort, probePo
 		panic(fmt.Sprintf("failed to add client-go scheme: %v", err))
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == "debug")))
+	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == logLevelDebug)))
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
@@ -402,7 +410,7 @@ func NewOperator(config *OperatorConfig) (*Operator, error) {
 	}
 
 	// Setup logger
-	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == "debug")))
+	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == logLevelDebug)))
 
 	// Create manager
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -579,7 +587,7 @@ func (o *Operator) GetID() string {
 	if o.leaderElectionManager != nil {
 		return o.leaderElectionManager.GetIdentity()
 	}
-	return "unknown"
+	return defaultHostname
 }
 
 // SimulateNetworkPartition simulates a network partition for testing
@@ -670,12 +678,12 @@ func (o *Operator) initializeCoreServices() error {
 // initializeHTTPServer initializes the HTTP server components
 func (o *Operator) initializeHTTPServer() error {
 	// Setup Gin engine
-	if o.config.LogLevel != "debug" {
+	if o.config.LogLevel != logLevelDebug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	o.ginEngine = gin.New()
 	o.ginEngine.Use(gin.Recovery())
-	if o.config.LogLevel == "debug" {
+	if o.config.LogLevel == logLevelDebug {
 		o.ginEngine.Use(gin.Logger())
 	}
 
@@ -740,7 +748,7 @@ func (o *Operator) setupControllers() error {
 
 	// Use unique controller names based on operator ID for testing
 	deploymentName := "deployment"
-	if operatorID := o.GetID(); operatorID != "" && operatorID != "unknown" {
+	if operatorID := o.GetID(); operatorID != "" && operatorID != defaultHostname {
 		deploymentName = fmt.Sprintf("deployment-%s", operatorID)
 	}
 
@@ -762,7 +770,7 @@ func (o *Operator) setupControllers() error {
 
 	// Use unique controller names based on operator ID for testing
 	statefulSetName := "statefulset"
-	if operatorID := o.GetID(); operatorID != "" && operatorID != "unknown" {
+	if operatorID := o.GetID(); operatorID != "" && operatorID != defaultHostname {
 		statefulSetName = fmt.Sprintf("statefulset-%s", operatorID)
 	}
 
@@ -822,16 +830,16 @@ func configFromEnv(config *OperatorConfig) error {
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		config.LogLevel = level
 	}
-	if os.Getenv("DISABLE_LEADER_ELECTION") == "true" {
+	if os.Getenv("DISABLE_LEADER_ELECTION") == envValueTrue {
 		config.LeaderElection = false
 	}
-	if os.Getenv("DISABLE_WEBHOOK") == "true" {
+	if os.Getenv("DISABLE_WEBHOOK") == envValueTrue {
 		config.EnableWebhook = false
 	}
-	if os.Getenv("READ_ONLY_MODE") == "true" {
+	if os.Getenv("READ_ONLY_MODE") == envValueTrue {
 		config.ReadOnlyMode = true
 	}
-	if os.Getenv("ENABLE_PPROF") == "true" {
+	if os.Getenv("ENABLE_PPROF") == envValueTrue {
 		config.EnablePprof = true
 	}
 

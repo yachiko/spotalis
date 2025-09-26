@@ -78,7 +78,7 @@ var _ = Describe("Logging", func() {
 				config := &LoggerConfig{}
 
 				// Test that we can set all expected fields
-				config.Level = "debug"
+				config.Level = logLevelDebug
 				config.Format = "text"
 				config.Development = true
 				config.Output = buffer
@@ -283,7 +283,7 @@ var _ = Describe("Logging", func() {
 
 		Describe("Log Filtering", func() {
 			It("should filter debug messages when level is info", func() {
-				config.Level = "info"
+				config.Level = logLevelInfo
 				logger, err := NewLogger(config)
 				Expect(err).ToNot(HaveOccurred())
 

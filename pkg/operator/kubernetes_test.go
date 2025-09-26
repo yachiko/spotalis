@@ -29,7 +29,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-var _ = Describe("Kubernetes Client Management", func() {
+const (
+	// Test constants
+	testValidNamespace = "valid-namespace"
+)
+
+var _ = Describe("KubernetesConfig", func() {
 	var (
 		kubeConfig *KubernetesConfig
 		ctx        context.Context
@@ -115,7 +120,7 @@ var _ = Describe("Kubernetes Client Management", func() {
 			It("should validate resource names", func() {
 				// Test valid Kubernetes resource names
 				kubeConfig.ServiceAccount = "valid-service-account"
-				kubeConfig.Namespace = "valid-namespace"
+				kubeConfig.Namespace = testValidNamespace
 				kubeConfig.ClusterRole = "valid-cluster-role"
 
 				Expect(kubeConfig.ServiceAccount).To(MatchRegexp(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`))

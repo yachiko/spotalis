@@ -34,7 +34,8 @@ import (
 
 const (
 	// RBAC verbs
-	verbGet = "get"
+	verbGet  = "get"
+	verbList = "list"
 )
 
 // KubernetesConfig contains Kubernetes client configuration
@@ -451,22 +452,22 @@ func (k *KubernetesClientManager) validatePermission(ctx context.Context, resour
 	// we'll just try to perform a basic operation
 	switch resource {
 	case "nodes":
-		if verb == "list" || verb == verbGet {
+		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
 	case "pods":
-		if verb == "list" || verb == verbGet {
+		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
 	case "deployments":
-		if verb == "list" || verb == "get" {
+		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.AppsV1().Deployments("").List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
 	case "statefulsets":
-		if verb == "list" || verb == "get" {
+		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
