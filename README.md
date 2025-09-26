@@ -1,7 +1,34 @@
-# Spotalis - Kubernetes Workload Replica Manager
+# Spotalis - Kubernetes Workload Replica Manag## Configuration
 
+Spotalis supports two configuration approaches:
+
+1. **YAML Configuration Files** (Recommended): Comprehensive, environment-specific configuration
+2. **Legacy Command-line Flags**: Backward compatible with existing deployments
+
+### Configuration Files
+
+Create YAML configuration files for different environments:
+
+```bash
+# Use predefined configuration templates
+./controller -config=examples/configs/development.yaml   # Local development
+./controller -config=examples/configs/production.yaml   # Production deployment
+./controller -config=examples/configs/testing.yaml      # Integration testing
+./controller -config=examples/configs/minimal.yaml      # Basic setup
+```
+
+Environment variables automatically override file settings:
+```bash
+export SPOTALIS_OPERATOR_NAMESPACE=my-namespace
+export SPOTALIS_LOGGING_LEVEL=debug
+./controller -config=examples/configs/production.yaml
+```
+
+See [Configuration Guide](CONFIGURATION.md) for complete migration instructions and examples.
+
+### Node Classification
 ## Overview
-Spotalis is a Kubernetes controller that manages workload replicas based on cost optimization and spot instance availability. Following the single binary architecture pattern pioneered by Karpenter.
+Spotalis is a Kubernetes controller that manages workload replicas based on cost optimization and spot instance availability. Built with a modern dependency injection architecture and unified configuration system, following the single binary pattern pioneered by Karpenter.
 
 ## Features
 
@@ -289,19 +316,32 @@ make run
 make docker-build
 ```
 
+### Architecture
+
+Spotalis uses a modern dependency injection architecture for improved testability and maintainability:
+
+- **DI Container**: [Uber Dig](https://pkg.go.dev/go.uber.org/dig) for runtime dependency injection
+- **Unified Configuration**: YAML-based configuration with environment variable overrides  
+- **Single Binary**: All components (controller, webhook, HTTP servers) in one executable
+- **4-Phase Migration**: Systematic adoption of DI across the codebase
+
 ### Project Structure
 
 ```
-├── cmd/controller/          # Main controller binary
+├── cmd/controller/          # Main controller binary (DI-integrated)
 ├── pkg/
 │   ├── apis/               # Core data models and APIs
 │   ├── controllers/        # Controller implementations
+│   ├── config/             # Configuration system (YAML + env vars)
+│   ├── di/                 # Dependency injection container
 │   ├── webhook/           # Admission webhook
 │   ├── metrics/           # Prometheus metrics
 │   └── operator/          # Operator lifecycle management
 ├── internal/
 │   ├── config/            # Configuration management
 │   └── annotations/       # Annotation parsing
+├── examples/
+│   └── configs/           # Configuration templates
 ├── tests/
 │   ├── unit/             # Unit tests
 │   ├── integration/      # Integration tests
