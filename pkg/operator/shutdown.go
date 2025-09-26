@@ -106,8 +106,6 @@ const (
 
 func (s ShutdownState) String() string {
 	switch s {
-	case ShutdownStateUnknown:
-		return "unknown"
 	case ShutdownStateStarted:
 		return "started"
 	case ShutdownStateInProgress:

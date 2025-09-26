@@ -317,20 +317,6 @@ var _ = Describe("AdmissionController", func() {
 			err := controller.Cleanup(ctx)
 			Expect(err).To(BeNil())
 		})
-
-		It("should attempt to delete webhook configuration when registered", func() {
-			controller.registered = true
-
-			// This should attempt to delete the webhook configuration
-			// In our fake client, this might not exist, so it could error
-			err := controller.Cleanup(ctx)
-			// The error behavior depends on the fake client implementation
-			// In some cases it might succeed, in others it might fail
-			// Explicitly ignore error since this is expected in tests with fake clients
-			if err != nil {
-				// Expected with fake clients - resource may not exist
-			}
-		})
 	})
 
 	Describe("Certificate validation", func() {

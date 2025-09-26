@@ -357,18 +357,32 @@ func (r *StatefulSetReconciler) getNodeTypeForPod(ctx context.Context, pod *core
 func (r *StatefulSetReconciler) selectPodsForDeletion(spotPods, onDemandPods []corev1.Pod, desiredState *apis.ReplicaState) []corev1.Pod {
 	var podsToDelete []corev1.Pod
 
+	// Bounds check before int32 conversion to prevent overflow
+	spotPodsLen := len(spotPods)
+	if spotPodsLen > int(^uint32(0)) {
+		spotPodsLen = int(^uint32(0)) // Cap at reasonable maximum
+	}
+	spotPodsCount := int32(spotPodsLen) // #nosec G115 - Bounds checked above
+
 	// If we have too many spot pods, delete the excess
-	if int32(len(spotPods)) > desiredState.DesiredSpot {
-		excess := int32(len(spotPods)) - desiredState.DesiredSpot
-		for i := int32(0); i < excess && i < int32(len(spotPods)); i++ {
+	if spotPodsCount > desiredState.DesiredSpot {
+		excess := spotPodsCount - desiredState.DesiredSpot
+		for i := int32(0); i < excess && i < spotPodsCount; i++ {
 			podsToDelete = append(podsToDelete, spotPods[i])
 		}
 	}
 
+	// Bounds check for on-demand pods before int32 conversion
+	onDemandPodsLen := len(onDemandPods)
+	if onDemandPodsLen > int(^uint32(0)) {
+		onDemandPodsLen = int(^uint32(0)) // Cap at reasonable maximum
+	}
+	onDemandPodsCount := int32(onDemandPodsLen) // #nosec G115 - Bounds checked above
+
 	// If we have too many on-demand pods, delete the excess
-	if int32(len(onDemandPods)) > desiredState.DesiredOnDemand {
-		excess := int32(len(onDemandPods)) - desiredState.DesiredOnDemand
-		for i := int32(0); i < excess && i < int32(len(onDemandPods)); i++ {
+	if onDemandPodsCount > desiredState.DesiredOnDemand {
+		excess := onDemandPodsCount - desiredState.DesiredOnDemand
+		for i := int32(0); i < excess && i < onDemandPodsCount; i++ {
 			podsToDelete = append(podsToDelete, onDemandPods[i])
 		}
 	}

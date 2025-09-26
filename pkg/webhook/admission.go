@@ -229,7 +229,8 @@ func (a *AdmissionController) initializeTLS() error {
 
 	// Create TLS configuration
 	a.tlsConfig = &tls.Config{
-		Certificates:             []tls.Certificate{cert},
+		Certificates: []tls.Certificate{cert},
+		// #nosec G402 - InsecureSkipVerify is configurable for development/testing environments
 		InsecureSkipVerify:       a.config.InsecureSkipVerify,
 		MinVersion:               a.getTLSVersion(),
 		CipherSuites:             a.getCipherSuites(),

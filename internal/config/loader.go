@@ -18,7 +18,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -249,7 +248,7 @@ func (cl *ConfigurationLoader) LoadFromFile(path string) error {
 	}
 
 	// Read file content
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read configuration file: %w", err)
 	}
@@ -431,8 +430,8 @@ func (cl *ConfigurationLoader) SaveToFile(path string) error {
 		return fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 
-	// Write to file
-	if err := ioutil.WriteFile(path, data, 0o644); err != nil {
+	// Write to file with secure permissions
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
 

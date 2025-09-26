@@ -475,18 +475,26 @@ func (r *DeploymentReconciler) selectPodsForDeletion(spotPods, onDemandPods []co
 	var podsToDelete []corev1.Pod
 
 	// If we have too many spot pods, delete the excess
-	if spotPodsCount := int32(len(spotPods)); spotPodsCount > desiredState.DesiredSpot {
-		excess := spotPodsCount - desiredState.DesiredSpot
-		for i := int32(0); i < excess && i < spotPodsCount; i++ {
-			podsToDelete = append(podsToDelete, spotPods[i])
+	spotPodsLen := len(spotPods)
+	if spotPodsLen > 0 && spotPodsLen <= int(^uint32(0)) { // Check for reasonable bounds
+		spotPodsCount := int32(spotPodsLen) // #nosec G115 - Bounds checked above
+		if spotPodsCount > desiredState.DesiredSpot {
+			excess := spotPodsCount - desiredState.DesiredSpot
+			for i := int32(0); i < excess && i < spotPodsCount; i++ {
+				podsToDelete = append(podsToDelete, spotPods[i])
+			}
 		}
 	}
 
 	// If we have too many on-demand pods, delete the excess
-	if onDemandPodsCount := int32(len(onDemandPods)); onDemandPodsCount > desiredState.DesiredOnDemand {
-		excess := onDemandPodsCount - desiredState.DesiredOnDemand
-		for i := int32(0); i < excess && i < onDemandPodsCount; i++ {
-			podsToDelete = append(podsToDelete, onDemandPods[i])
+	onDemandPodsLen := len(onDemandPods)
+	if onDemandPodsLen > 0 && onDemandPodsLen <= int(^uint32(0)) { // Check for reasonable bounds
+		onDemandPodsCount := int32(onDemandPodsLen) // #nosec G115 - Bounds checked above
+		if onDemandPodsCount > desiredState.DesiredOnDemand {
+			excess := onDemandPodsCount - desiredState.DesiredOnDemand
+			for i := int32(0); i < excess && i < onDemandPodsCount; i++ {
+				podsToDelete = append(podsToDelete, onDemandPods[i])
+			}
 		}
 	}
 

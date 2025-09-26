@@ -18,7 +18,6 @@ package utils
 
 import (
 	"bytes"
-	"context"
 	"log/slog"
 	"os"
 	"strings"
@@ -255,17 +254,6 @@ var _ = Describe("Logging", func() {
 		})
 
 		Describe("Context Logging", func() {
-			It("should support context-based logging", func() {
-				ctx := context.Background()
-				ctx = context.WithValue(ctx, "request_id", "req-123")
-
-				Skip("Context-based logging requires context handler implementation")
-				// This would test logging with context values
-				// logger.InfoContext(ctx, "context message")
-				// output := buffer.String()
-				// Expect(output).To(ContainSubstring("req-123"))
-			})
-
 			It("should add component context", func() {
 				Skip("Component context requires SetComponent method implementation")
 				// logger.SetComponent("test-component")

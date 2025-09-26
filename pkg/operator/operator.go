@@ -724,11 +724,6 @@ func (o *Operator) setupHTTPRoutes() {
 	if o.webhookServer != nil {
 		o.webhookServer.SetupRoutes(o.ginEngine)
 	}
-
-	// Debug endpoints (if enabled)
-	if o.config.EnablePprof {
-		// Add pprof routes here if needed
-	}
 }
 
 // setupControllers sets up the Kubernetes controllers

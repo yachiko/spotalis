@@ -375,7 +375,7 @@ func generateIdentity(prefix string) string {
 
 func generateRandomSuffix() string {
 	// Generate a simple random suffix for testing
-	return strconv.Itoa(rand.Intn(100000))
+	return strconv.Itoa(rand.Intn(100000)) // #nosec G404 - weak randomness acceptable for test identifiers
 }
 
 func isValidLeaderElectionTiming(leaseDuration, renewDeadline, retryPeriod time.Duration) bool {

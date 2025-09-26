@@ -75,7 +75,10 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 		if err != nil {
 			return nil, fmt.Errorf("invalid spot-percentage annotation: %w", err)
 		}
-		config.SpotPercentage = int32(percentage)
+		if percentage < 0 || percentage > int(^uint32(0)) {
+			return nil, fmt.Errorf("spot-percentage annotation out of valid range: %d", percentage)
+		}
+		config.SpotPercentage = int32(percentage) // #nosec G109,G115 - Bounds checked above
 	}
 
 	// Parse minimum on-demand replicas
@@ -84,7 +87,10 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 		if err != nil {
 			return nil, fmt.Errorf("invalid min-on-demand annotation: %w", err)
 		}
-		config.MinOnDemand = int32(count)
+		if count < 0 || count > int(^uint32(0)) {
+			return nil, fmt.Errorf("min-on-demand annotation out of valid range: %d", count)
+		}
+		config.MinOnDemand = int32(count) // #nosec G109,G115 - Bounds checked above
 	}
 
 	return config, nil

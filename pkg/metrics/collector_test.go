@@ -107,7 +107,7 @@ var _ = Describe("Collector", func() {
 			})
 		})
 
-		Context("when context is cancelled", func() {
+		Context("when context is canceled", func() {
 			It("should respect context cancellation", func() {
 				cancel() // Cancel the context
 				err := collector.UpdateNodeMetrics(ctx)
@@ -327,7 +327,7 @@ var _ = Describe("Collector", func() {
 				done <- true
 			}()
 
-			// Should exit when context is cancelled
+			// Should exit when context is canceled
 			Eventually(done, 200*time.Millisecond).Should(Receive())
 		})
 
