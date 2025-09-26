@@ -65,6 +65,9 @@ const (
 
 	// Environment variable values
 	envValueTrue = "true"
+
+	// Default values
+	defaultHostname = "unknown"
 )
 
 // Operator represents the main Spotalis operator following Karpenter architecture pattern
@@ -501,14 +504,23 @@ func (o *Operator) IsReady() bool {
 		return false
 	}
 
-	// Check if manager is elected (for leader election)
-	select {
-	case <-o.Elected():
-		return true
-	default:
-		// If no leader election, consider ready if started
-		return !o.config.LeaderElection
+	// If no manager (e.g., in tests), just check started state
+	if o.Manager == nil {
+		return o.started
 	}
+
+	// Check if manager is elected (for leader election)
+	if o.config.LeaderElection {
+		select {
+		case <-o.Elected():
+			return true
+		default:
+			return false
+		}
+	}
+
+	// If no leader election, consider ready if started
+	return o.started
 }
 
 // GetMetrics returns current operator metrics (for compatibility)

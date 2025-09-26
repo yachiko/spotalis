@@ -31,9 +31,6 @@ import (
 )
 
 const (
-	// Default values
-	defaultHostname = "unknown"
-
 	// Channel buffer sizes
 	leaderChangedChannelBuffer = 10
 )

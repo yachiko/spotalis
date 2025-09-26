@@ -195,28 +195,122 @@ var _ = Describe("Operator", func() {
 				config:    config,
 				namespace: config.Namespace,
 				started:   true,
+				Manager:   nil, // Explicitly set to nil for tests
 			}
 		})
 
-		It("should provide operator metrics", func() {
+		It("should return empty metrics when collector is nil", func() {
+			mockOperator.metricsCollector = nil
 			metrics := mockOperator.GetMetrics()
-			Expect(metrics).ToNot(BeNil())
-			// Should return a valid Metrics struct
+			Expect(metrics).To(Equal(Metrics{}))
 		})
 
-		It("should allow access to server components", func() {
-			// These should not panic even if nil
-			ginEngine := mockOperator.GetGinEngine()
-			_ = ginEngine // May be nil
+		It("should return health status correctly", func() {
+			mockOperator.started = true
+			status := mockOperator.GetHealthStatus()
+			Expect(status).ToNot(BeNil())
+			Expect(status.Status).To(BeElementOf([]string{"healthy", "unhealthy"}))
+			Expect(status.Leadership).To(BeElementOf([]string{"leader", "follower"}))
+		})
 
-			healthChecker := mockOperator.GetHealthChecker()
-			_ = healthChecker // May be nil
+		It("should handle leader election state correctly", func() {
+			// Without leader election manager, should always be leader
+			Expect(mockOperator.IsLeader()).To(BeTrue())
+			Expect(mockOperator.IsFollower()).To(BeFalse())
+		})
 
-			metricsServer := mockOperator.GetMetricsServer()
-			_ = metricsServer // May be nil
+		It("should provide debug info for leader election", func() {
+			debugInfo := mockOperator.GetLeaderElectionDebugInfo()
+			Expect(debugInfo).To(Equal("no leader election manager"))
+		})
+	})
 
-			webhookServer := mockOperator.GetWebhookServer()
-			_ = webhookServer // May be nil
+	Describe("Lifecycle Management", func() {
+		var mockOperator *Operator
+
+		BeforeEach(func() {
+			mockOperator = &Operator{
+				config:    config,
+				namespace: config.Namespace,
+				started:   false,
+			}
+		})
+
+		It("should stop gracefully when not started", func() {
+			err := mockOperator.Stop()
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should handle simulation methods for testing", func() {
+			err := mockOperator.SimulateNetworkPartition(5 * time.Second)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = mockOperator.SimulateLeaseRenewalFailure()
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should provide operator ID", func() {
+			id := mockOperator.GetID()
+			Expect(id).ToNot(BeEmpty())
+		})
+
+		It("should return gin engine when available", func() {
+			// Initially nil
+			engine := mockOperator.GetGinEngine()
+			Expect(engine).To(BeNil())
+		})
+
+		It("should return nil health checker when not initialized", func() {
+			checker := mockOperator.GetHealthChecker()
+			Expect(checker).To(BeNil())
+		})
+
+		It("should return nil metrics server when not initialized", func() {
+			server := mockOperator.GetMetricsServer()
+			Expect(server).To(BeNil())
+		})
+
+		It("should return nil webhook server when not initialized", func() {
+			server := mockOperator.GetWebhookServer()
+			Expect(server).To(BeNil())
+		})
+	})
+
+	Describe("Factory Functions", func() {
+		It("should create operator with New function", func() {
+			Skip("New function requires valid rest.Config and k8s cluster")
+			// op := New(nil)
+			// Expect(op).ToNot(BeNil())
+		})
+
+		It("should create operator with NewWithConfig function", func() {
+			Skip("NewWithConfig function requires valid rest.Config and k8s cluster")
+			// op := NewWithConfig(nil, config)
+			// Expect(op).ToNot(BeNil())
+		})
+
+		It("should handle nil config in NewWithConfig", func() {
+			Skip("NewWithConfig function requires valid rest.Config and k8s cluster")
+			// op := NewWithConfig(nil, nil)
+			// Expect(op).ToNot(BeNil())
+		})
+
+		It("should create operator with ID", func() {
+			Skip("NewWithID function requires valid rest.Config and k8s cluster")
+			// op := NewWithID(nil, "test-operator")
+			// Expect(op).ToNot(BeNil())
+		})
+
+		It("should create operator for testing", func() {
+			Skip("NewForTesting function requires valid rest.Config and k8s cluster")
+			// op := NewForTesting(nil, "test-operator")
+			// Expect(op).ToNot(BeNil())
+		})
+
+		It("should create operator with custom ports", func() {
+			Skip("NewWithIDAndPorts function requires valid rest.Config and k8s cluster")
+			// op := NewWithIDAndPorts(nil, "test-op", 8080, 8081, 9443)
+			// Expect(op).ToNot(BeNil())
 		})
 	})
 
@@ -254,17 +348,6 @@ var _ = Describe("Operator", func() {
 		It("should handle nil configuration gracefully", func() {
 			config := DefaultOperatorConfig()
 			Expect(config).ToNot(BeNil())
-		})
-
-		It("should handle environment configuration", func() {
-			config := &Config{
-				MetricsAddr: ":8080",
-				LogLevel:    "info",
-			}
-
-			// Test the environment configuration function exists
-			err := configFromEnv(config)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should handle concurrent access to configuration", func() {

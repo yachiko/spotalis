@@ -785,7 +785,233 @@ var _ = Describe("StatefulSetReconciler", func() {
 			_ = err // Explicitly ignore error as we're testing cancellation handling
 		})
 	})
+
+	Describe("isStatefulSetStableAndReady", func() {
+		It("should return false for statefulset with nil replicas", func() {
+			statefulSet := &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Replicas: nil,
+				},
+			}
+			Expect(reconciler.isStatefulSetStableAndReady(statefulSet)).To(BeFalse())
+		})
+
+		It("should return false for statefulset with zero replicas", func() {
+			statefulSet := &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Replicas: int32Ptr(0),
+				},
+			}
+			Expect(reconciler.isStatefulSetStableAndReady(statefulSet)).To(BeFalse())
+		})
+
+		It("should return false for unstable statefulset", func() {
+			statefulSet := &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Replicas: int32Ptr(3),
+				},
+				Status: appsv1.StatefulSetStatus{
+					ReadyReplicas:   2,
+					UpdatedReplicas: 3,
+					CurrentReplicas: 3,
+				},
+			}
+			Expect(reconciler.isStatefulSetStableAndReady(statefulSet)).To(BeFalse())
+		})
+
+		It("should return true for stable and ready statefulset", func() {
+			statefulSet := &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Replicas: int32Ptr(3),
+				},
+				Status: appsv1.StatefulSetStatus{
+					ReadyReplicas:   3,
+					UpdatedReplicas: 3,
+					CurrentReplicas: 3,
+				},
+			}
+			Expect(reconciler.isStatefulSetStableAndReady(statefulSet)).To(BeTrue())
+		})
+	})
+
+	Describe("needsRebalancing", func() {
+		It("should return true when spot pods exceed desired", func() {
+			state := &apis.ReplicaState{
+				TotalReplicas:   5,
+				DesiredSpot:     2,
+				DesiredOnDemand: 3,
+				CurrentSpot:     4,
+				CurrentOnDemand: 1,
+			}
+			Expect(reconciler.needsRebalancing(state)).To(BeTrue())
+		})
+
+		It("should return true when on-demand pods exceed desired", func() {
+			state := &apis.ReplicaState{
+				TotalReplicas:   5,
+				DesiredSpot:     3,
+				DesiredOnDemand: 2,
+				CurrentSpot:     1,
+				CurrentOnDemand: 4,
+			}
+			Expect(reconciler.needsRebalancing(state)).To(BeTrue())
+		})
+
+		It("should return false when distribution is correct", func() {
+			state := &apis.ReplicaState{
+				TotalReplicas:   5,
+				DesiredSpot:     3,
+				DesiredOnDemand: 2,
+				CurrentSpot:     3,
+				CurrentOnDemand: 2,
+			}
+			Expect(reconciler.needsRebalancing(state)).To(BeFalse())
+		})
+	})
+
+	Describe("selectPodsForDeletion", func() {
+		var spotPods, onDemandPods []corev1.Pod
+
+		BeforeEach(func() {
+			spotPods = []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-2"}},
+			}
+			onDemandPods = []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-3"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-4"}},
+			}
+		})
+
+		It("should select excess spot pods for deletion", func() {
+			state := &apis.ReplicaState{
+				DesiredSpot:     2,
+				DesiredOnDemand: 2,
+			}
+			podsToDelete := reconciler.selectPodsForDeletion(spotPods, onDemandPods, state)
+			Expect(len(podsToDelete)).To(Equal(1))
+		})
+
+		It("should select excess on-demand pods for deletion", func() {
+			state := &apis.ReplicaState{
+				DesiredSpot:     3,
+				DesiredOnDemand: 1,
+			}
+			podsToDelete := reconciler.selectPodsForDeletion(spotPods, onDemandPods, state)
+			Expect(len(podsToDelete)).To(Equal(1))
+		})
+	})
+
+	Describe("Edge Cases and Error Handling", func() {
+		It("should handle statefulset with invalid selector", func() {
+			statefulSet := &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "invalid-selector-sts",
+					Namespace: "default",
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas: int32Ptr(1),
+					Selector: nil, // Invalid: no selector
+				},
+			}
+
+			// Should handle the case where statefulset has no selector
+			_, _, err := reconciler.categorizePodsByNodeType(ctx, statefulSet)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("selector"))
+		})
+
+		It("should handle metrics collection for statefulsets", func() {
+			// Test that metrics recorder interface is properly called
+			mockMetrics := &MockStatefulSetMetricsRecorder{}
+			reconciler.MetricsCollector = mockMetrics
+
+			state := &apis.ReplicaState{
+				TotalReplicas:   3,
+				DesiredSpot:     2,
+				DesiredOnDemand: 1,
+				CurrentSpot:     2,
+				CurrentOnDemand: 1,
+			}
+
+			// This would be called during reconciliation
+			reconciler.MetricsCollector.RecordWorkloadMetrics("default", "test-sts", "StatefulSet", state)
+
+			Expect(mockMetrics.RecordedMetrics).To(HaveLen(1))
+			Expect(mockMetrics.RecordedMetrics[0].Namespace).To(Equal("default"))
+		})
+
+		It("should handle cooldown period correctly for statefulsets", func() {
+			statefulSetKey := "default/test-statefulset"
+			now := time.Now()
+
+			// Store a recent deletion time
+			reconciler.lastDeletionTimes.Store(statefulSetKey, now.Add(-30*time.Second))
+
+			statefulSet := &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-statefulset",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"spotalis.io/enabled":         "true",
+						"spotalis.io/spot-percentage": "70",
+					},
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test-sts"},
+					},
+					ServiceName: "test-service",
+				},
+				Status: appsv1.StatefulSetStatus{
+					ReadyReplicas:   3,
+					UpdatedReplicas: 3,
+					CurrentReplicas: 3,
+				},
+			}
+
+			Expect(fakeClient.Create(ctx, statefulSet)).To(Succeed())
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-statefulset",
+					Namespace: "default",
+				},
+			}
+
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			// Should be in cooldown and requeue after remaining cooldown time
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+		})
+	})
 })
+
+// MockStatefulSetMetricsRecorder implements MetricsRecorder for testing StatefulSets
+type MockStatefulSetMetricsRecorder struct {
+	RecordedMetrics []struct {
+		Namespace    string
+		WorkloadName string
+		WorkloadType string
+		ReplicaState *apis.ReplicaState
+	}
+}
+
+func (m *MockStatefulSetMetricsRecorder) RecordWorkloadMetrics(namespace, workloadName, workloadType string, replicaState *apis.ReplicaState) {
+	m.RecordedMetrics = append(m.RecordedMetrics, struct {
+		Namespace    string
+		WorkloadName string
+		WorkloadType string
+		ReplicaState *apis.ReplicaState
+	}{
+		Namespace:    namespace,
+		WorkloadName: workloadName,
+		WorkloadType: workloadType,
+		ReplicaState: replicaState,
+	})
+}
 
 // Helper function to create resource quantities
 func mustParseQuantity(value string) resource.Quantity {
