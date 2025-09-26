@@ -176,6 +176,14 @@ func (w *WebhookServer) ValidateHandler(c *gin.Context) {
 		return
 	}
 
+	if admissionReview.Request == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "admission request is missing",
+			"code":  "MISSING_ADMISSION_REQUEST",
+		})
+		return
+	}
+
 	response := &v1.AdmissionResponse{
 		UID:     admissionReview.Request.UID,
 		Allowed: true,

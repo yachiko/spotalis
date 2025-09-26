@@ -406,51 +406,83 @@ func (m *MutationHandler) podBelongsToWorkload(pod *corev1.Pod, workloadName, wo
 // getPodCapacityType determines the capacity type of an existing pod
 func (m *MutationHandler) getPodCapacityType(pod *corev1.Pod) string {
 	// Check nodeSelector first
+	if capacityType := m.getCapacityTypeFromNodeSelector(pod); capacityType != "" {
+		return capacityType
+	}
+
+	// Check node affinity
+	if capacityType := m.getCapacityTypeFromNodeAffinity(pod); capacityType != "" {
+		return capacityType
+	}
+
+	// If we can't determine, assume on-demand (safer default)
+	return capacityTypeOnDemand
+}
+
+// getCapacityTypeFromNodeSelector extracts capacity type from pod's nodeSelector
+func (m *MutationHandler) getCapacityTypeFromNodeSelector(pod *corev1.Pod) string {
 	if pod.Spec.NodeSelector != nil {
 		if capacityType, exists := pod.Spec.NodeSelector["karpenter.sh/capacity-type"]; exists {
 			return capacityType
 		}
 	}
+	return ""
+}
 
-	// Check node affinity
-	if pod.Spec.Affinity != nil && pod.Spec.Affinity.NodeAffinity != nil {
-		nodeAffinity := pod.Spec.Affinity.NodeAffinity
+// getCapacityTypeFromNodeAffinity extracts capacity type from pod's node affinity
+func (m *MutationHandler) getCapacityTypeFromNodeAffinity(pod *corev1.Pod) string {
+	if pod.Spec.Affinity == nil || pod.Spec.Affinity.NodeAffinity == nil {
+		return ""
+	}
 
-		// Check required affinity
-		if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-				for _, expr := range term.MatchExpressions {
-					if expr.Key == "karpenter.sh/capacity-type" && len(expr.Values) > 0 {
-						return expr.Values[0]
-					}
-				}
+	nodeAffinity := pod.Spec.Affinity.NodeAffinity
+
+	// Check required affinity first (highest priority)
+	if capacityType := m.getCapacityTypeFromRequiredAffinity(nodeAffinity); capacityType != "" {
+		return capacityType
+	}
+
+	// Check preferred affinity
+	return m.getCapacityTypeFromPreferredAffinity(nodeAffinity)
+}
+
+// getCapacityTypeFromRequiredAffinity extracts capacity type from required node affinity
+func (m *MutationHandler) getCapacityTypeFromRequiredAffinity(nodeAffinity *corev1.NodeAffinity) string {
+	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return ""
+	}
+
+	for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+		for _, expr := range term.MatchExpressions {
+			if expr.Key == "karpenter.sh/capacity-type" && len(expr.Values) > 0 {
+				return expr.Values[0]
 			}
 		}
+	}
+	return ""
+}
 
-		// Check preferred affinity for highest weight
-		if nodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-			highestWeight := int32(0)
-			preferredType := ""
+// getCapacityTypeFromPreferredAffinity extracts capacity type from preferred node affinity (highest weight wins)
+func (m *MutationHandler) getCapacityTypeFromPreferredAffinity(nodeAffinity *corev1.NodeAffinity) string {
+	if nodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution == nil {
+		return ""
+	}
 
-			for _, term := range nodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-				if term.Weight > highestWeight {
-					for _, expr := range term.Preference.MatchExpressions {
-						if expr.Key == "karpenter.sh/capacity-type" && len(expr.Values) > 0 {
-							highestWeight = term.Weight
-							preferredType = expr.Values[0]
-						}
-					}
+	highestWeight := int32(0)
+	preferredType := ""
+
+	for _, term := range nodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+		if term.Weight > highestWeight {
+			for _, expr := range term.Preference.MatchExpressions {
+				if expr.Key == "karpenter.sh/capacity-type" && len(expr.Values) > 0 {
+					highestWeight = term.Weight
+					preferredType = expr.Values[0]
 				}
-			}
-
-			if preferredType != "" {
-				return preferredType
 			}
 		}
 	}
 
-	// If we can't determine, assume on-demand (safer default)
-	return capacityTypeOnDemand
+	return preferredType
 }
 
 // InjectDecoder injects the decoder into the handler

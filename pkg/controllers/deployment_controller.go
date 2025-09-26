@@ -74,6 +74,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -385,19 +386,34 @@ func (r *DeploymentReconciler) needsRebalancing(state *apis.ReplicaState) bool {
 
 // performPodRebalancing deletes pods that are on wrong node types to achieve target distribution
 func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deployment *appsv1.Deployment, desiredState *apis.ReplicaState, deploymentKey string) error {
+	// Get deployment pods
+	spotPods, onDemandPods, err := r.categorizeDeploymentPods(ctx, deployment)
+	if err != nil {
+		return err
+	}
+
+	// Determine which pods need to be deleted for rebalancing
+	podsToDelete := r.selectPodsForDeletion(spotPods, onDemandPods, desiredState)
+
+	// Execute gradual rebalancing (one pod at a time)
+	return r.executeDeploymentRebalancing(ctx, podsToDelete, deploymentKey)
+}
+
+// categorizeDeploymentPods retrieves and categorizes all pods for a deployment by node type
+func (r *DeploymentReconciler) categorizeDeploymentPods(ctx context.Context, deployment *appsv1.Deployment) ([]corev1.Pod, []corev1.Pod, error) {
 	logger := log.FromContext(ctx)
 
 	// Get all pods for this deployment
 	podList := &corev1.PodList{}
 	selector, err := deploymentLabelSelector(deployment)
 	if err != nil {
-		return fmt.Errorf("failed to get selector: %w", err)
+		return nil, nil, fmt.Errorf("failed to get selector: %w", err)
 	}
 
 	if err := r.List(ctx, podList, &client.ListOptions{
 		Namespace: deployment.Namespace,
 	}, selector); err != nil {
-		return fmt.Errorf("failed to list pods: %w", err)
+		return nil, nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
 	// Categorize pods by current node type
@@ -408,33 +424,40 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 			continue // Skip pending or terminating pods
 		}
 
-		// Get the node for this pod
-		var node corev1.Node
-		if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-			logger.Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
-			continue
+		nodeType, err := r.getNodeTypeForDeploymentPod(ctx, pod, logger)
+		if err != nil {
+			continue // Skip pods with node lookup errors
 		}
 
-		// Classify the node
-		nodeType := r.NodeClassifier.ClassifyNode(&node)
 		switch nodeType {
 		case apis.NodeTypeSpot:
 			spotPods = append(spotPods, *pod)
-		case apis.NodeTypeOnDemand:
-			onDemandPods = append(onDemandPods, *pod)
-		case apis.NodeTypeUnknown:
+		case apis.NodeTypeOnDemand, apis.NodeTypeUnknown:
 			// Unknown node type - treat as on-demand for safety
 			onDemandPods = append(onDemandPods, *pod)
-			// Note: pod.Name on node.Name has unknown type, treating as on-demand
 		}
 	}
 
-	// Delete excess pods from over-represented node types
+	return spotPods, onDemandPods, nil
+}
+
+// getNodeTypeForDeploymentPod determines the node type for a given pod
+func (r *DeploymentReconciler) getNodeTypeForDeploymentPod(ctx context.Context, pod *corev1.Pod, logger logr.Logger) (apis.NodeType, error) {
+	var node corev1.Node
+	if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
+		logger.Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
+		return apis.NodeTypeUnknown, err
+	}
+
+	return r.NodeClassifier.ClassifyNode(&node), nil
+}
+
+// selectPodsForDeletion identifies excess pods that should be deleted for rebalancing
+func (r *DeploymentReconciler) selectPodsForDeletion(spotPods, onDemandPods []corev1.Pod, desiredState *apis.ReplicaState) []corev1.Pod {
 	var podsToDelete []corev1.Pod
 
 	// If we have too many spot pods, delete the excess
-	spotPodsCount := int32(len(spotPods))
-	if spotPodsCount > desiredState.DesiredSpot {
+	if spotPodsCount := int32(len(spotPods)); spotPodsCount > desiredState.DesiredSpot {
 		excess := spotPodsCount - desiredState.DesiredSpot
 		for i := int32(0); i < excess && i < spotPodsCount; i++ {
 			podsToDelete = append(podsToDelete, spotPods[i])
@@ -442,30 +465,36 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 	}
 
 	// If we have too many on-demand pods, delete the excess
-	onDemandPodsCount := int32(len(onDemandPods))
-	if onDemandPodsCount > desiredState.DesiredOnDemand {
+	if onDemandPodsCount := int32(len(onDemandPods)); onDemandPodsCount > desiredState.DesiredOnDemand {
 		excess := onDemandPodsCount - desiredState.DesiredOnDemand
 		for i := int32(0); i < excess && i < onDemandPodsCount; i++ {
 			podsToDelete = append(podsToDelete, onDemandPods[i])
 		}
 	}
 
-	// Delete the selected pods - but only one at a time to avoid chaos
-	if len(podsToDelete) > 0 {
-		// Only delete the first pod to avoid overwhelming the system
-		pod := podsToDelete[0]
-		logger.Info("Deleting one pod for rebalancing (gradual approach)", "pod", pod.Name, "node", pod.Spec.NodeName, "remaining", len(podsToDelete)-1)
-		if err := r.Delete(ctx, &pod); err != nil {
-			logger.Error(err, "Failed to delete pod for rebalancing", "pod", pod.Name)
-			return err
-		}
+	return podsToDelete
+}
 
-		// Record the deletion time for cooldown tracking
-		r.lastDeletionTimes.Store(deploymentKey, time.Now())
-
-		logger.Info("Deleted one pod for rebalancing - will continue with remaining pods in next reconcile", "deleted", pod.Name)
+// executeDeploymentRebalancing performs gradual pod deletion (one at a time)
+func (r *DeploymentReconciler) executeDeploymentRebalancing(ctx context.Context, podsToDelete []corev1.Pod, deploymentKey string) error {
+	if len(podsToDelete) == 0 {
+		return nil
 	}
 
+	logger := log.FromContext(ctx)
+
+	// Only delete the first pod to avoid overwhelming the system
+	pod := podsToDelete[0]
+	logger.Info("Deleting one pod for rebalancing (gradual approach)", "pod", pod.Name, "node", pod.Spec.NodeName, "remaining", len(podsToDelete)-1)
+	if err := r.Delete(ctx, &pod); err != nil {
+		logger.Error(err, "Failed to delete pod for rebalancing", "pod", pod.Name)
+		return err
+	}
+
+	// Record the deletion time for cooldown tracking
+	r.lastDeletionTimes.Store(deploymentKey, time.Now())
+
+	logger.Info("Deleted one pod for rebalancing - will continue with remaining pods in next reconcile", "deleted", pod.Name)
 	return nil
 }
 

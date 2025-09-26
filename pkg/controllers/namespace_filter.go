@@ -368,116 +368,175 @@ func (nf *NamespaceFilter) performFiltering(ctx context.Context, namespace strin
 		Timestamp: metav1.Now().Unix(),
 	}
 
+	// Apply exclusion filters first (early termination for rejected namespaces)
+	if blocked := nf.applyExclusionFilters(namespace, result); blocked {
+		return result, nil
+	}
+
+	// Apply inclusion filters
+	if blocked := nf.applyInclusionFilters(namespace, result); blocked {
+		return result, nil
+	}
+
+	// Apply namespace metadata filters (labels and annotations)
+	if blocked := nf.applyMetadataFilters(ctx, namespace, result); blocked {
+		return result, nil
+	}
+
+	result.Reason = "passed all filters"
+	return result, nil
+}
+
+// applyExclusionFilters checks system namespaces, explicit exclusions, and exclude patterns
+func (nf *NamespaceFilter) applyExclusionFilters(namespace string, result *FilterResult) bool {
 	// Check system namespace handling
 	if nf.isSystemNamespace(namespace) && !nf.config.IncludeSystemNamespaces {
 		result.Allowed = false
 		result.Reason = "system namespace excluded"
 		result.MatchedRule = "system_namespace_exclusion"
-		return result, nil
+		return true
 	}
 
 	// Check explicit exclusions first
+	if nf.checkExplicitExclusion(namespace, result) {
+		return true
+	}
+
+	// Check exclude patterns
+	return nf.checkExcludePatterns(namespace, result)
+}
+
+// checkExplicitExclusion checks if namespace is explicitly excluded
+func (nf *NamespaceFilter) checkExplicitExclusion(namespace string, result *FilterResult) bool {
 	for _, excluded := range nf.config.ExcludeNamespaces {
 		if namespace == excluded {
 			result.Allowed = false
 			result.Reason = "explicitly excluded"
 			result.MatchedRule = fmt.Sprintf("exclude_namespace:%s", excluded)
-			return result, nil
+			return true
 		}
 	}
+	return false
+}
 
-	// Check exclude patterns
+// checkExcludePatterns checks if namespace matches any exclude patterns
+func (nf *NamespaceFilter) checkExcludePatterns(namespace string, result *FilterResult) bool {
 	for i, pattern := range nf.excludeRegex {
 		if pattern.MatchString(namespace) {
 			result.Allowed = false
 			result.Reason = "matched exclude pattern"
 			result.MatchedRule = fmt.Sprintf("exclude_pattern:%s", nf.config.ExcludePatterns[i])
-			return result, nil
+			return true
 		}
 	}
+	return false
+}
 
+// applyInclusionFilters checks explicit inclusions and include patterns
+func (nf *NamespaceFilter) applyInclusionFilters(namespace string, result *FilterResult) bool {
 	// Check explicit inclusions
-	if len(nf.config.IncludeNamespaces) > 0 {
-		found := false
-		for _, included := range nf.config.IncludeNamespaces {
-			if namespace == included {
-				found = true
-				result.MatchedRule = fmt.Sprintf("include_namespace:%s", included)
-				break
-			}
-		}
-		if !found {
-			result.Allowed = false
-			result.Reason = "not in include list"
-			result.MatchedRule = "include_namespace_check"
-			return result, nil
-		}
+	if nf.checkExplicitInclusion(namespace, result) {
+		return true
 	}
 
 	// Check include patterns
-	if len(nf.includeRegex) > 0 {
-		found := false
-		for i, pattern := range nf.includeRegex {
-			if pattern.MatchString(namespace) {
-				found = true
-				result.MatchedRule = fmt.Sprintf("include_pattern:%s", nf.config.IncludePatterns[i])
-				break
-			}
-		}
-		if !found {
-			result.Allowed = false
-			result.Reason = "no include pattern matched"
-			result.MatchedRule = "include_pattern_check"
-			return result, nil
+	return nf.checkIncludePatterns(namespace, result)
+}
+
+// checkExplicitInclusion checks if namespace is in explicit inclusion list
+func (nf *NamespaceFilter) checkExplicitInclusion(namespace string, result *FilterResult) bool {
+	if len(nf.config.IncludeNamespaces) == 0 {
+		return false
+	}
+
+	for _, included := range nf.config.IncludeNamespaces {
+		if namespace == included {
+			result.MatchedRule = fmt.Sprintf("include_namespace:%s", included)
+			return false // Found in include list, continue processing
 		}
 	}
 
-	// Check namespace labels and annotations
-	if nf.client != nil {
-		namespaceObj := &corev1.Namespace{}
-		err := nf.client.Get(ctx, client.ObjectKey{Name: namespace}, namespaceObj)
-		if err != nil {
-			// Namespace might not exist, allow processing to proceed
-			result.Reason = "namespace not found, allowing"
-			result.MatchedRule = "namespace_not_found"
-			return result, nil
-		}
+	// Not found in include list, block
+	result.Allowed = false
+	result.Reason = "not in include list"
+	result.MatchedRule = "include_namespace_check"
+	return true
+}
 
-		// Check required labels
-		if !nf.checkRequiredLabels(namespaceObj.Labels) {
-			result.Allowed = false
-			result.Reason = "missing required labels"
-			result.MatchedRule = "required_labels_check"
-			return result, nil
-		}
+// checkIncludePatterns checks if namespace matches any include patterns
+func (nf *NamespaceFilter) checkIncludePatterns(namespace string, result *FilterResult) bool {
+	if len(nf.includeRegex) == 0 {
+		return false
+	}
 
-		// Check forbidden labels
-		if nf.checkForbiddenLabels(namespaceObj.Labels) {
-			result.Allowed = false
-			result.Reason = "has forbidden labels"
-			result.MatchedRule = "forbidden_labels_check"
-			return result, nil
-		}
-
-		// Check required annotations
-		if !nf.checkRequiredAnnotations(namespaceObj.Annotations) {
-			result.Allowed = false
-			result.Reason = "missing required annotations"
-			result.MatchedRule = "required_annotations_check"
-			return result, nil
-		}
-
-		// Check forbidden annotations
-		if nf.checkForbiddenAnnotations(namespaceObj.Annotations) {
-			result.Allowed = false
-			result.Reason = "has forbidden annotations"
-			result.MatchedRule = "forbidden_annotations_check"
-			return result, nil
+	for i, pattern := range nf.includeRegex {
+		if pattern.MatchString(namespace) {
+			result.MatchedRule = fmt.Sprintf("include_pattern:%s", nf.config.IncludePatterns[i])
+			return false // Found matching pattern, continue processing
 		}
 	}
 
-	result.Reason = "passed all filters"
-	return result, nil
+	// No include pattern matched, block
+	result.Allowed = false
+	result.Reason = "no include pattern matched"
+	result.MatchedRule = "include_pattern_check"
+	return true
+}
+
+// applyMetadataFilters checks namespace labels and annotations
+func (nf *NamespaceFilter) applyMetadataFilters(ctx context.Context, namespace string, result *FilterResult) bool {
+	if nf.client == nil {
+		return false
+	}
+
+	namespaceObj := &corev1.Namespace{}
+	err := nf.client.Get(ctx, client.ObjectKey{Name: namespace}, namespaceObj)
+	if err != nil {
+		// Namespace might not exist, allow processing to proceed
+		result.Reason = "namespace not found, allowing"
+		result.MatchedRule = "namespace_not_found"
+		return false
+	}
+
+	// Check all metadata requirements
+	return nf.checkMetadataRequirements(namespaceObj, result)
+}
+
+// checkMetadataRequirements checks all label and annotation requirements
+func (nf *NamespaceFilter) checkMetadataRequirements(namespaceObj *corev1.Namespace, result *FilterResult) bool {
+	// Check required labels
+	if !nf.checkRequiredLabels(namespaceObj.Labels) {
+		result.Allowed = false
+		result.Reason = "missing required labels"
+		result.MatchedRule = "required_labels_check"
+		return true
+	}
+
+	// Check forbidden labels
+	if nf.checkForbiddenLabels(namespaceObj.Labels) {
+		result.Allowed = false
+		result.Reason = "has forbidden labels"
+		result.MatchedRule = "forbidden_labels_check"
+		return true
+	}
+
+	// Check required annotations
+	if !nf.checkRequiredAnnotations(namespaceObj.Annotations) {
+		result.Allowed = false
+		result.Reason = "missing required annotations"
+		result.MatchedRule = "required_annotations_check"
+		return true
+	}
+
+	// Check forbidden annotations
+	if nf.checkForbiddenAnnotations(namespaceObj.Annotations) {
+		result.Allowed = false
+		result.Reason = "has forbidden annotations"
+		result.MatchedRule = "forbidden_annotations_check"
+		return true
+	}
+
+	return false
 }
 
 // checkTenantAccess checks if a namespace is accessible by a specific tenant
