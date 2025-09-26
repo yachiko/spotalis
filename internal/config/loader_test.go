@@ -41,7 +41,7 @@ var _ = Describe("ConfigurationLoader", func() {
 
 	AfterEach(func() {
 		if tempDir != "" {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir)
 		}
 		// Clean up any environment variables we may have set
 		envVars := []string{
@@ -58,7 +58,7 @@ var _ = Describe("ConfigurationLoader", func() {
 			"SPOTALIS_KUBE_TIMEOUT",
 		}
 		for _, env := range envVars {
-			os.Unsetenv(env)
+			_ = os.Unsetenv(env)
 		}
 	})
 

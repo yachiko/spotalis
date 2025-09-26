@@ -19,14 +19,12 @@ package controllers
 import (
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
-	"k8s.io/client-go/kubernetes/fake"
-
 	"github.com/ahoma/spotalis/internal/annotations"
 	"github.com/ahoma/spotalis/internal/config"
 	"github.com/ahoma/spotalis/pkg/metrics"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 var _ = Describe("ControllerManager", func() {

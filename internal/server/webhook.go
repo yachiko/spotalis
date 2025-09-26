@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 	"github.com/gin-gonic/gin"
 	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 )
 
 // WebhookServer provides webhook admission control functionality

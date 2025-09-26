@@ -27,6 +27,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ahoma/spotalis/internal/annotations"
+	"github.com/ahoma/spotalis/internal/config"
+	"github.com/ahoma/spotalis/pkg/apis"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,10 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/apis"
 )
 
 // StatefulSetReconciler reconciles StatefulSet objects for spot/on-demand pod distribution management

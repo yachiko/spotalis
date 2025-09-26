@@ -23,14 +23,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ahoma/spotalis/tests/integration/shared"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/ahoma/spotalis/tests/integration/shared"
 )
 
 func TestBasicDeploymentIntegration(t *testing.T) {

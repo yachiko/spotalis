@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ahoma/spotalis/pkg/apis"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -27,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/ahoma/spotalis/pkg/apis"
 )
 
 var _ = Describe("NodeClassifierService", func() {

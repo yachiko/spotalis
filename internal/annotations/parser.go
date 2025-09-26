@@ -21,9 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/ahoma/spotalis/pkg/apis"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -35,6 +34,12 @@ const (
 
 	// MinOnDemandAnnotation configures minimum number of on-demand replicas
 	MinOnDemandAnnotation = "spotalis.io/min-on-demand"
+
+	// BooleanTrue represents the string "true" for annotation values
+	BooleanTrue = "true"
+
+	// BooleanFalse represents the string "false" for annotation values
+	BooleanFalse = "false"
 )
 
 // AnnotationParser provides methods for parsing Spotalis annotations
@@ -56,7 +61,7 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 
 	// Check if Spotalis is enabled for this workload
 	if enabled, exists := annotations[EnabledAnnotation]; exists {
-		config.Enabled = enabled == "true"
+		config.Enabled = enabled == BooleanTrue
 	} else {
 		// If no enabled annotation, default to false
 		config.Enabled = false
@@ -131,7 +136,7 @@ func (p *AnnotationParser) IsSpotalisEnabled(obj metav1.Object) bool {
 	enabled, exists := annotations[EnabledAnnotation]
 	if exists {
 		// If explicit enabled annotation exists, it must be "true"
-		return strings.ToLower(enabled) == "true"
+		return strings.ToLower(enabled) == BooleanTrue
 	}
 
 	// If no explicit enabled annotation, check if any other Spotalis annotations exist
@@ -185,7 +190,7 @@ func (p *AnnotationParser) ValidateAnnotations(obj metav1.Object) []error {
 
 	// Validate enabled annotation if present
 	if value, exists := annotations[EnabledAnnotation]; exists {
-		if value != "true" && value != "false" {
+		if value != BooleanTrue && value != BooleanFalse {
 			errors = append(errors, fmt.Errorf("invalid %s: must be 'true' or 'false', got '%s'", EnabledAnnotation, value))
 		}
 	}

@@ -226,7 +226,7 @@ func (h *HealthChecker) ClearKubernetesUnavailable() {
 }
 
 // checkKubernetesAPI verifies we can communicate with the Kubernetes API server
-func (h *HealthChecker) checkKubernetesAPI(ctx context.Context) error {
+func (h *HealthChecker) checkKubernetesAPI(_ context.Context) error {
 	if h.kubeClient == nil {
 		return fmt.Errorf("kubernetes client not initialized")
 	}

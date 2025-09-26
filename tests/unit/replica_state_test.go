@@ -19,11 +19,10 @@ package unit
 import (
 	"time"
 
+	"github.com/ahoma/spotalis/pkg/apis"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/ahoma/spotalis/pkg/apis"
 )
 
 var _ = Describe("ReplicaState", func() {

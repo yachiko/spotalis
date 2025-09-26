@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ahoma/spotalis/internal/annotations"
+	"github.com/ahoma/spotalis/internal/config"
+	"github.com/ahoma/spotalis/pkg/apis"
 	"gomodules.xyz/jsonpatch/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,10 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/apis"
 )
 
 const (

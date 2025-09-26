@@ -87,7 +87,7 @@ type RateLimiter struct {
 	metrics *RateLimiterMetrics
 
 	// Workqueue rate limiter
-	workqueueLimiter workqueue.RateLimiter
+	workqueueLimiter workqueue.TypedRateLimiter[any]
 }
 
 // NewRateLimiter creates a new rate limiter
@@ -117,7 +117,7 @@ func NewRateLimiter(config *RateLimiterConfig) *RateLimiter {
 	}
 
 	// Create workqueue rate limiter
-	rl.workqueueLimiter = workqueue.NewItemExponentialFailureRateLimiter(
+	rl.workqueueLimiter = workqueue.NewTypedItemExponentialFailureRateLimiter[any](
 		config.BaseDelay,
 		config.MaxDelay,
 	)
@@ -224,7 +224,7 @@ func (rl *RateLimiter) RecordFailure(resource string, err error) {
 }
 
 // GetWorkqueueRateLimiter returns a workqueue-compatible rate limiter
-func (rl *RateLimiter) GetWorkqueueRateLimiter() workqueue.RateLimiter {
+func (rl *RateLimiter) GetWorkqueueRateLimiter() workqueue.TypedRateLimiter[any] {
 	return rl.workqueueLimiter
 }
 

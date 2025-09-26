@@ -249,7 +249,7 @@ func (k *KubernetesClientManager) initializeRESTConfig() error {
 
 	// Apply configuration overrides
 	config.QPS = k.config.QPS
-	config.Burst = int(k.config.Burst)
+	config.Burst = k.config.Burst
 	config.Timeout = k.config.Timeout
 	config.UserAgent = k.config.UserAgent
 	config.DisableCompression = k.config.DisableCompression

@@ -21,11 +21,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/ahoma/spotalis/internal/server"
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/ahoma/spotalis/internal/server"
 )
 
 func TestReadyzContract(t *testing.T) {

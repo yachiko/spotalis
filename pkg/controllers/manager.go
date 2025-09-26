@@ -20,15 +20,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ahoma/spotalis/internal/annotations"
+	"github.com/ahoma/spotalis/internal/config"
+	"github.com/ahoma/spotalis/pkg/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/metrics"
 )
 
 // ManagerConfig contains configuration for the controller manager

@@ -41,6 +41,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/ahoma/spotalis/internal/annotations"
+	"github.com/ahoma/spotalis/internal/config"
+	"github.com/ahoma/spotalis/internal/server"
+	"github.com/ahoma/spotalis/pkg/controllers"
+	"github.com/ahoma/spotalis/pkg/metrics"
+	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 	"github.com/gin-gonic/gin"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -51,13 +57,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/internal/server"
-	"github.com/ahoma/spotalis/pkg/controllers"
-	"github.com/ahoma/spotalis/pkg/metrics"
-	webhookMutate "github.com/ahoma/spotalis/pkg/webhook"
 )
 
 const (

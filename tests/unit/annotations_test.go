@@ -17,12 +17,11 @@ limitations under the License.
 package unit
 
 import (
+	"github.com/ahoma/spotalis/internal/annotations"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/ahoma/spotalis/internal/annotations"
 )
 
 var _ = Describe("AnnotationParser", func() {
@@ -513,31 +512,31 @@ func (m *MockObject) SetAnnotations(annotations map[string]string) {
 	m.annotations = annotations
 }
 
-func (m *MockObject) GetName() string                                            { return "test-object" }
-func (m *MockObject) SetName(name string)                                        {}
-func (m *MockObject) GetGenerateName() string                                    { return "" }
-func (m *MockObject) SetGenerateName(name string)                                {}
-func (m *MockObject) GetNamespace() string                                       { return "default" }
-func (m *MockObject) SetNamespace(namespace string)                              {}
-func (m *MockObject) GetSelfLink() string                                        { return "" }
-func (m *MockObject) SetSelfLink(selfLink string)                                {}
-func (m *MockObject) GetUID() types.UID                                          { return types.UID("test-uid") }
-func (m *MockObject) SetUID(uid types.UID)                                       {}
-func (m *MockObject) GetResourceVersion() string                                 { return "1" }
-func (m *MockObject) SetResourceVersion(version string)                          {}
-func (m *MockObject) GetGeneration() int64                                       { return 1 }
-func (m *MockObject) SetGeneration(generation int64)                             {}
-func (m *MockObject) GetCreationTimestamp() metav1.Time                          { return metav1.Time{} }
-func (m *MockObject) SetCreationTimestamp(timestamp metav1.Time)                 {}
-func (m *MockObject) GetDeletionTimestamp() *metav1.Time                         { return nil }
-func (m *MockObject) SetDeletionTimestamp(timestamp *metav1.Time)                {}
-func (m *MockObject) GetDeletionGracePeriodSeconds() *int64                      { return nil }
-func (m *MockObject) SetDeletionGracePeriodSeconds(seconds *int64)               {}
-func (m *MockObject) GetLabels() map[string]string                               { return nil }
-func (m *MockObject) SetLabels(labels map[string]string)                         {}
-func (m *MockObject) GetOwnerReferences() []metav1.OwnerReference                { return nil }
-func (m *MockObject) SetOwnerReferences(references []metav1.OwnerReference)      {}
-func (m *MockObject) GetFinalizers() []string                                    { return nil }
-func (m *MockObject) SetFinalizers(finalizers []string)                          {}
-func (m *MockObject) GetManagedFields() []metav1.ManagedFieldsEntry              { return nil }
-func (m *MockObject) SetManagedFields(managedFields []metav1.ManagedFieldsEntry) {}
+func (m *MockObject) GetName() string                                { return "test-object" }
+func (m *MockObject) SetName(_ string)                               {}
+func (m *MockObject) GetGenerateName() string                        { return "" }
+func (m *MockObject) SetGenerateName(_ string)                       {}
+func (m *MockObject) GetNamespace() string                           { return "default" }
+func (m *MockObject) SetNamespace(_ string)                          {}
+func (m *MockObject) GetSelfLink() string                            { return "" }
+func (m *MockObject) SetSelfLink(_ string)                           {}
+func (m *MockObject) GetUID() types.UID                              { return types.UID("test-uid") }
+func (m *MockObject) SetUID(_ types.UID)                             {}
+func (m *MockObject) GetResourceVersion() string                     { return "1" }
+func (m *MockObject) SetResourceVersion(_ string)                    {}
+func (m *MockObject) GetGeneration() int64                           { return 1 }
+func (m *MockObject) SetGeneration(_ int64)                          {}
+func (m *MockObject) GetCreationTimestamp() metav1.Time              { return metav1.Time{} }
+func (m *MockObject) SetCreationTimestamp(_ metav1.Time)             {}
+func (m *MockObject) GetDeletionTimestamp() *metav1.Time             { return nil }
+func (m *MockObject) SetDeletionTimestamp(_ *metav1.Time)            {}
+func (m *MockObject) GetDeletionGracePeriodSeconds() *int64          { return nil }
+func (m *MockObject) SetDeletionGracePeriodSeconds(_ *int64)         {}
+func (m *MockObject) GetLabels() map[string]string                   { return nil }
+func (m *MockObject) SetLabels(_ map[string]string)                  {}
+func (m *MockObject) GetOwnerReferences() []metav1.OwnerReference    { return nil }
+func (m *MockObject) SetOwnerReferences(_ []metav1.OwnerReference)   {}
+func (m *MockObject) GetFinalizers() []string                        { return nil }
+func (m *MockObject) SetFinalizers(_ []string)                       {}
+func (m *MockObject) GetManagedFields() []metav1.ManagedFieldsEntry  { return nil }
+func (m *MockObject) SetManagedFields(_ []metav1.ManagedFieldsEntry) {}

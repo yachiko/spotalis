@@ -74,6 +74,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ahoma/spotalis/internal/annotations"
+	"github.com/ahoma/spotalis/internal/config"
+	"github.com/ahoma/spotalis/pkg/apis"
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -84,10 +87,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/apis"
 )
 
 // DeploymentReconciler reconciles Deployment objects for spot/on-demand pod distribution management

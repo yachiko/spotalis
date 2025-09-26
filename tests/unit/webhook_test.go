@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ahoma/spotalis/pkg/webhook"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -30,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	"github.com/ahoma/spotalis/pkg/webhook"
 )
 
 var _ = Describe("MutationHandler", func() {

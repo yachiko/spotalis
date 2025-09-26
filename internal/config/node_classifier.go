@@ -23,11 +23,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ahoma/spotalis/pkg/apis"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/ahoma/spotalis/pkg/apis"
 )
 
 const (

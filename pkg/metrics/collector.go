@@ -21,11 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
-
 	"github.com/ahoma/spotalis/internal/config"
 	"github.com/ahoma/spotalis/pkg/apis"
+	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (

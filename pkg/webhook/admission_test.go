@@ -63,7 +63,7 @@ var _ = Describe("AdmissionController", func() {
 			cancel()
 		}
 		if tempDir != "" {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir)
 		}
 	})
 
@@ -207,8 +207,8 @@ var _ = Describe("AdmissionController", func() {
 
 				suites := controller.getCipherSuites()
 				Expect(suites).To(HaveLen(2))
-				Expect(suites).To(ContainElement(uint16(tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256)))
-				Expect(suites).To(ContainElement(uint16(tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384)))
+				Expect(suites).To(ContainElement(tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256))
+				Expect(suites).To(ContainElement(tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384))
 			})
 
 			It("should ignore unknown cipher suites", func() {
