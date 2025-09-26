@@ -393,7 +393,7 @@ var _ = Describe("AdmissionController", func() {
 // Mock admission handler for testing
 type mockAdmissionHandler struct{}
 
-func (m *mockAdmissionHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (m *mockAdmissionHandler) Handle(_ context.Context, _ admission.Request) admission.Response {
 	return admission.Allowed("mock handler")
 }
 

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package webhook provides Kubernetes admission webhook functionality
+// for mutating pod specifications with node selectors.
 package webhook
 
 import (
@@ -330,7 +332,7 @@ func (a *AdmissionController) createClientConfig() admissionv1.WebhookClientConf
 
 // extractCABundle extracts CA bundle from certificate file
 func (a *AdmissionController) extractCABundle(certPath string) error {
-	certPEM, err := os.ReadFile(certPath)
+	certPEM, err := os.ReadFile(certPath) // #nosec G304 - certificate path is trusted
 	if err != nil {
 		return fmt.Errorf("failed to read certificate file: %w", err)
 	}
@@ -383,7 +385,7 @@ func (a *AdmissionController) getCipherSuites() []uint16 {
 func (a *AdmissionController) ValidateCertificates() error {
 	certPath := filepath.Join(a.config.CertDir, a.config.CertName)
 
-	certPEM, err := os.ReadFile(certPath)
+	certPEM, err := os.ReadFile(certPath) // #nosec G304 - certificate path is constructed from trusted config
 	if err != nil {
 		return fmt.Errorf("failed to read certificate: %w", err)
 	}

@@ -288,7 +288,7 @@ var _ = Describe("Graceful Shutdown", func() {
 		It("should support pre-shutdown hooks", func() {
 			// Test that we can set pre-shutdown hooks
 			hooks := []ShutdownHook{
-				func(ctx context.Context) error { return nil },
+				func(_ context.Context) error { return nil },
 			}
 			shutdownConfig.PreShutdownHooks = hooks
 
@@ -298,7 +298,7 @@ var _ = Describe("Graceful Shutdown", func() {
 		It("should support post-shutdown hooks", func() {
 			// Test that we can set post-shutdown hooks
 			hooks := []ShutdownHook{
-				func(ctx context.Context) error { return nil },
+				func(_ context.Context) error { return nil },
 			}
 			shutdownConfig.PostShutdownHooks = hooks
 

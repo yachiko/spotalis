@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package server provides HTTP server components for health checks, metrics,
+// and webhook endpoints used by the Spotalis controller.
 package server
 
 import (

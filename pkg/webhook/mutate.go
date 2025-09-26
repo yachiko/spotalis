@@ -490,7 +490,7 @@ func (m *MutationHandler) InjectDecoder(d admission.Decoder) error {
 	return nil
 }
 
-// Legacy support for existing interface
+// MutatingHandler provides legacy support for existing interface compatibility
 type MutatingHandler = MutationHandler
 
 // NewMutatingHandler creates a new mutating webhook handler (legacy)

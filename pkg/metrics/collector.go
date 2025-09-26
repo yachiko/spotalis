@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package metrics provides Prometheus metrics collection and recording
+// for Spotalis controller operations and workload management.
 package metrics
 
 import (
@@ -321,19 +323,19 @@ func (c *Collector) UpdateControllerHealth(controllerName string, isLeader bool)
 }
 
 // GetMetricsSnapshot returns a snapshot of current metrics values
-func (c *Collector) GetMetricsSnapshot() MetricsSnapshot {
+func (c *Collector) GetMetricsSnapshot() Snapshot {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	return MetricsSnapshot{
+	return Snapshot{
 		LastUpdate:       c.lastUpdate,
 		Timestamp:        time.Now(),
 		ManagedWorkloads: c.managedWorkloadsCount,
 	}
 }
 
-// MetricsSnapshot represents a point-in-time snapshot of metrics
-type MetricsSnapshot struct {
+// Snapshot represents a point-in-time snapshot of metrics
+type Snapshot struct {
 	LastUpdate       time.Time `json:"lastUpdate"`
 	Timestamp        time.Time `json:"timestamp"`
 	ManagedWorkloads int       `json:"managedWorkloads"`
@@ -408,7 +410,7 @@ func (t *Timer) ObserveWebhook(collector *Collector, operation, resourceKind, re
 	collector.RecordWebhookRequest(operation, resourceKind, result, duration)
 }
 
-// Global metrics collector instance
+// GlobalCollector is the shared metrics collector instance used throughout the application
 var GlobalCollector = NewCollector()
 
 // Helper functions for common metrics operations

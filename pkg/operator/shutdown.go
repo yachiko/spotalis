@@ -97,10 +97,15 @@ type ComponentShutdownState struct {
 type ShutdownState int
 
 const (
+	// ShutdownStateUnknown indicates the shutdown state is not yet determined
 	ShutdownStateUnknown ShutdownState = iota
+	// ShutdownStateStarted indicates shutdown has been initiated
 	ShutdownStateStarted
+	// ShutdownStateInProgress indicates shutdown is currently in progress
 	ShutdownStateInProgress
+	// ShutdownStateCompleted indicates shutdown has completed successfully
 	ShutdownStateCompleted
+	// ShutdownStateFailed indicates shutdown encountered an error
 	ShutdownStateFailed
 )
 

@@ -358,7 +358,7 @@ var _ = Describe("ControllerManager", func() {
 			done := make(chan bool, 10)
 
 			for i := 0; i < 10; i++ {
-				go func(id int) {
+				go func(_ int) {
 					defer func() { done <- true }()
 					manager.started = true
 					_ = manager.GetManagerMetrics()

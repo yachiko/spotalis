@@ -409,7 +409,7 @@ var _ = Describe("Timer", func() {
 var _ = Describe("MetricsSnapshot", func() {
 	It("should contain timestamp and last update fields", func() {
 		now := time.Now()
-		snapshot := MetricsSnapshot{
+		snapshot := Snapshot{
 			LastUpdate: now.Add(-5 * time.Minute),
 			Timestamp:  now,
 		}

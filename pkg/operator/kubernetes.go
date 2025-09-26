@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package operator provides the core Spotalis operator implementation,
+// including lifecycle management, Kubernetes integration, and leader election.
 package operator
 
 import (
@@ -447,7 +449,7 @@ func (k *KubernetesClientManager) ensureClusterRoleBinding(ctx context.Context) 
 }
 
 // validatePermission validates a specific permission
-func (k *KubernetesClientManager) validatePermission(ctx context.Context, resource, verb, group string) error {
+func (k *KubernetesClientManager) validatePermission(ctx context.Context, resource, verb, _ string) error {
 	// This would typically use SubjectAccessReview, but for simplicity
 	// we'll just try to perform a basic operation
 	switch resource {

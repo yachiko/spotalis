@@ -298,11 +298,17 @@ type DisruptionPolicyStatus struct {
 type DisruptionReason string
 
 const (
-	DisruptionReasonAllowed          DisruptionReason = "allowed"
-	DisruptionReasonNoPDB            DisruptionReason = "no-pdb"
-	DisruptionReasonMinAvailable     DisruptionReason = "min-available-violated"
-	DisruptionReasonMaxUnavailable   DisruptionReason = "max-unavailable-reached"
-	DisruptionReasonOutsideWindow    DisruptionReason = "outside-disruption-window"
+	// DisruptionReasonAllowed indicates that disruption is permitted
+	DisruptionReasonAllowed DisruptionReason = "allowed"
+	// DisruptionReasonNoPDB indicates no PodDisruptionBudget exists
+	DisruptionReasonNoPDB DisruptionReason = "no-pdb"
+	// DisruptionReasonMinAvailable indicates minimum available replicas would be violated
+	DisruptionReasonMinAvailable DisruptionReason = "min-available-violated"
+	// DisruptionReasonMaxUnavailable indicates maximum unavailable replicas would be exceeded
+	DisruptionReasonMaxUnavailable DisruptionReason = "max-unavailable-reached"
+	// DisruptionReasonOutsideWindow indicates disruption is outside the allowed time window
+	DisruptionReasonOutsideWindow DisruptionReason = "outside-disruption-window"
+	// DisruptionReasonTooManyDisrupted indicates too many pods are currently disrupted
 	DisruptionReasonTooManyDisrupted DisruptionReason = "too-many-disrupted"
 )
 

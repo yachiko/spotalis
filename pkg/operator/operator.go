@@ -72,7 +72,7 @@ type Operator struct {
 	manager.Manager
 
 	// Configuration
-	config    *OperatorConfig
+	config    *Config
 	namespace string
 
 	// Core services
@@ -97,8 +97,8 @@ type Operator struct {
 	started bool
 }
 
-// OperatorConfig contains configuration for the Spotalis operator
-type OperatorConfig struct {
+// Config contains configuration for the Spotalis operator
+type Config struct {
 	// Basic configuration
 	MetricsAddr      string
 	ProbeAddr        string
@@ -145,9 +145,9 @@ type HealthStatus struct {
 	Status     string
 }
 
-// DefaultOperatorConfig returns the default operator configuration
-func DefaultOperatorConfig() *OperatorConfig {
-	return &OperatorConfig{
+// DefaultOperatorConfig creates a default configuration
+func DefaultOperatorConfig() *Config {
+	return &Config{
 		MetricsAddr:             ":8080",
 		ProbeAddr:               ":8081",
 		WebhookAddr:             ":9443",
@@ -170,7 +170,7 @@ func DefaultOperatorConfig() *OperatorConfig {
 }
 
 // New creates a new operator instance (for compatibility)
-func New(cfg *rest.Config) *Operator {
+func New(_ *rest.Config) *Operator {
 	config := DefaultOperatorConfig()
 	operator, err := NewOperator(config)
 	if err != nil {
@@ -180,10 +180,10 @@ func New(cfg *rest.Config) *Operator {
 }
 
 // NewWithConfig creates a new operator with configuration (for compatibility)
-func NewWithConfig(cfg *rest.Config, operatorConfig interface{}) *Operator {
-	var config *OperatorConfig
+func NewWithConfig(_ *rest.Config, operatorConfig interface{}) *Operator {
+	var config *Config
 	if operatorConfig != nil {
-		if c, ok := operatorConfig.(*OperatorConfig); ok {
+		if c, ok := operatorConfig.(*Config); ok {
 			config = c
 		} else {
 			config = DefaultOperatorConfig()
@@ -392,7 +392,7 @@ func NewWithIDAndPorts(cfg *rest.Config, operatorID string, metricsPort, probePo
 }
 
 // NewOperator creates a new Spotalis operator instance
-func NewOperator(config *OperatorConfig) (*Operator, error) {
+func NewOperator(config *Config) (*Operator, error) {
 	if config == nil {
 		config = DefaultOperatorConfig()
 	}
@@ -503,7 +503,7 @@ func (o *Operator) IsReady() bool {
 
 	// Check if manager is elected (for leader election)
 	select {
-	case <-o.Manager.Elected():
+	case <-o.Elected():
 		return true
 	default:
 		// If no leader election, consider ready if started
@@ -539,7 +539,7 @@ func (o *Operator) GetMetrics() Metrics {
 }
 
 // GetConfig returns the operator configuration
-func (o *Operator) GetConfig() *OperatorConfig {
+func (o *Operator) GetConfig() *Config {
 	return o.config
 }
 
@@ -590,7 +590,7 @@ func (o *Operator) GetID() string {
 }
 
 // SimulateNetworkPartition simulates a network partition for testing
-func (o *Operator) SimulateNetworkPartition(duration time.Duration) error {
+func (o *Operator) SimulateNetworkPartition(_ time.Duration) error {
 	// This is a test helper method - in real scenarios this would simulate network issues
 	if o.leaderElectionManager != nil {
 		return o.leaderElectionManager.Resign()
@@ -700,7 +700,7 @@ func (o *Operator) initializeHTTPServer() error {
 			KeyPath:  o.config.WebhookKeyName,
 			ReadOnly: o.config.ReadOnlyMode,
 		}
-		o.webhookServer = server.NewWebhookServer(webhookConfig, o.mutationHandler, o.Manager.GetScheme())
+		o.webhookServer = server.NewWebhookServer(webhookConfig, o.mutationHandler, o.GetScheme())
 	}
 
 	// Setup HTTP routes
@@ -735,7 +735,7 @@ func (o *Operator) setupControllers() error {
 	namespaceFilterConfig.RequiredAnnotations = map[string]string{
 		"spotalis.io/enabled": "true",
 	}
-	namespaceFilter, err := controllers.NewNamespaceFilter(namespaceFilterConfig, o.Manager.GetClient())
+	namespaceFilter, err := controllers.NewNamespaceFilter(namespaceFilterConfig, o.GetClient())
 	if err != nil {
 		setupLog.Error(err, "Failed to create namespace filter, proceeding without namespace filtering")
 		namespaceFilter = nil
@@ -745,8 +745,8 @@ func (o *Operator) setupControllers() error {
 
 	// Setup Deployment controller
 	deploymentController := &controllers.DeploymentReconciler{
-		Client:            o.Manager.GetClient(),
-		Scheme:            o.Manager.GetScheme(),
+		Client:            o.GetClient(),
+		Scheme:            o.GetScheme(),
 		AnnotationParser:  o.annotationParser,
 		NodeClassifier:    o.nodeClassifier,
 		NamespaceFilter:   namespaceFilter,
@@ -768,8 +768,8 @@ func (o *Operator) setupControllers() error {
 
 	// Setup StatefulSet controller (reuse the same namespace filter)
 	statefulSetController := &controllers.StatefulSetReconciler{
-		Client:            o.Manager.GetClient(),
-		Scheme:            o.Manager.GetScheme(),
+		Client:            o.GetClient(),
+		Scheme:            o.GetScheme(),
 		AnnotationParser:  o.annotationParser,
 		NodeClassifier:    o.nodeClassifier,
 		NamespaceFilter:   namespaceFilter,
@@ -813,17 +813,17 @@ func (o *Operator) setupWebhooks() error {
 // setupHealthChecks configures health and readiness checks
 func (o *Operator) setupHealthChecks() {
 	// Add health checks to manager
-	if err := o.Manager.AddHealthzCheck("healthz", o.healthChecker.GetHealthzChecker()); err != nil {
+	if err := o.AddHealthzCheck("healthz", o.healthChecker.GetHealthzChecker()); err != nil {
 		ctrl.Log.Error(err, "failed to add healthz check")
 	}
 
-	if err := o.Manager.AddReadyzCheck("readyz", o.healthChecker.GetReadyzChecker()); err != nil {
+	if err := o.AddReadyzCheck("readyz", o.healthChecker.GetReadyzChecker()); err != nil {
 		ctrl.Log.Error(err, "failed to add readyz check")
 	}
 }
 
 // configFromEnv loads configuration from environment variables
-func configFromEnv(config *OperatorConfig) error {
+func configFromEnv(config *Config) error {
 	if addr := os.Getenv("METRICS_ADDR"); addr != "" {
 		config.MetricsAddr = addr
 	}

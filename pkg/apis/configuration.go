@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package apis defines the core API types and data structures used throughout
+// the Spotalis controller for workload configuration and state management.
 package apis
 
 import (

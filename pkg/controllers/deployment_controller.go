@@ -66,6 +66,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package controllers implements Kubernetes controllers for managing workload
+// replica distribution across spot and on-demand instances.
 package controllers
 
 import (
@@ -141,7 +143,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if errors.IsNotFound(err) {
 			logger.Info("Deployment not found, ignoring")
 			// Clean up tracking data for deleted deployment
-			r.lastDeletionTimes.Delete(req.NamespacedName.String())
+			r.lastDeletionTimes.Delete(req.String())
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "Failed to get Deployment")
@@ -187,7 +189,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Implement cooldown period after pod deletion to avoid constant rescheduling
-	deploymentKey := req.NamespacedName.String()
+	deploymentKey := req.String()
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(deploymentKey); exists {
 		lastDeletion, ok := lastDeletionInterface.(time.Time)
 		if !ok {
@@ -265,9 +267,8 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// After performing rebalancing, requeue sooner to check the results
 		logger.Info("Pod rebalancing initiated, will check status sooner")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
-	} else {
-		logger.Info("No pod rebalancing needed")
 	}
+	logger.Info("No pod rebalancing needed")
 
 	logger.Info("Deployment reconciliation completed successfully")
 

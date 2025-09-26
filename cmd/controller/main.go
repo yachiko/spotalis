@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package main provides the entry point for the Spotalis Kubernetes controller.
+// It initializes and runs the operator that manages workload replica distribution
+// across spot and on-demand instances based on annotation-driven configuration.
 package main
 
 import (
@@ -94,7 +97,7 @@ func main() {
 	)
 
 	// Create operator configuration
-	config := &operator.OperatorConfig{
+	config := &operator.Config{
 		MetricsAddr:             *metricsAddr,
 		ProbeAddr:               *probeAddr,
 		WebhookAddr:             *webhookAddr,

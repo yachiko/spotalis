@@ -27,13 +27,13 @@ import (
 
 var _ = Describe("Operator", func() {
 	var (
-		config *OperatorConfig
+		config *Config
 		cancel context.CancelFunc
 	)
 
 	BeforeEach(func() {
 		_, cancel = context.WithCancel(context.Background())
-		config = &OperatorConfig{
+		config = &Config{
 			MetricsAddr:             ":8080",
 			ProbeAddr:               ":8081",
 			WebhookAddr:             ":9443",
@@ -107,7 +107,7 @@ var _ = Describe("Operator", func() {
 
 		Describe("Configuration Fields", func() {
 			It("should have all required configuration fields", func() {
-				config := &OperatorConfig{}
+				config := &Config{}
 
 				// Test that we can set all expected fields
 				config.MetricsAddr = ":8080"
@@ -257,7 +257,7 @@ var _ = Describe("Operator", func() {
 		})
 
 		It("should handle environment configuration", func() {
-			config := &OperatorConfig{
+			config := &Config{
 				MetricsAddr: ":8080",
 				LogLevel:    "info",
 			}

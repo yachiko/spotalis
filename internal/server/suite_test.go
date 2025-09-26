@@ -18,6 +18,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -56,10 +57,10 @@ func performRequest(engine *gin.Engine, method, path string, body interface{}) *
 		if err != nil {
 			panic(err) // This is a test helper, panic is acceptable
 		}
-		req, _ = http.NewRequest(method, path, bytes.NewBuffer(jsonBody))
+		req, _ = http.NewRequestWithContext(context.Background(), method, path, bytes.NewBuffer(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		req, err = http.NewRequest(method, path, http.NoBody)
+		req, err = http.NewRequestWithContext(context.Background(), method, path, http.NoBody)
 	}
 
 	Expect(err).NotTo(HaveOccurred())
@@ -80,10 +81,10 @@ func performRequestWithHeaders(engine *gin.Engine, method, path string, body int
 		if err != nil {
 			panic(err) // This is a test helper, panic is acceptable
 		}
-		req, _ = http.NewRequest(method, path, bytes.NewBuffer(jsonBody))
+		req, _ = http.NewRequestWithContext(context.Background(), method, path, bytes.NewBuffer(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		req, err = http.NewRequest(method, path, http.NoBody)
+		req, err = http.NewRequestWithContext(context.Background(), method, path, http.NoBody)
 	}
 
 	Expect(err).NotTo(HaveOccurred())

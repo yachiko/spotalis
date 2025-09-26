@@ -535,7 +535,7 @@ func (m *MockNodeClassifier) SetNodeType(nodeType NodeType) {
 	m.nodeType = nodeType
 }
 
-func (m *MockNodeClassifier) ClassifyNode(node *corev1.Node) NodeType {
+func (m *MockNodeClassifier) ClassifyNode(_ *corev1.Node) NodeType {
 	return m.nodeType
 }
 

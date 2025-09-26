@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package config provides configuration types and utilities for the Spotalis
+// operator, including node classification and runtime configuration management.
 package config
 
 import (

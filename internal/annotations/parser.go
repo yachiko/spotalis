@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package annotations provides parsing and validation of Spotalis-specific
+// Kubernetes annotations for workload configuration.
 package annotations
 
 import (

@@ -180,7 +180,7 @@ var _ = Describe("Leader Election", func() {
 				var newLeader string
 
 				// Set up callbacks
-				leConfig.OnStartedLeading = func(ctx context.Context) {
+				leConfig.OnStartedLeading = func(_ context.Context) {
 					startedLeading = true
 				}
 				leConfig.OnStoppedLeading = func() {
@@ -396,7 +396,7 @@ func isValidKubernetesName(name string) bool {
 	}
 
 	for _, char := range name {
-		if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 			return false
 		}
 	}

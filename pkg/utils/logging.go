@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package utils provides common utility functions for logging, rate limiting,
+// and other shared functionality used throughout the Spotalis controller.
 package utils
 
 import (
@@ -166,7 +168,7 @@ func SetupControllerRuntimeLogging(config *LoggerConfig) error {
 // WithComponent returns a logger with a component field
 func (l *Logger) WithComponent(component string) *Logger {
 	newLogger := &Logger{
-		Logger:        l.Logger.With("component", component),
+		Logger:        l.With("component", component),
 		config:        l.config,
 		contextFields: make(map[string]interface{}),
 		component:     component,

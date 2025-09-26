@@ -762,21 +762,21 @@ func (m *NamespaceFilterMetrics) RecordFilterResult(namespace string, allowed bo
 }
 
 // RecordCacheHit records a cache hit
-func (m *NamespaceFilterMetrics) RecordCacheHit(namespace string) {
+func (m *NamespaceFilterMetrics) RecordCacheHit(_ string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.cacheHits++
 }
 
 // RecordCacheMiss records a cache miss
-func (m *NamespaceFilterMetrics) RecordCacheMiss(namespace string) {
+func (m *NamespaceFilterMetrics) RecordCacheMiss(_ string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.cacheMisses++
 }
 
 // RecordFilterError records a filter error
-func (m *NamespaceFilterMetrics) RecordFilterError(namespace string, err error) {
+func (m *NamespaceFilterMetrics) RecordFilterError(_ string, _ error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.errors++
@@ -846,6 +846,7 @@ func (t *NamespaceRefreshTicker) run() {
 	}
 }
 
+// Stop stops the namespace refresh ticker and signals completion
 func (t *NamespaceRefreshTicker) Stop() {
 	t.ticker.Stop()
 	t.done <- true

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package utils provides common utility functions for logging, rate limiting,
+// and other shared functionality used throughout the Spotalis controller.
 package utils
 
 import (
@@ -305,8 +307,11 @@ func (rl *RateLimiter) GetCircuitBreakerState() CircuitBreakerState {
 type CircuitBreakerState int
 
 const (
+	// CircuitBreakerStateClosed indicates the circuit breaker is closed and allowing requests
 	CircuitBreakerStateClosed CircuitBreakerState = iota
+	// CircuitBreakerStateOpen indicates the circuit breaker is open and rejecting requests
 	CircuitBreakerStateOpen
+	// CircuitBreakerStateHalfOpen indicates the circuit breaker is testing if requests should be allowed
 	CircuitBreakerStateHalfOpen
 )
 
@@ -516,7 +521,7 @@ func (m *RateLimiterMetrics) RecordRateLimitCheck(resource string, allowed bool)
 }
 
 // RecordRateLimitReservation records a rate limit reservation
-func (m *RateLimiterMetrics) RecordRateLimitReservation(resource string) {
+func (m *RateLimiterMetrics) RecordRateLimitReservation(_ string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -524,7 +529,7 @@ func (m *RateLimiterMetrics) RecordRateLimitReservation(resource string) {
 }
 
 // RecordCircuitBreakerTrip records a circuit breaker trip
-func (m *RateLimiterMetrics) RecordCircuitBreakerTrip(resource string) {
+func (m *RateLimiterMetrics) RecordCircuitBreakerTrip(_ string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -548,7 +553,7 @@ func (m *RateLimiterMetrics) RecordOperationSuccess(resource string) {
 }
 
 // RecordOperationFailure records a failed operation
-func (m *RateLimiterMetrics) RecordOperationFailure(resource string, err error) {
+func (m *RateLimiterMetrics) RecordOperationFailure(resource string, _ error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

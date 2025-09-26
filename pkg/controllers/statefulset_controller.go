@@ -90,7 +90,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if errors.IsNotFound(err) {
 			logger.Info("StatefulSet not found, ignoring")
 			// Clean up tracking data for deleted statefulset
-			r.lastDeletionTimes.Delete(req.NamespacedName.String())
+			r.lastDeletionTimes.Delete(req.String())
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "Failed to get StatefulSet")
@@ -121,7 +121,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Implement cooldown period after pod deletion to avoid constant rescheduling
-	statefulsetKey := req.NamespacedName.String()
+	statefulsetKey := req.String()
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(statefulsetKey); exists {
 		lastDeletion, ok := lastDeletionInterface.(time.Time)
 		if !ok {
@@ -196,9 +196,8 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		// After performing rebalancing, requeue sooner to check the results
 		logger.Info("Pod rebalancing initiated, will check status sooner")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
-	} else {
-		logger.Info("No pod rebalancing needed")
 	}
+	logger.Info("No pod rebalancing needed")
 
 	logger.Info("StatefulSet reconciliation completed successfully")
 

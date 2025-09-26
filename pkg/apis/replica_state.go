@@ -161,12 +161,19 @@ func (r *ReplicaState) GetNextAction() ReplicaAction {
 type ReplicaAction string
 
 const (
-	ReplicaActionNone              ReplicaAction = "none"
-	ReplicaActionScaleUpOnDemand   ReplicaAction = "scale-up-on-demand"
-	ReplicaActionScaleUpSpot       ReplicaAction = "scale-up-spot"
+	// ReplicaActionNone indicates no action is needed for replica reconciliation
+	ReplicaActionNone ReplicaAction = "none"
+	// ReplicaActionScaleUpOnDemand indicates scaling up on-demand instances
+	ReplicaActionScaleUpOnDemand ReplicaAction = "scale-up-on-demand"
+	// ReplicaActionScaleUpSpot indicates scaling up spot instances
+	ReplicaActionScaleUpSpot ReplicaAction = "scale-up-spot"
+	// ReplicaActionScaleDownOnDemand indicates scaling down on-demand instances
 	ReplicaActionScaleDownOnDemand ReplicaAction = "scale-down-on-demand"
-	ReplicaActionScaleDownSpot     ReplicaAction = "scale-down-spot"
-	ReplicaActionMigrateToSpot     ReplicaAction = "migrate-to-spot"
+	// ReplicaActionScaleDownSpot indicates scaling down spot instances
+	ReplicaActionScaleDownSpot ReplicaAction = "scale-down-spot"
+	// ReplicaActionMigrateToSpot indicates migrating from on-demand to spot instances
+	ReplicaActionMigrateToSpot ReplicaAction = "migrate-to-spot"
+	// ReplicaActionMigrateToOnDemand indicates migrating from spot to on-demand instances
 	ReplicaActionMigrateToOnDemand ReplicaAction = "migrate-to-on-demand"
 )
 

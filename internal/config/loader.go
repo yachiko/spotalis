@@ -248,7 +248,7 @@ func (cl *ConfigurationLoader) LoadFromFile(path string) error {
 	}
 
 	// Read file content
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 - path is validated configuration file
 	if err != nil {
 		return fmt.Errorf("failed to read configuration file: %w", err)
 	}
@@ -420,7 +420,7 @@ func (cl *ConfigurationLoader) ValidateConfiguration() error {
 func (cl *ConfigurationLoader) SaveToFile(path string) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil { // #nosec G301 - secure directory permissions
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
