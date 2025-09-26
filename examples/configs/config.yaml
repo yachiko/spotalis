@@ -1,0 +1,37 @@
+# Spotalis Development Configuration
+# This configuration is optimized for local development and testing
+
+operator:
+  namespace: "spotalis-system"
+  leaderElection:
+    enabled: false  # Disable leader election for single instance development
+    id: "spotalis-controller-leader"
+    namespace: "spotalis-system"
+  readOnlyMode: false
+
+controllers:
+  reconcileInterval: "30s"  # Faster reconciliation for development
+  maxConcurrentReconciles: 1
+  rateLimit:
+    qps: 100.0
+    burst: 150
+
+webhook:
+  enabled: true
+  port: 9443
+  certDir: "/tmp/k8s-webhook-server/serving-certs"
+  certName: "tls.crt"
+  keyName: "tls.key"
+
+observability:
+  logging:
+    level: "info"  # Verbose logging for development
+    format: "text"
+  metrics:
+    enabled: true
+    bindAddress: ":8080"
+    path: "/metrics"
+  health:
+    enabled: true
+    bindAddress: ":8081"
+    path: "/healthz"
