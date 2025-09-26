@@ -63,7 +63,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 
 	Context("when metrics are available", func() {
 		It("should return 200 OK status", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -72,7 +72,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should return Prometheus metrics format", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -81,7 +81,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should include controller runtime metrics", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -91,7 +91,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should include workload management metrics", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -102,7 +102,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should include reconciliation performance metrics", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -113,7 +113,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should include node classification metrics", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -124,7 +124,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should include webhook metrics", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -135,7 +135,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should include rate limiting metrics", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -153,7 +153,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should still return 200 but with error metric", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -166,7 +166,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 
 	Context("performance requirements", func() {
 		It("should respond within 1 second", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoHelper()
@@ -180,7 +180,7 @@ var _ = Describe("GET /metrics endpoint", func() {
 		})
 
 		It("should not include sensitive data", func() {
-			req, err := http.NewRequest("GET", "/metrics", nil)
+			req, err := http.NewRequest("GET", "/metrics", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)

@@ -352,7 +352,7 @@ var _ = Describe("AdmissionController", func() {
 		It("should handle invalid certificate content", func() {
 			// Create a file with invalid certificate content
 			invalidCert := []byte("invalid certificate content")
-			err := os.WriteFile(certPath, invalidCert, 0600)
+			err := os.WriteFile(certPath, invalidCert, 0o600)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = controller.ValidateCertificates()

@@ -86,8 +86,9 @@ func (nf *NamespaceFilter) UpdateNamespaces(namespaces []corev1.Namespace) {
 
 	var monitoredNamespaces []string
 
-	for _, ns := range namespaces {
-		if nf.shouldMonitorNamespaceInternal(&ns) {
+	for i := range namespaces {
+		ns := &namespaces[i]
+		if nf.shouldMonitorNamespaceInternal(ns) {
 			monitoredNamespaces = append(monitoredNamespaces, ns.Name)
 		}
 	}

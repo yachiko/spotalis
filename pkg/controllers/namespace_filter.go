@@ -257,7 +257,8 @@ func (nf *NamespaceFilter) GetFilteredNamespaces(ctx context.Context) ([]string,
 	}
 
 	// Filter namespaces
-	for _, item := range namespaceList.Items {
+	for i := range namespaceList.Items {
+		item := &namespaceList.Items[i]
 		namespace := item.Name
 		result, err := nf.IsNamespaceAllowed(ctx, namespace)
 		if err != nil {
@@ -310,7 +311,8 @@ func (nf *NamespaceFilter) GetTenantNamespaces(ctx context.Context, tenant strin
 		return nil, fmt.Errorf("failed to list tenant namespaces: %w", err)
 	}
 
-	for _, item := range namespaceList.Items {
+	for i := range namespaceList.Items {
+		item := &namespaceList.Items[i]
 		namespace := item.Name
 		result, err := nf.IsNamespaceAllowedForTenant(ctx, namespace, tenant)
 		if err != nil {

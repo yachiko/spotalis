@@ -59,7 +59,7 @@ func performRequest(engine *gin.Engine, method, path string, body interface{}) *
 		req, err = http.NewRequest(method, path, bytes.NewBuffer(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		req, err = http.NewRequest(method, path, nil)
+		req, err = http.NewRequest(method, path, http.NoBody)
 	}
 
 	Expect(err).NotTo(HaveOccurred())
@@ -83,7 +83,7 @@ func performRequestWithHeaders(engine *gin.Engine, method, path string, body int
 		req, err = http.NewRequest(method, path, bytes.NewBuffer(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		req, err = http.NewRequest(method, path, nil)
+		req, err = http.NewRequest(method, path, http.NoBody)
 	}
 
 	Expect(err).NotTo(HaveOccurred())

@@ -125,14 +125,15 @@ func main() {
 
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
 
 	// Start the operator
 	setupLog.Info("Starting operator")
 	if err := op.Start(ctx); err != nil {
 		setupLog.Error(err, "failed to start operator")
+		cancel() // Ensure cleanup before exit
 		os.Exit(1)
 	}
 
+	cancel() // Clean shutdown
 	setupLog.Info("Operator stopped")
 }

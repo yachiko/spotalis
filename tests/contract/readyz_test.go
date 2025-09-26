@@ -51,7 +51,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 
 	Context("when the controller is ready", func() {
 		It("should return 200 OK status", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -60,7 +60,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 		})
 
 		It("should return JSON content type", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -69,7 +69,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 		})
 
 		It("should return readiness status in response body", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -78,7 +78,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 		})
 
 		It("should include leader election status", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -87,7 +87,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 		})
 
 		It("should include Kubernetes API connectivity status", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -105,7 +105,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 		})
 
 		It("should return 503 Service Unavailable when not ready", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -114,7 +114,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 		})
 
 		It("should include reason for not being ready", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -132,7 +132,7 @@ var _ = Describe("GET /readyz endpoint", func() {
 		})
 
 		It("should return 503 when Kubernetes API is unreachable", func() {
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)

@@ -132,7 +132,7 @@ logging:
 metrics:
   bindAddress: ":9090"
 `
-				err := os.WriteFile(configFile, []byte(yamlContent), 0644)
+				err := os.WriteFile(configFile, []byte(yamlContent), 0o644)
 				Expect(err).NotTo(HaveOccurred())
 
 				loader := NewConfigurationLoader()
@@ -158,7 +158,7 @@ controller:
 logging:
   level: "error"
 `
-				err := os.WriteFile(configFile, []byte(yamlContent), 0644)
+				err := os.WriteFile(configFile, []byte(yamlContent), 0o644)
 				Expect(err).NotTo(HaveOccurred())
 
 				loader := NewConfigurationLoader()
@@ -203,7 +203,7 @@ webhook:
 logging:
   level: "error"
 `
-				err := os.WriteFile(configFile, []byte(yamlContent), 0644)
+				err := os.WriteFile(configFile, []byte(yamlContent), 0o644)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Set environment variables that should override
@@ -240,7 +240,7 @@ controller:
   invalid: yaml content
     missing quote
 `
-				err := os.WriteFile(configFile, []byte(invalidYAML), 0644)
+				err := os.WriteFile(configFile, []byte(invalidYAML), 0o644)
 				Expect(err).NotTo(HaveOccurred())
 
 				loader := NewConfigurationLoader()
@@ -258,7 +258,7 @@ controller:
 webhook:
   port: -1
 `
-				err := os.WriteFile(configFile, []byte(invalidConfig), 0644)
+				err := os.WriteFile(configFile, []byte(invalidConfig), 0o644)
 				Expect(err).NotTo(HaveOccurred())
 
 				loader := NewConfigurationLoader()

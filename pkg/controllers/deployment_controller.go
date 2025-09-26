@@ -321,7 +321,8 @@ func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context,
 	var spotReplicas, onDemandReplicas int32
 
 	// Classify each pod based on its node
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
+		pod := &podList.Items[i]
 		if pod.Spec.NodeName == "" {
 			continue // Skip pending pods
 		}
@@ -401,7 +402,8 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 
 	// Categorize pods by current node type
 	var spotPods, onDemandPods []corev1.Pod
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
+		pod := &podList.Items[i]
 		if pod.Spec.NodeName == "" || pod.DeletionTimestamp != nil {
 			continue // Skip pending or terminating pods
 		}
@@ -417,12 +419,12 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 		nodeType := r.NodeClassifier.ClassifyNode(&node)
 		switch nodeType {
 		case apis.NodeTypeSpot:
-			spotPods = append(spotPods, pod)
+			spotPods = append(spotPods, *pod)
 		case apis.NodeTypeOnDemand:
-			onDemandPods = append(onDemandPods, pod)
+			onDemandPods = append(onDemandPods, *pod)
 		case apis.NodeTypeUnknown:
 			// Unknown node type - treat as on-demand for safety
-			onDemandPods = append(onDemandPods, pod)
+			onDemandPods = append(onDemandPods, *pod)
 			// Note: pod.Name on node.Name has unknown type, treating as on-demand
 		}
 	}

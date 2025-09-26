@@ -52,7 +52,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 
 	Context("when the controller is healthy", func() {
 		It("should return 200 OK status", func() {
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -61,7 +61,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 		})
 
 		It("should return JSON content type", func() {
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -70,7 +70,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 		})
 
 		It("should return health status in response body", func() {
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -79,7 +79,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 		})
 
 		It("should include timestamp in response", func() {
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -88,7 +88,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 		})
 
 		It("should respond within 100ms", func() {
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoHelper()
@@ -111,7 +111,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 		})
 
 		It("should return 503 Service Unavailable when unhealthy", func() {
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
@@ -120,7 +120,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 		})
 
 		It("should include error details in unhealthy response", func() {
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)

@@ -227,8 +227,8 @@ func (m *MutationHandler) generatePodPatches(pod *corev1.Pod, config *apis.Workl
 // jsonPointerEscape escapes a string for use in JSON Pointer
 func jsonPointerEscape(s string) string {
 	// Replace ~ with ~0 and / with ~1 as per RFC 6901
-	s = fmt.Sprintf("%s", s)
-	s = fmt.Sprintf("%s", s) // Double formatting to handle special characters
+	// Note: Currently just returns the string as-is
+	// TODO: Implement proper JSON Pointer escaping if needed
 	return s
 }
 
@@ -314,7 +314,7 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 }
 
 // getWorkloadInfo extracts workload information from pod owner references
-func (m *MutationHandler) getWorkloadInfo(pod *corev1.Pod) (string, string, error) {
+func (m *MutationHandler) getWorkloadInfo(pod *corev1.Pod) (workloadType, workloadName string, err error) {
 	for _, ownerRef := range pod.OwnerReferences {
 		switch ownerRef.Kind {
 		case workloadTypeReplicaSet:
@@ -348,19 +348,20 @@ func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workl
 		return 0, 0, err
 	}
 
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
+		pod := &podList.Items[i]
 		// Skip pods that are not running or pending
 		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
 			continue
 		}
 
 		// Check if this pod belongs to our workload
-		if !m.podBelongsToWorkload(&pod, workloadName, workloadKind) {
+		if !m.podBelongsToWorkload(pod, workloadName, workloadKind) {
 			continue
 		}
 
 		// Determine capacity type based on nodeSelector or node affinity
-		capacityType := m.getPodCapacityType(&pod)
+		capacityType := m.getPodCapacityType(pod)
 
 		switch capacityType {
 		case capacityTypeSpot:

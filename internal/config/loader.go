@@ -421,7 +421,7 @@ func (cl *ConfigurationLoader) ValidateConfiguration() error {
 func (cl *ConfigurationLoader) SaveToFile(path string) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -432,7 +432,7 @@ func (cl *ConfigurationLoader) SaveToFile(path string) error {
 	}
 
 	// Write to file
-	if err := ioutil.WriteFile(path, data, 0644); err != nil {
+	if err := ioutil.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
 

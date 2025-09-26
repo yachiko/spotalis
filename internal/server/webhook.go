@@ -257,10 +257,8 @@ func (w *WebhookServer) deserializeAdmissionRequest(body []byte, review *v1.Admi
 // SetupRoutes configures the webhook routes on the given Gin router
 func (w *WebhookServer) SetupRoutes(router *gin.Engine) {
 	webhook := router.Group("/webhook")
-	{
-		webhook.POST("/mutate", w.MutateHandler)
-		webhook.POST("/validate", w.ValidateHandler)
-	}
+	webhook.POST("/mutate", w.MutateHandler)
+	webhook.POST("/validate", w.ValidateHandler)
 }
 
 // GetControllerRuntimeServer returns the controller-runtime webhook server for integration

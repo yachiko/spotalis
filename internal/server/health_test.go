@@ -332,7 +332,7 @@ var _ = Describe("HealthChecker", func() {
 			Expect(checker).NotTo(BeNil())
 
 			// Test that the checker works with a clean state
-			req, err := http.NewRequest("GET", "/healthz", nil)
+			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 			err = checker(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -364,7 +364,7 @@ var _ = Describe("HealthChecker", func() {
 			Expect(checker).NotTo(BeNil())
 
 			// Test that the checker works with a clean state
-			req, err := http.NewRequest("GET", "/readyz", nil)
+			req, err := http.NewRequest("GET", "/readyz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 			err = checker(req)
 			Expect(err).NotTo(HaveOccurred())
