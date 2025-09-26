@@ -69,20 +69,14 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         args:
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=:8080
-        - --webhook-bind-address=:9443
-        - --webhook-cert-dir=/tmp/k8s-webhook-server/serving-certs
-        - --leader-elect=true
-        - --log-level=info
-        - --namespace=spotalis-system
-        - --enable-webhook=true
-        - --max-concurrent-reconciles=4
-        - --reconcile-interval=30s
+        - "--config=/etc/spotalis/config.yaml"
         volumeMounts:
         - name: webhook-certs
           mountPath: /tmp/k8s-webhook-server/serving-certs
           readOnly: true
+        - name: config
+          mountPath: /etc/spotalis/config.yaml
+          subPath: config.yaml
         - name: tmp
           mountPath: /tmp
         livenessProbe:
@@ -114,6 +108,9 @@ spec:
       - name: webhook-certs
         secret:
           secretName: spotalis-webhook-certs
+      - name: config
+        configMap:
+          name: spotalis-config
       - name: tmp
         emptyDir: {}
       terminationGracePeriodSeconds: 30

@@ -10,35 +10,37 @@ metadata:
     app.kubernetes.io/managed-by: kubectl
 data:
   config.yaml: |
-    # Namespace filtering for multi-tenant clusters
-    # If not specified, all namespaces are managed
-    namespaceSelector:
-      matchLabels:
-        spotalis.io/enabled: "true"
-    
-    # Controller behavior
-    reconcileInterval: 30s
-    leaderElection: true
-    leaderElectionLeaseDuration: 60s
-    leaderElectionRenewDeadline: 40s
-    leaderElectionRetryPeriod: 10s
-    
-    # Webhook configuration
+    operator:
+      namespace: "spotalis-system"
+      leaderElection:
+        enabled: true  # Enable leader election for high availability
+        id: "spotalis-controller-leader"
+        namespace: "spotalis-system"
+      readOnlyMode: false
+
+    controllers:
+      reconcileInterval: "30s"  # Faster reconciliation for development
+      maxConcurrentReconciles: 1
+      rateLimit:
+        qps: 100.0
+        burst: 150
+
     webhook:
+      enabled: true
       port: 9443
-      certDir: /tmp/k8s-webhook-server/serving-certs
-      
-    # Health and metrics endpoints
-    healthAddr: :8081
-    metricsAddr: :8080
-    
-    # Logging configuration
-    logLevel: info
-    logFormat: json
-    
-    # Performance tuning
-    maxConcurrentReconciles: 10
-    rateLimiter:
-      baseDelay: 5ms
-      maxDelay: 1000s
-      failureMaxDelay: 30s
+      certDir: "/tmp/k8s-webhook-server/serving-certs"
+      certName: "tls.crt"
+      keyName: "tls.key"
+
+    observability:
+      logging:
+        level: "debug"  # Verbose logging for development
+        format: "text"
+      metrics:
+        enabled: true
+        bindAddress: ":8080"
+        path: "/metrics"
+      health:
+        enabled: true
+        bindAddress: ":8081"
+        path: "/healthz"
