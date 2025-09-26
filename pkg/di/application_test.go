@@ -94,12 +94,12 @@ func TestApplication_Start(t *testing.T) {
 	// Set environment variables to disable webhook for testing and use random ports
 	t.Setenv("SPOTALIS_WEBHOOK_ENABLED", "false")
 	t.Setenv("SPOTALIS_LEADER_ELECTION_ENABLED", "false")
-	t.Setenv("SPOTALIS_METRICS_BIND_ADDRESS", ":0")  // Use random port
-	t.Setenv("SPOTALIS_HEALTH_BIND_ADDRESS", ":0")   // Use random port
-	
+	t.Setenv("SPOTALIS_METRICS_BIND_ADDRESS", ":0") // Use random port
+	t.Setenv("SPOTALIS_HEALTH_BIND_ADDRESS", ":0")  // Use random port
+
 	// Build just the application builder and container without full operator
 	builder := NewApplicationBuilder()
-	
+
 	// Register configuration loader
 	builder.container.MustProvide(func() *config.Loader {
 		return config.NewLoader()
@@ -109,7 +109,7 @@ func TestApplication_Start(t *testing.T) {
 	builder.container.MustProvide(func(loader *config.Loader) (*config.SpotalisConfig, error) {
 		return loader.Load()
 	})
-	
+
 	// Test that we can build operator config (without creating actual operator)
 	builder.container.MustProvide(func(config *config.SpotalisConfig) *operator.Config {
 		return &operator.Config{
@@ -133,15 +133,15 @@ func TestApplication_Start(t *testing.T) {
 	err := builder.container.Invoke(func(cfg *operator.Config) {
 		resolvedConfig = cfg
 	})
-	
+
 	require.NoError(t, err, "Failed to resolve operator config from DI container")
 	require.NotNil(t, resolvedConfig, "Operator config not resolved from DI container")
-	
+
 	t.Logf("✅ Operator config resolved from DI container")
 	t.Logf("  - Namespace: %s", resolvedConfig.Namespace)
 	t.Logf("  - Leader Election: %v", resolvedConfig.LeaderElection)
 	t.Logf("  - Webhook Enabled: %v", resolvedConfig.EnableWebhook)
-	
+
 	// Verify DI integration: the fact that we can resolve the config through
 	// the dependency chain proves the DI system is working correctly
 }
