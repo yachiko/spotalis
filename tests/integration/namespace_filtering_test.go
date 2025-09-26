@@ -213,23 +213,9 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 			// Even if a deployment has valid Spotalis annotations, it should NOT be managed
 			// if the namespace doesn't have the required "spotalis.io/enabled": "true" annotation.
 
-			// Create a namespace without the required spotalis.io/enabled annotation
-			restrictedNamespace := "restricted-" + randString(6)
-			restrictedNS := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: restrictedNamespace,
-					Labels: map[string]string{
-						"environment": "test",
-						// Deliberately omitting "spotalis.io/enabled": "true"
-					},
-				},
-			}
-			err := k8sClient.Create(ctx, restrictedNS)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Create a deployment with Spotalis annotations in the restricted namespace
+			// Create a deployment with Spotalis annotations in the unmanaged namespace
 			restrictedDeployment := deployment.DeepCopy()
-			restrictedDeployment.Namespace = restrictedNamespace
+			restrictedDeployment.Namespace = unmanagedNamespace
 			restrictedDeployment.Name = "restricted-deployment"
 			restrictedDeployment.Annotations = map[string]string{
 				"spotalis.io/enabled":         "true",
@@ -237,7 +223,7 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 				"spotalis.io/min-on-demand":   "1",
 			}
 
-			err = k8sClient.Create(ctx, restrictedDeployment)
+			err := k8sClient.Create(ctx, restrictedDeployment)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify that Spotalis controller does NOT manage this deployment
@@ -268,7 +254,7 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 			// don't get mutated with Spotalis-specific node selectors
 			Eventually(func() int {
 				podList := &corev1.PodList{}
-				err := k8sClient.List(ctx, podList, client.InNamespace(restrictedNamespace))
+				err := k8sClient.List(ctx, podList, client.InNamespace(unmanagedNamespace))
 				if err != nil {
 					return -1
 				}
