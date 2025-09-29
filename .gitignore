@@ -50,3 +50,7 @@ coverage.html
 build/k8s/secret.yaml
 output
 test-deployment.yaml
+
+# Generated manifests from templates (contain sensitive certificate data)
+deploy/k8s/certs-generated.yaml
+deploy/k8s/webhook-generated.yaml

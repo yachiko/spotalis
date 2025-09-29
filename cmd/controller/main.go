@@ -28,8 +28,8 @@ import (
 	"syscall"
 
 	"github.com/ahoma/spotalis/pkg/di"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var (
@@ -83,7 +83,7 @@ func main() {
 
 	// Setup controller-runtime to use our logger
 	ctrl.SetLogger(logger.Logger)
-	
+
 	// Configure klog to use the same structured logger
 	// This ensures leader election logs use structured format
 	klog.SetLogger(logger.Logger)
@@ -123,7 +123,7 @@ func main() {
 		setupLog.Error(err, "failed to start operator")
 		return
 	}
-	
+
 	// Ensure klog flushes any remaining logs on shutdown
 	defer klog.Flush()
 

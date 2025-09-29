@@ -27,6 +27,7 @@ deps:
 lint: 
 	golangci-lint run
 
+.PHONY: fmt
 fmt: 
 	golangci-lint fmt
 
@@ -38,27 +39,16 @@ test: envtest ## Run unit tests
 test-integration:  ## Run integration tests with Kind
 	go test ./tests/integration/... -v -tags=integration -timeout=15m
 
-.PHONY: test-integration-cleanup
-test-integration-cleanup: ## Clean up integration test resources from Kind cluster
-	@kubectl config current-context | grep -q "kind-" || (echo "Error: Not connected to a Kind cluster. Run 'kubectl config use-context kind-spotalis'" && exit 1)
-	@echo "Cleaning up test namespaces with spotalis.io/test=true label..."
-	@kubectl delete namespaces -l spotalis.io/test=true --ignore-not-found=true --timeout=60s
-	@echo "Cleaning up legacy test namespaces..."
-	@kubectl get namespaces -o name | grep -E "(managed-|unmanaged-|spotalis-managed-|spotalis-test-)" | xargs -r kubectl delete --ignore-not-found=true --timeout=60s
-	@echo "Cleaning up test deployments..."
-	@kubectl delete deployments -A -l spotalis.io/test=true --ignore-not-found=true --timeout=30s
-	@echo "Cleaning up test pods..."
-	@kubectl delete pods -A -l spotalis.io/test=true --ignore-not-found=true --timeout=30s
-	@echo "Cleaning up any remaining test resources..."
-	@kubectl delete all -A -l test.spotalis.io/cleanup=auto --ignore-not-found=true --timeout=30s
-	@echo "Integration test cleanup completed"
-
 ##@ Build
 .PHONY: build
 docker-build:
 	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(BIN_DIR)/controller cmd/controller/main.go
 
 ##@ Deployment
+.PHONY: deploy
+deploy: ## Deploy Spotalis to Kubernetes cluster (generates certs dynamically with templates)
+	@./scripts/deploy.sh
+
 .PHONY: build-deploy
 build-deploy: ## Build and deploy to Kind cluster with unique tag
 	@generated_tag=$$(openssl rand -hex 3); \
@@ -68,29 +58,13 @@ build-deploy: ## Build and deploy to Kind cluster with unique tag
 	kubectl set image deployment/spotalis-controller controller=spotalis:$$generated_tag -n spotalis-system || true
 
 ##@ Kind
-.PHONY: kind-create
-kind-create: ## Create Kind cluster for testing
-	kind create cluster --name spotalis --config build/kind/cluster.yaml
-
-.PHONY: kind-delete
-kind-delete: ## Delete Kind cluster
-	kind delete cluster --name spotalis
-
-.PHONY: generate-certs
-generate-certs: ## Generate TLS certificates for webhook
-	./generate-certs.sh
+.PHONY: kind
+kind: ## Setup Kind cluster for development
+	@chmod +x scripts/setup-kind.sh
+	@scripts/setup-kind.sh
 
 ENVTEST = $(TOOLS_DIR)/setup-envtest
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(TOOLS_DIR)
 	GOBIN=$(TOOLS_DIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-
-GOLANGCI_LINT = $(TOOLS_DIR)/golangci-lint
-.PHONY: golangci-lint
-golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
-$(GOLANGCI_LINT): $(TOOLS_DIR)
-	GOBIN=$(TOOLS_DIR) go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-$(TOOLS_DIR):
-	mkdir -p $(TOOLS_DIR)
