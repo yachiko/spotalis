@@ -1,5 +1,11 @@
 # Multi-stage build for Spotalis controller
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+# Build arguments provided by buildx
+ARG TARGETOS
+ARG TARGETARCH
+ARG BUILDTIME
+ARG VERSION
 
 # Install required packages
 RUN apk add --no-cache git ca-certificates
@@ -18,9 +24,9 @@ COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY internal/ internal/
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
-    -ldflags="-w -s" \
+# Build the binary for target architecture
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILDTIME}" \
     -o controller \
     ./cmd/controller/
 

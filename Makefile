@@ -9,6 +9,9 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 CGO_ENABLED ?= 0
 
+# Docker variables
+DOCKER_PLATFORM ?= linux/arm64
+
 # Tools
 CONTROLLER_GEN_VERSION ?= v0.19.0
 ENVTEST_K8S_VERSION = 1.28.0
@@ -41,7 +44,7 @@ test-integration:  ## Run integration tests with Kind
 
 ##@ Build
 .PHONY: build
-docker-build:
+build:
 	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(BIN_DIR)/controller cmd/controller/main.go
 
 ##@ Deployment
@@ -50,18 +53,29 @@ deploy: ## Deploy Spotalis to Kubernetes cluster (generates certs dynamically wi
 	@./scripts/deploy.sh
 
 .PHONY: build-deploy
-build-deploy: ## Build and deploy to Kind cluster with unique tag
-	@generated_tag=$$(openssl rand -hex 3); \
-	echo "Generated tag: $$generated_tag"; \
-	docker buildx build -t spotalis:$$generated_tag -f build/docker/Dockerfile .; \
-	kind load docker-image spotalis:$$generated_tag --name spotalis || true; \
-	kubectl set image deployment/spotalis-controller controller=spotalis:$$generated_tag -n spotalis-system || true
+build-deploy: kind-load ## Build, load to Kind, and deploy
+	@echo "✅ Build and deployment completed"
+
+##@ Docker
+.PHONY: docker-build-local
+docker-build-local: ## Build Docker image for local development (ARM64 by default, use DOCKER_PLATFORM=linux/amd64 to override)
+	docker buildx bake controller-local --set controller-local.platform=$(DOCKER_PLATFORM)
+
+.PHONY: docker-build
+docker-build: ## Build Docker images for all platforms
+	docker buildx bake controller --push
 
 ##@ Kind
 .PHONY: kind
 kind: ## Setup Kind cluster for development
 	@chmod +x scripts/setup-kind.sh
 	@scripts/setup-kind.sh
+
+.PHONY: kind-load
+kind-load: docker-build-local ## Load Docker image into Kind cluster
+	kind load docker-image spotalis:local --name spotalis || true; \
+	kubectl set image deployment/spotalis-controller controller=spotalis:local -n spotalis-system || true
+	kubectl rollout restart deployment spotalis-controller -n spotalis-system
 
 ENVTEST = $(TOOLS_DIR)/setup-envtest
 .PHONY: envtest
