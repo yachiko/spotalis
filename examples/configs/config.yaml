@@ -25,8 +25,11 @@ webhook:
 
 observability:
   logging:
-    level: "info"  # Verbose logging for development
-    format: "text"
+    level: "info"
+    format: "json"  # Use JSON format for structured logging
+    output: "stdout"  # Log to standard output
+    addCaller: true   # Include caller information
+    development: false  # Production mode
   metrics:
     enabled: true
     bindAddress: ":8080"

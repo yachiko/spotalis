@@ -134,45 +134,54 @@ func (r *DeploymentReconciler) SetNodeClassifier(classifier *config.NodeClassifi
 
 // Reconcile handles the reconciliation of Deployment objects
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("deployment", req.NamespacedName)
-	logger.Info("Starting reconciliation for deployment", "namespace", req.Namespace, "name", req.Name)
+	// Create enhanced structured logger for this reconciliation
+	ctrlLogger := NewControllerLogger(ctx, "deployment-controller", req, "Deployment")
+	ctrlLogger.ReconcileStarted("Starting deployment reconciliation")
 
 	// Fetch the Deployment
 	var deployment appsv1.Deployment
 	if err := r.Get(ctx, req.NamespacedName, &deployment); err != nil {
 		if errors.IsNotFound(err) {
-			logger.Info("Deployment not found, ignoring")
+			ctrlLogger.Logger.Info("Deployment not found, ignoring")
 			// Clean up tracking data for deleted deployment
 			r.lastDeletionTimes.Delete(req.String())
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "Failed to get Deployment")
+		ctrlLogger.ReconcileFailed(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
-	logger.Info("Successfully fetched deployment", "replicas", deployment.Spec.Replicas)
+
+	// Add workload context to logger
+	var replicas int32
+	if deployment.Spec.Replicas != nil {
+		replicas = *deployment.Spec.Replicas
+	}
+	workloadLogger := ctrlLogger.WithWorkload("Deployment", replicas)
+	logger := workloadLogger.Logger // For compatibility with existing code
+	logger.Info("Successfully fetched deployment", "replicas", replicas)
 
 	// Check if Spotalis is explicitly enabled for this deployment
 	if !r.AnnotationParser.IsSpotalisEnabled(&deployment) {
-		logger.Info("Deployment does not have spotalis.io/enabled=true, skipping")
+		workloadLogger.AnnotationCheck(false, 0)
 		return ctrl.Result{}, nil
 	}
-	logger.Info("Deployment has Spotalis enabled, checking namespace permissions")
+	workloadLogger.AnnotationCheck(true, 70) // Default spot percentage
 
 	// Check if the namespace is allowed for Spotalis management
 	if r.NamespaceFilter != nil {
-		logger.Info("Checking namespace permissions with namespace filter", "namespace", deployment.Namespace)
+		workloadLogger.Logger.Info("Checking namespace permissions with namespace filter", "namespace", deployment.Namespace)
 		result, err := r.NamespaceFilter.IsNamespaceAllowed(ctx, deployment.Namespace)
 		if err != nil {
-			logger.Error(err, "Failed to check namespace permissions")
+			workloadLogger.ReconcileFailed(err, "Failed to check namespace permissions")
 			return ctrl.Result{}, err
 		}
 		if !result.Allowed {
-			logger.Info("Namespace is not allowed for Spotalis management", "reason", result.Reason, "rule", result.MatchedRule)
+			workloadLogger.NamespaceCheck(false, result.Reason, result.MatchedRule)
 			return ctrl.Result{}, nil
 		}
-		logger.Info("Namespace is allowed for Spotalis management", "rule", result.MatchedRule)
+		workloadLogger.NamespaceCheck(true, "", result.MatchedRule)
 	} else {
-		logger.Info("No namespace filter configured, allowing all namespaces")
+		workloadLogger.Logger.Info("No namespace filter configured, allowing all namespaces")
 	}
 
 	// Record that this workload is now managed (for metrics) - do this early
@@ -193,7 +202,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(deploymentKey); exists {
 		lastDeletion, ok := lastDeletionInterface.(time.Time)
 		if !ok {
-			logger.Error(nil, "Invalid type for last deletion time", "deploymentKey", deploymentKey)
+			workloadLogger.Logger.Error(nil, "Invalid type for last deletion time", "deploymentKey", deploymentKey)
 			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
 		}
 		cooldownPeriod := 5 * time.Second // Wait 10 seconds after deleting a pod
@@ -201,7 +210,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		if timeSinceLastDeletion < cooldownPeriod {
 			remainingCooldown := cooldownPeriod - timeSinceLastDeletion
-			logger.Info("In cooldown period after recent pod deletion, skipping rebalancing",
+			workloadLogger.Logger.Info("In cooldown period after recent pod deletion, skipping rebalancing",
 				"lastDeletion", lastDeletion,
 				"timeSince", timeSinceLastDeletion,
 				"remainingCooldown", remainingCooldown)

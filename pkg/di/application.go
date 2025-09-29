@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ahoma/spotalis/pkg/config"
+	"github.com/ahoma/spotalis/pkg/logging"
 	"github.com/ahoma/spotalis/pkg/operator"
 )
 
@@ -29,22 +30,13 @@ func (b *ApplicationBuilder) WithConfigFile(path string) *ApplicationBuilder {
 
 // Build builds the application with all dependencies configured
 func (b *ApplicationBuilder) Build(_ context.Context) (*Application, error) {
-	// Register configuration loader with optional file
-	b.container.MustProvide(func() *config.Loader {
-		loader := config.NewLoader()
-		if b.configFile != "" {
-			loader = loader.WithConfigFile(b.configFile)
-		}
-		return loader
-	})
-
-	// Register consolidated configuration
-	b.container.MustProvide(func(loader *config.Loader) (*config.SpotalisConfig, error) {
-		return loader.Load()
-	})
+	// Configure the service registry with config file if provided
+	registry := NewServiceRegistry(b.container)
+	if b.configFile != "" {
+		registry.WithConfigFile(b.configFile)
+	}
 
 	// Register all services using the service registry
-	registry := NewServiceRegistry(b.container)
 	if err := registry.RegisterAll(); err != nil {
 		return nil, fmt.Errorf("failed to register services: %w", err)
 	}
@@ -108,6 +100,17 @@ func (a *Application) Stop(_ context.Context) error {
 // GetConfig returns the application configuration
 func (a *Application) GetConfig() *config.SpotalisConfig {
 	return a.Config
+}
+
+// GetLogger returns the configured logger from the DI container
+func (a *Application) GetLogger() (*logging.Logger, error) {
+	var logger *logging.Logger
+	if err := a.Container.Invoke(func(l *logging.Logger) {
+		logger = l
+	}); err != nil {
+		return nil, fmt.Errorf("failed to resolve logger from DI container: %w", err)
+	}
+	return logger, nil
 }
 
 // Example usage functions

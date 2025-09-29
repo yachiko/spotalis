@@ -68,6 +68,9 @@ observability:
   logging:
     level: "debug"
     format: "console"
+    output: "stderr"
+    addCaller: false
+    development: true
   health:
     enabled: false
     bindAddress: ":9091"
@@ -102,6 +105,9 @@ observability:
 	assert.Equal(t, ":9090", config.Observability.Metrics.BindAddress)
 	assert.Equal(t, "debug", config.Observability.Logging.Level)
 	assert.Equal(t, "console", config.Observability.Logging.Format)
+	assert.Equal(t, "stderr", config.Observability.Logging.Output)
+	assert.False(t, config.Observability.Logging.AddCaller)
+	assert.True(t, config.Observability.Logging.Development)
 	assert.False(t, config.Observability.Health.Enabled)
 	assert.Equal(t, ":9091", config.Observability.Health.BindAddress)
 }
@@ -126,6 +132,9 @@ func TestLoader_LoadFromEnv(t *testing.T) {
 		"SPOTALIS_METRICS_BIND_ADDRESS":                  ":7070",
 		"SPOTALIS_LOGGING_LEVEL":                         "warn",
 		"SPOTALIS_LOGGING_FORMAT":                        "console",
+		"SPOTALIS_LOGGING_OUTPUT":                        "stderr",
+		"SPOTALIS_LOGGING_ADDCALLER":                     "false",
+		"SPOTALIS_LOGGING_DEVELOPMENT":                   "true",
 		"SPOTALIS_HEALTH_ENABLED":                        "false",
 		"SPOTALIS_HEALTH_BIND_ADDRESS":                   ":7071",
 	}
@@ -157,6 +166,9 @@ func TestLoader_LoadFromEnv(t *testing.T) {
 	assert.Equal(t, ":7070", config.Observability.Metrics.BindAddress)
 	assert.Equal(t, "warn", config.Observability.Logging.Level)
 	assert.Equal(t, "console", config.Observability.Logging.Format)
+	assert.Equal(t, "stderr", config.Observability.Logging.Output)
+	assert.False(t, config.Observability.Logging.AddCaller)
+	assert.True(t, config.Observability.Logging.Development)
 	assert.False(t, config.Observability.Health.Enabled)
 	assert.Equal(t, ":7071", config.Observability.Health.BindAddress)
 }
@@ -325,6 +337,9 @@ func clearSpotalisEnvVars() {
 		"SPOTALIS_METRICS_BIND_ADDRESS",
 		"SPOTALIS_LOGGING_LEVEL",
 		"SPOTALIS_LOGGING_FORMAT",
+		"SPOTALIS_LOGGING_OUTPUT",
+		"SPOTALIS_LOGGING_ADDCALLER",
+		"SPOTALIS_LOGGING_DEVELOPMENT",
 		"SPOTALIS_HEALTH_ENABLED",
 		"SPOTALIS_HEALTH_BIND_ADDRESS",
 	}

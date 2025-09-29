@@ -29,7 +29,6 @@ import (
 
 	"github.com/ahoma/spotalis/pkg/di"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var (
@@ -74,14 +73,18 @@ func main() {
 		return
 	}
 
-	// Setup logger based on configuration
-	config := app.GetConfig()
-	opts := zap.Options{
-		Development: config.Observability.Logging.Level == "debug",
+	// Get logger from DI container
+	logger, err := app.GetLogger()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get logger: %v\n", err)
+		return
 	}
-	logger := zap.New(zap.UseFlagOptions(&opts))
-	ctrl.SetLogger(logger)
 
+	// Setup controller-runtime to use our logger
+	ctrl.SetLogger(logger.Logger)
+
+	// Get configuration for logging context
+	config := app.GetConfig()
 	setupLog := logger.WithName("setup")
 	setupLog.Info("Starting Spotalis controller",
 		"version", version,

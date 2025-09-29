@@ -9,6 +9,7 @@ import (
 	"github.com/ahoma/spotalis/internal/server"
 	"github.com/ahoma/spotalis/pkg/config"
 	"github.com/ahoma/spotalis/pkg/controllers"
+	"github.com/ahoma/spotalis/pkg/logging"
 	"github.com/ahoma/spotalis/pkg/metrics"
 	"github.com/ahoma/spotalis/pkg/operator"
 	"github.com/ahoma/spotalis/pkg/webhook"
@@ -18,7 +19,8 @@ import (
 
 // ServiceRegistry registers all Spotalis services with the DI container
 type ServiceRegistry struct {
-	container *Container
+	container  *Container
+	configFile string
 }
 
 // NewServiceRegistry creates a new service registry
@@ -28,10 +30,30 @@ func NewServiceRegistry(container *Container) *ServiceRegistry {
 	}
 }
 
+// WithConfigFile sets the configuration file path
+func (r *ServiceRegistry) WithConfigFile(configFile string) *ServiceRegistry {
+	r.configFile = configFile
+	return r
+}
+
 // RegisterAll registers all core Spotalis services
 func (r *ServiceRegistry) RegisterAll() error {
-	// For now, focus on the core operator registration
-	// The existing operator handles its own internal dependency setup
+	// Register configuration first (required by other services)
+	if err := r.RegisterConfiguration(); err != nil {
+		return fmt.Errorf("failed to register configuration: %w", err)
+	}
+
+	// Register logger (depends on configuration)
+	if err := r.RegisterLogger(); err != nil {
+		return fmt.Errorf("failed to register logger: %w", err)
+	}
+
+	// Register core services
+	if err := r.RegisterCoreServices(); err != nil {
+		return fmt.Errorf("failed to register core services: %w", err)
+	}
+
+	// Register operator (main service)
 	if err := r.RegisterOperator(); err != nil {
 		return fmt.Errorf("failed to register operator: %w", err)
 	}
@@ -41,12 +63,37 @@ func (r *ServiceRegistry) RegisterAll() error {
 
 // RegisterConfiguration registers configuration-related services
 func (r *ServiceRegistry) RegisterConfiguration() error {
-	// Register configuration loader
-	r.container.MustProvide(config.NewLoader)
+	// Register configuration loader with optional config file
+	r.container.MustProvide(func() *config.Loader {
+		loader := config.NewLoader()
+		if r.configFile != "" {
+			loader = loader.WithConfigFile(r.configFile)
+		}
+		return loader
+	})
 
 	// Register consolidated configuration
 	r.container.MustProvide(func(loader *config.Loader) (*config.SpotalisConfig, error) {
 		return loader.Load()
+	})
+
+	return nil
+}
+
+// RegisterLogger registers structured JSON logger service
+func (r *ServiceRegistry) RegisterLogger() error {
+	// Register logger with configuration dependency
+	r.container.MustProvide(func(config *config.SpotalisConfig) (*logging.Logger, error) {
+		// Convert config logging settings to logger config
+		logConfig := &logging.LoggingConfig{
+			Level:       config.Observability.Logging.Level,
+			Format:      config.Observability.Logging.Format,
+			Output:      config.Observability.Logging.Output,
+			AddCaller:   config.Observability.Logging.AddCaller,
+			Development: config.Observability.Logging.Development,
+		}
+
+		return logging.NewLogger(logConfig)
 	})
 
 	return nil

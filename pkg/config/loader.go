@@ -135,6 +135,15 @@ func (l *Loader) loadFromEnv(config *SpotalisConfig) {
 	if val := l.getEnv("LOGGING_FORMAT"); val != "" {
 		config.Observability.Logging.Format = val
 	}
+	if val := l.getEnv("LOGGING_OUTPUT"); val != "" {
+		config.Observability.Logging.Output = val
+	}
+	if val := l.getEnv("LOGGING_ADDCALLER"); val != "" {
+		config.Observability.Logging.AddCaller = l.parseBool(val, config.Observability.Logging.AddCaller)
+	}
+	if val := l.getEnv("LOGGING_DEVELOPMENT"); val != "" {
+		config.Observability.Logging.Development = l.parseBool(val, config.Observability.Logging.Development)
+	}
 
 	// Health configuration
 	if val := l.getEnv("HEALTH_ENABLED"); val != "" {
