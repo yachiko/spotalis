@@ -13,7 +13,7 @@ data:
     operator:
       namespace: "spotalis-system"
       leaderElection:
-        enabled: true  # Enable leader election for high availability
+        enabled: true
         id: "spotalis-controller-leader"
         namespace: "spotalis-system"
       readOnlyMode: false
@@ -34,8 +34,11 @@ data:
 
     observability:
       logging:
-        level: "debug"  # Verbose logging for development
-        format: "text"
+        level: "info"
+        format: "json" 
+        output: "stdout" 
+        addCaller: true 
+        development: true
       metrics:
         enabled: true
         bindAddress: ":8080"

@@ -37,7 +37,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: controller
-        image: spotalis:latest
+        image: spotalis:12b1b2
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

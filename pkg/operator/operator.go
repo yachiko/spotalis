@@ -53,16 +53,12 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 const (
-	// Log levels
-	logLevelDebug = "debug"
-
 	// Environment variable values
 	envValueTrue = "true"
 
@@ -225,8 +221,6 @@ func NewForTesting(cfg *rest.Config, operatorID string) *Operator {
 		panic(fmt.Sprintf("failed to add client-go scheme: %v", err))
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == logLevelDebug)))
-
 	// Create manager options without webhook server for testing
 	managerOpts := ctrl.Options{
 		Scheme: scheme,
@@ -320,8 +314,6 @@ func NewWithIDAndPorts(cfg *rest.Config, operatorID string, metricsPort, probePo
 		panic(fmt.Sprintf("failed to add client-go scheme: %v", err))
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == logLevelDebug)))
-
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -410,9 +402,6 @@ func NewOperator(config *Config) (*Operator, error) {
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("failed to add client-go scheme: %w", err)
 	}
-
-	// Setup logger
-	ctrl.SetLogger(zap.New(zap.UseDevMode(config.LogLevel == logLevelDebug)))
 
 	// Create manager
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
