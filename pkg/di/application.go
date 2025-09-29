@@ -68,16 +68,9 @@ type Application struct {
 
 // Start starts the application using DI-registered services
 func (a *Application) Start(ctx context.Context) error {
-	fmt.Printf("Starting Spotalis operator in namespace: %s\n", a.Config.Operator.Namespace)
-	fmt.Printf("Leader election enabled: %v\n", a.Config.Operator.LeaderElection.Enabled)
-	fmt.Printf("Max concurrent reconciles: %d\n", a.Config.Controllers.MaxConcurrentReconciles)
-	fmt.Printf("Webhook enabled: %v\n", a.Config.Webhook.Enabled)
-	fmt.Printf("Metrics enabled: %v\n", a.Config.Observability.Metrics.Enabled)
-
 	// Get the operator from DI container and start it
 	var startErr error
 	if err := a.Container.Invoke(func(op *operator.Operator) {
-		fmt.Println("✅ Operator resolved from DI container - Type:", fmt.Sprintf("%T", op))
 		// Now actually start the operator!
 		startErr = op.Start(ctx)
 	}); err != nil {

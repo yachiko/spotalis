@@ -688,15 +688,11 @@ func (o *Operator) initializeCoreServices() error {
 
 // initializeHTTPServer initializes the HTTP server components
 func (o *Operator) initializeHTTPServer() error {
-	// Setup Gin engine
-	if o.config.LogLevel != logLevelDebug {
-		gin.SetMode(gin.ReleaseMode)
-	}
+	// Setup Gin engine - always use release mode to avoid debug messages
+	gin.SetMode(gin.ReleaseMode)
 	o.ginEngine = gin.New()
 	o.ginEngine.Use(gin.Recovery())
-	if o.config.LogLevel == logLevelDebug {
-		o.ginEngine.Use(gin.Logger())
-	}
+	// Note: We don't use gin.Logger() as we have our own structured logging
 
 	// Initialize health checker
 	o.healthChecker = server.NewHealthChecker(o.Manager, o.kubeClient, o.namespace)

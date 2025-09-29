@@ -21,6 +21,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/ahoma/spotalis/tests/integration/shared"
@@ -73,7 +74,7 @@ var _ = Describe("Pod rebalancing scenario", func() {
 		// Cleanup namespace
 		if namespace != "" && kindHelper != nil {
 			err := kindHelper.CleanupNamespace(namespace)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to cleanup test namespace %s", namespace))
 		}
 		if cancel != nil {
 			cancel()

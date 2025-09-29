@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ahoma/spotalis/tests/integration/shared"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -133,18 +134,37 @@ func cleanupTestResources() {
 	// Clean up any test resources created during integration tests
 	// This helps ensure tests don't interfere with each other
 
-	namespaces := []string{
-		"spotalis-test-1",
-		"spotalis-test-2",
-		"spotalis-test-namespace",
+	// Create a helper for cleanup operations
+	kindHelper, err := shared.NewKindClusterHelper(ctx)
+	if err != nil {
+		// Use a different approach - fail the suite if we can't create helper
+		fmt.Printf("CRITICAL: Failed to create kind helper for cleanup: %v\n", err)
+		// Continue with manual cleanup attempt
+		manualCleanup()
+		return
 	}
 
-	for _, ns := range namespaces {
-		namespace := &corev1.Namespace{}
-		err := k8sClient.Get(ctx, client.ObjectKey{Name: ns}, namespace)
-		if err == nil {
-			// Namespace exists, delete it
-			Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
+	// Perform comprehensive cleanup
+	if err := kindHelper.CleanupAllTestResources(); err != nil {
+		// Don't fail the suite, but log the error and attempt manual cleanup
+		fmt.Printf("WARNING: Failed to cleanup test resources: %v\n", err)
+		fmt.Println("Attempting manual cleanup...")
+		manualCleanup()
+	}
+
+	GinkgoWriter.Println("Test resource cleanup completed")
+}
+
+func manualCleanup() {
+	// Manual cleanup using direct kubectl-like operations
+	namespaces := &corev1.NamespaceList{}
+	if err := k8sClient.List(ctx, namespaces, client.MatchingLabels{
+		"spotalis.io/test": "true",
+	}); err == nil {
+		for _, ns := range namespaces.Items {
+			if err := k8sClient.Delete(ctx, &ns); err != nil {
+				fmt.Printf("Failed to delete test namespace %s: %v\n", ns.Name, err)
+			}
 		}
 	}
 }

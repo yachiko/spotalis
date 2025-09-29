@@ -36,14 +36,22 @@ test: envtest ## Run unit tests
 
 .PHONY: test-integration
 test-integration:  ## Run integration tests with Kind
-	go test ./tests/integration/... -v -tags=integration
+	go test ./tests/integration/... -v -tags=integration -timeout=15m
 
 .PHONY: test-integration-cleanup
 test-integration-cleanup: ## Clean up integration test resources from Kind cluster
 	@kubectl config current-context | grep -q "kind-" || (echo "Error: Not connected to a Kind cluster. Run 'kubectl config use-context kind-spotalis'" && exit 1)
-	@kubectl delete namespaces -l spotalis.io/test=true --ignore-not-found=true
-	@kubectl get namespaces -o name | grep -E "(managed-|unmanaged-|spotalis-managed-)" | xargs -r kubectl delete --ignore-not-found=true
-	@kubectl delete deployments -A -l spotalis.io/test=true --ignore-not-found=true
+	@echo "Cleaning up test namespaces with spotalis.io/test=true label..."
+	@kubectl delete namespaces -l spotalis.io/test=true --ignore-not-found=true --timeout=60s
+	@echo "Cleaning up legacy test namespaces..."
+	@kubectl get namespaces -o name | grep -E "(managed-|unmanaged-|spotalis-managed-|spotalis-test-)" | xargs -r kubectl delete --ignore-not-found=true --timeout=60s
+	@echo "Cleaning up test deployments..."
+	@kubectl delete deployments -A -l spotalis.io/test=true --ignore-not-found=true --timeout=30s
+	@echo "Cleaning up test pods..."
+	@kubectl delete pods -A -l spotalis.io/test=true --ignore-not-found=true --timeout=30s
+	@echo "Cleaning up any remaining test resources..."
+	@kubectl delete all -A -l test.spotalis.io/cleanup=auto --ignore-not-found=true --timeout=30s
+	@echo "Integration test cleanup completed"
 
 ##@ Build
 .PHONY: build

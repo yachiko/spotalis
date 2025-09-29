@@ -100,6 +100,14 @@ func main() {
 		"log-level", config.Observability.Logging.Level,
 	)
 
+	// Log additional configuration details
+	setupLog.Info("Operator configuration",
+		"max-concurrent-reconciles", config.Controllers.MaxConcurrentReconciles,
+		"metrics-enabled", config.Observability.Metrics.Enabled,
+		"leader-election-id", config.Operator.LeaderElection.ID,
+		"leader-election-lease-duration", config.Operator.LeaderElection.LeaseDuration,
+	)
+
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

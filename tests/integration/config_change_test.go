@@ -72,9 +72,13 @@ var _ = Describe("Configuration change scenario", func() {
 			},
 		}
 		err := k8sClient.Delete(testCtx, ns)
-		if err != nil {
-			GinkgoWriter.Printf("Warning: Failed to delete namespace %s: %v\n", namespace, err)
-		}
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to delete namespace %s", namespace))
+
+		// Wait for namespace to be fully deleted to ensure cleanup is complete
+		Eventually(func() bool {
+			err := k8sClient.Get(testCtx, client.ObjectKey{Name: namespace}, ns)
+			return err != nil // Error means namespace is gone
+		}, 30*time.Second, 1*time.Second).Should(BeTrue(), fmt.Sprintf("Namespace %s was not deleted within timeout", namespace))
 
 		testCancel()
 	})

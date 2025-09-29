@@ -41,14 +41,16 @@ func TestNamespaceFilteringIntegration(t *testing.T) {
 
 var _ = Describe("Multi-tenant namespace filtering", func() {
 	var (
-		ctx        context.Context
-		cancel     context.CancelFunc
-		kindHelper *shared.KindClusterHelper
-		k8sClient  client.Client
+		ctx                context.Context
+		cancel             context.CancelFunc
+		kindHelper         *shared.KindClusterHelper
+		k8sClient          client.Client
+		managedNamespace   string
+		unmanagedNamespace string
 	)
 
 	BeforeEach(func() {
-		ctx, cancel = context.WithCancel(context.Background())
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
 
 		// Connect to existing Kind cluster
 		var err error
@@ -64,6 +66,21 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 	})
 
 	AfterEach(func() {
+		// Clean up created namespaces (use IfExists in case tests deleted them)
+		if k8sClient != nil {
+			if managedNamespace != "" {
+				fmt.Printf("Cleaning up managed namespace: %s\n", managedNamespace)
+				err := kindHelper.CleanupNamespaceIfExists(managedNamespace)
+				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to cleanup managed namespace %s", managedNamespace))
+				fmt.Printf("Successfully cleaned up managed namespace: %s\n", managedNamespace)
+			}
+			if unmanagedNamespace != "" {
+				fmt.Printf("Cleaning up unmanaged namespace: %s\n", unmanagedNamespace)
+				err := kindHelper.CleanupNamespaceIfExists(unmanagedNamespace)
+				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to cleanup unmanaged namespace %s", unmanagedNamespace))
+				fmt.Printf("Successfully cleaned up unmanaged namespace: %s\n", unmanagedNamespace)
+			}
+		}
 		if cancel != nil {
 			cancel()
 		}
@@ -71,9 +88,7 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 
 	Context("with namespace filtering enabled", func() {
 		var (
-			managedNamespace   string
-			unmanagedNamespace string
-			deployment         *appsv1.Deployment
+			deployment *appsv1.Deployment
 		)
 
 		BeforeEach(func() {

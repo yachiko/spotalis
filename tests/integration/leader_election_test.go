@@ -53,6 +53,14 @@ var _ = Describe("Leader Election Integration", func() {
 		GinkgoWriter.Printf("Using test namespace: %s\n", namespace)
 	})
 
+	AfterEach(func() {
+		// Clean up test namespace
+		if namespace != "" && kindHelper != nil {
+			err := kindHelper.CleanupNamespace(namespace)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to cleanup namespace %s", namespace))
+		}
+	})
+
 	Describe("Leader Election with Multiple Replicas", func() {
 		It("should ensure only one leader among multiple controller replicas", func() {
 			// Check if spotalis-controller deployment exists

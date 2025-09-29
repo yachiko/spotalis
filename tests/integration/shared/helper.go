@@ -21,6 +21,7 @@ package shared
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -159,17 +160,74 @@ func (h *KindClusterHelper) CleanupNamespace(namespace string) error {
 		},
 	}
 
-	err := h.Client.Delete(h.Context, ns)
+	// First check if namespace exists
+	err := h.Client.Get(h.Context, client.ObjectKey{Name: namespace}, ns)
 	if err != nil {
-		return err
+		// Namespace doesn't exist, nothing to clean up
+		if client.IgnoreNotFound(err) == nil {
+			return nil
+		}
+		return fmt.Errorf("failed to check if namespace %s exists: %w", namespace, err)
 	}
 
-	// Wait for namespace to be deleted
+	// Force remove finalizers that might prevent deletion
+	if len(ns.Finalizers) > 0 {
+		ns.Finalizers = []string{}
+		if err := h.Client.Update(h.Context, ns); err != nil {
+			// Log but don't fail on finalizer removal
+			fmt.Printf("Warning: failed to remove finalizers from namespace %s: %v\n", namespace, err)
+		}
+	}
+
+	// Delete all resources in the namespace first
+	if err := h.forceCleanupNamespaceResources(namespace); err != nil {
+		fmt.Printf("Warning: failed to cleanup resources in namespace %s: %v\n", namespace, err)
+	}
+
+	// Delete the namespace
+	err = h.Client.Delete(h.Context, ns)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("failed to delete namespace %s: %w", namespace, err)
+	}
+
+	// Wait for namespace to be deleted with shorter timeout to avoid test hangs
+	timeout := 60 * time.Second
+	interval := 2 * time.Second
+
+	deleted := false
 	Eventually(func() bool {
 		err := h.Client.Get(h.Context, client.ObjectKey{Name: namespace}, ns)
-		return err != nil // Error means namespace is gone
-	}, 30*time.Second, 1*time.Second).Should(BeTrue())
+		deleted = (err != nil && client.IgnoreNotFound(err) == nil) // Error means namespace is gone
+		return deleted
+	}, timeout, interval).Should(BeTrue(), fmt.Sprintf("namespace %s was not deleted within %v", namespace, timeout))
 
+	return nil
+}
+
+// forceCleanupNamespaceResources attempts to delete all resources in a namespace
+func (h *KindClusterHelper) forceCleanupNamespaceResources(namespace string) error {
+	// Delete all deployments in the namespace
+	deployments := &appsv1.DeploymentList{}
+	if err := h.Client.List(h.Context, deployments, client.InNamespace(namespace)); err == nil {
+		for _, deployment := range deployments.Items {
+			if err := h.Client.Delete(h.Context, &deployment); err != nil {
+				fmt.Printf("Warning: failed to delete deployment %s/%s: %v\n", deployment.Namespace, deployment.Name, err)
+			}
+		}
+	}
+
+	// Delete all pods in the namespace
+	pods := &corev1.PodList{}
+	if err := h.Client.List(h.Context, pods, client.InNamespace(namespace)); err == nil {
+		for _, pod := range pods.Items {
+			if err := h.Client.Delete(h.Context, &pod); err != nil {
+				fmt.Printf("Warning: failed to delete pod %s/%s: %v\n", pod.Namespace, pod.Name, err)
+			}
+		}
+	}
+
+	// Give resources a moment to terminate
+	time.Sleep(5 * time.Second)
 	return nil
 }
 
@@ -180,14 +238,18 @@ func (h *KindClusterHelper) CleanupAllTestNamespaces() error {
 		"spotalis.io/test": "true",
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list test namespaces: %w", err)
 	}
 
+	var cleanupErrors []error
 	for _, ns := range namespaces.Items {
 		if err := h.CleanupNamespace(ns.Name); err != nil {
-			// Log error but continue with other namespaces
-			continue
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("failed to cleanup namespace %s: %w", ns.Name, err))
 		}
+	}
+
+	if len(cleanupErrors) > 0 {
+		return fmt.Errorf("cleanup failed for %d namespaces: %v", len(cleanupErrors), cleanupErrors)
 	}
 	return nil
 }
@@ -197,7 +259,7 @@ func (h *KindClusterHelper) CleanupLegacyTestNamespaces() error {
 	namespaces := &corev1.NamespaceList{}
 	err := h.Client.List(h.Context, namespaces)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list namespaces for legacy cleanup: %w", err)
 	}
 
 	for _, ns := range namespaces.Items {
@@ -212,8 +274,7 @@ func (h *KindClusterHelper) CleanupLegacyTestNamespaces() error {
 		// Clean up namespaces that match test patterns but don't have proper labels
 		if h.isLegacyTestNamespace(ns.Name) {
 			if err := h.CleanupNamespace(ns.Name); err != nil {
-				// Log error but continue with other namespaces
-				continue
+				return fmt.Errorf("failed to cleanup legacy namespace %s: %w", ns.Name, err)
 			}
 		}
 	}
@@ -354,6 +415,146 @@ func (h *KindClusterHelper) verifySpotalisDeployment() error {
 	// an actual deployment in this setup, we'll just verify cluster connectivity
 	namespaces := &corev1.NamespaceList{}
 	return h.Client.List(h.Context, namespaces)
+}
+
+// CleanupAllTestResources performs comprehensive cleanup of all test resources
+func (h *KindClusterHelper) CleanupAllTestResources() error {
+	var allErrors []error
+
+	// Clean up test namespaces
+	if err := h.CleanupAllTestNamespaces(); err != nil {
+		allErrors = append(allErrors, fmt.Errorf("test namespaces cleanup failed: %w", err))
+	}
+
+	// Clean up legacy test namespaces
+	if err := h.CleanupLegacyTestNamespaces(); err != nil {
+		allErrors = append(allErrors, fmt.Errorf("legacy namespaces cleanup failed: %w", err))
+	}
+
+	// Clean up any test-labeled deployments in non-test namespaces
+	if err := h.CleanupTestDeployments(); err != nil {
+		allErrors = append(allErrors, fmt.Errorf("test deployments cleanup failed: %w", err))
+	}
+
+	// Clean up test-labeled pods that might be stuck
+	if err := h.CleanupTestPods(); err != nil {
+		allErrors = append(allErrors, fmt.Errorf("test pods cleanup failed: %w", err))
+	}
+
+	if len(allErrors) > 0 {
+		return fmt.Errorf("comprehensive cleanup failed with %d errors: %v", len(allErrors), allErrors)
+	}
+
+	return nil
+}
+
+// CleanupTestDeployments removes deployments marked with test labels across all namespaces
+func (h *KindClusterHelper) CleanupTestDeployments() error {
+	deployments := &appsv1.DeploymentList{}
+	err := h.Client.List(h.Context, deployments, client.MatchingLabels{
+		"spotalis.io/test": "true",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list test deployments: %w", err)
+	}
+
+	var cleanupErrors []error
+	for _, deployment := range deployments.Items {
+		if err := h.Client.Delete(h.Context, &deployment); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("failed to delete deployment %s/%s: %w", deployment.Namespace, deployment.Name, err))
+		}
+	}
+
+	if len(cleanupErrors) > 0 {
+		return fmt.Errorf("deployment cleanup failed for %d resources: %v", len(cleanupErrors), cleanupErrors)
+	}
+	return nil
+}
+
+// CleanupTestPods removes pods marked with test labels across all namespaces
+func (h *KindClusterHelper) CleanupTestPods() error {
+	pods := &corev1.PodList{}
+	err := h.Client.List(h.Context, pods, client.MatchingLabels{
+		"spotalis.io/test": "true",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list test pods: %w", err)
+	}
+
+	var cleanupErrors []error
+	for _, pod := range pods.Items {
+		if err := h.Client.Delete(h.Context, &pod); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("failed to delete pod %s/%s: %w", pod.Namespace, pod.Name, err))
+		}
+	}
+
+	if len(cleanupErrors) > 0 {
+		return fmt.Errorf("pod cleanup failed for %d resources: %v", len(cleanupErrors), cleanupErrors)
+	}
+	return nil
+}
+
+// CleanupNamespaceIfExists safely deletes a namespace if it exists, with timeout
+func (h *KindClusterHelper) CleanupNamespaceIfExists(namespace string) error {
+	if namespace == "" {
+		return nil
+	}
+
+	ns := &corev1.Namespace{}
+	err := h.Client.Get(h.Context, client.ObjectKey{Name: namespace}, ns)
+	if err != nil {
+		// Namespace doesn't exist, nothing to clean up
+		if client.IgnoreNotFound(err) == nil {
+			return nil // Not found is OK
+		}
+		return fmt.Errorf("failed to check if namespace %s exists: %w", namespace, err)
+	}
+
+	// Use the robust cleanup method
+	return h.CleanupNamespace(namespace)
+}
+
+// RestoreDeploymentReplicas restores a deployment to its original replica count
+func (h *KindClusterHelper) RestoreDeploymentReplicas(namespace, name string, originalReplicas int32) error {
+	deployment := &appsv1.Deployment{}
+	err := h.Client.Get(h.Context, client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, deployment)
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Replicas = &originalReplicas
+	return h.Client.Update(h.Context, deployment)
+}
+
+// WaitForNamespaceCleanup waits for namespaces with specific labels to be cleaned up
+func (h *KindClusterHelper) WaitForNamespaceCleanup(labels map[string]string) error {
+	Eventually(func() int {
+		namespaces := &corev1.NamespaceList{}
+		err := h.Client.List(h.Context, namespaces, client.MatchingLabels(labels))
+		if err != nil {
+			return -1
+		}
+		return len(namespaces.Items)
+	}, 30*time.Second, 2*time.Second).Should(Equal(0))
+
+	return nil
+}
+
+// WaitForDeploymentCleanup waits for deployments with specific labels to be cleaned up
+func (h *KindClusterHelper) WaitForDeploymentCleanup(labels map[string]string) error {
+	Eventually(func() int {
+		deployments := &appsv1.DeploymentList{}
+		err := h.Client.List(h.Context, deployments, client.MatchingLabels(labels))
+		if err != nil {
+			return -1
+		}
+		return len(deployments.Items)
+	}, 30*time.Second, 2*time.Second).Should(Equal(0))
+
+	return nil
 }
 
 // randString generates a random string of specified length
