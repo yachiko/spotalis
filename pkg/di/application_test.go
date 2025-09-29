@@ -6,11 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/ahoma/spotalis/pkg/config"
 	"github.com/ahoma/spotalis/pkg/operator"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApplicationBuilder_NewApplicationBuilder(t *testing.T) {
@@ -67,7 +66,7 @@ observability:
     level: "debug"
 `
 
-	err := os.WriteFile(configFile, []byte(yamlContent), 0o644)
+	err := os.WriteFile(configFile, []byte(yamlContent), 0o600)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -101,9 +100,7 @@ func TestApplication_Start(t *testing.T) {
 	builder := NewApplicationBuilder()
 
 	// Register configuration loader
-	builder.container.MustProvide(func() *config.Loader {
-		return config.NewLoader()
-	})
+	builder.container.MustProvide(config.NewLoader)
 
 	// Register consolidated configuration
 	builder.container.MustProvide(func(loader *config.Loader) (*config.SpotalisConfig, error) {
@@ -188,7 +185,7 @@ controllers:
   maxConcurrentReconciles: 5
 `
 
-	err := os.WriteFile(configFile, []byte(yamlContent), 0o644)
+	err := os.WriteFile(configFile, []byte(yamlContent), 0o600)
 	require.NoError(t, err)
 
 	ctx := context.Background()

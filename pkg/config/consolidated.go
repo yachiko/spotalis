@@ -1,3 +1,4 @@
+// Package config provides consolidated configuration structures and defaults for the Spotalis operator.
 package config
 
 import (

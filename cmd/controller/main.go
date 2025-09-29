@@ -27,10 +27,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/ahoma/spotalis/pkg/di"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	"github.com/ahoma/spotalis/pkg/di"
 )
 
 var (
@@ -54,7 +53,7 @@ func main() {
 		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Commit: %s\n", commit)
 		fmt.Printf("Build Date: %s\n", buildDate)
-		os.Exit(0)
+		return
 	}
 
 	// Create context for application lifecycle
@@ -72,7 +71,7 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create application: %v\n", err)
-		os.Exit(1)
+		return
 	}
 
 	// Setup logger based on configuration
@@ -106,7 +105,7 @@ func main() {
 	setupLog.Info("Starting operator")
 	if err := app.Start(ctx); err != nil {
 		setupLog.Error(err, "failed to start operator")
-		os.Exit(1)
+		return
 	}
 
 	setupLog.Info("Operator stopped")

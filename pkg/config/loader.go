@@ -177,7 +177,7 @@ func (config *SpotalisConfig) Save(filename string) error {
 		return fmt.Errorf("failed to marshal config to YAML: %w", err)
 	}
 
-	if err := os.WriteFile(filename, data, 0o644); err != nil {
+	if err := os.WriteFile(filename, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

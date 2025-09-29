@@ -66,7 +66,7 @@ func (c *Container) InvokeFunc(function interface{}) error {
 }
 
 // InvokeFuncWithContext invokes a function with dependency injection and context
-func (c *Container) InvokeFuncWithContext(ctx context.Context, function interface{}) error {
+func (c *Container) InvokeFuncWithContext(_ context.Context, function interface{}) error {
 	// Dig doesn't directly support context, so we need to handle it differently
 	// We can provide the context as a dependency if needed
 	return c.Invoke(function)

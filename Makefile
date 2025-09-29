@@ -27,6 +27,9 @@ deps:
 lint: 
 	golangci-lint run
 
+fmt: 
+	golangci-lint fmt
+
 .PHONY: test
 test: envtest ## Run unit tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_DIR) -p path)" go clean -testcache && go test ./pkg/... ./internal/... -coverprofile cover.out

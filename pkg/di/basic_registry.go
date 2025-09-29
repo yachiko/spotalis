@@ -88,9 +88,7 @@ func (sr *BasicServiceRegistry) RegisterBasicServices(operatorConfig *operator.C
 	})
 
 	// Register annotation parser
-	sr.container.MustProvide(func() *annotations.AnnotationParser {
-		return annotations.NewAnnotationParser()
-	})
+	sr.container.MustProvide(annotations.NewAnnotationParser)
 
 	// Register node classifier service
 	sr.container.MustProvide(func(client client.Client) *config.NodeClassifierService {
@@ -108,9 +106,7 @@ func (sr *BasicServiceRegistry) RegisterBasicServices(operatorConfig *operator.C
 	})
 
 	// Register metrics collector
-	sr.container.MustProvide(func() *metrics.Collector {
-		return metrics.NewCollector()
-	})
+	sr.container.MustProvide(metrics.NewCollector)
 
 	return nil
 }
@@ -120,7 +116,7 @@ func (sr *BasicServiceRegistry) GetContainer() *Container {
 	return sr.container
 }
 
-// Example of how to use the DI container
+// ExampleUsage demonstrates how to use the DI container
 func (sr *BasicServiceRegistry) ExampleUsage() error {
 	// Example of invoking a function with injected dependencies
 	return sr.container.Invoke(func(

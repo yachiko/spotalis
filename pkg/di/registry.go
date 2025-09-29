@@ -4,11 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-
 	"github.com/ahoma/spotalis/internal/annotations"
 	internalConfig "github.com/ahoma/spotalis/internal/config"
 	"github.com/ahoma/spotalis/internal/server"
@@ -17,6 +12,8 @@ import (
 	"github.com/ahoma/spotalis/pkg/metrics"
 	"github.com/ahoma/spotalis/pkg/operator"
 	"github.com/ahoma/spotalis/pkg/webhook"
+	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // ServiceRegistry registers all Spotalis services with the DI container
@@ -45,9 +42,7 @@ func (r *ServiceRegistry) RegisterAll() error {
 // RegisterConfiguration registers configuration-related services
 func (r *ServiceRegistry) RegisterConfiguration() error {
 	// Register configuration loader
-	r.container.MustProvide(func() *config.Loader {
-		return config.NewLoader()
-	})
+	r.container.MustProvide(config.NewLoader)
 
 	// Register consolidated configuration
 	r.container.MustProvide(func(loader *config.Loader) (*config.SpotalisConfig, error) {
@@ -60,17 +55,13 @@ func (r *ServiceRegistry) RegisterConfiguration() error {
 // RegisterCoreServices registers annotation parser, metrics, and other core services
 func (r *ServiceRegistry) RegisterCoreServices() error {
 	// Register annotation parser
-	r.container.MustProvide(func() *annotations.AnnotationParser {
-		return annotations.NewAnnotationParser()
-	})
+	r.container.MustProvide(annotations.NewAnnotationParser)
 
 	// Register metrics collector
-	r.container.MustProvide(func() *metrics.Collector {
-		return metrics.NewCollector()
-	})
+	r.container.MustProvide(metrics.NewCollector)
 
 	// Register node classifier configuration from consolidated config
-	r.container.MustProvide(func(config *config.SpotalisConfig) *internalConfig.NodeClassifierConfig {
+	r.container.MustProvide(func(_ *config.SpotalisConfig) *internalConfig.NodeClassifierConfig {
 		// Convert consolidated config to node classifier config
 		return &internalConfig.NodeClassifierConfig{
 			// Add any node classifier specific configuration here
@@ -79,9 +70,7 @@ func (r *ServiceRegistry) RegisterCoreServices() error {
 	})
 
 	// Register node classifier service (requires client and config)
-	r.container.MustProvide(func(client client.Client, config *internalConfig.NodeClassifierConfig) *internalConfig.NodeClassifierService {
-		return internalConfig.NewNodeClassifierService(client, config)
-	})
+	r.container.MustProvide(internalConfig.NewNodeClassifierService)
 
 	return nil
 }
@@ -116,16 +105,10 @@ func (r *ServiceRegistry) RegisterControllers() error {
 // RegisterServers registers server-related services (webhook, metrics, health)
 func (r *ServiceRegistry) RegisterServers() error {
 	// Register webhook mutation handler
-	r.container.MustProvide(func(
-		client client.Client,
-		scheme *runtime.Scheme,
-	) *webhook.MutationHandler {
-		return webhook.NewMutationHandler(client, scheme)
-	})
+	r.container.MustProvide(webhook.NewMutationHandler)
 
 	// Register webhook server - simplified for now
 	r.container.MustProvide(func(
-		config *config.SpotalisConfig,
 		mutationHandler *webhook.MutationHandler,
 	) *webhook.MutationHandler {
 		// For now, just return the mutation handler
@@ -184,7 +167,7 @@ func (r *ServiceRegistry) RegisterOperator() error {
 }
 
 // InitializeOperator is a convenience function to set up and return a fully configured operator
-func InitializeOperator(ctx context.Context, configFile string) (*operator.Operator, error) {
+func InitializeOperator(_ context.Context, configFile string) (*operator.Operator, error) {
 	container := NewContainer()
 	registry := NewServiceRegistry(container)
 

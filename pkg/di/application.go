@@ -28,7 +28,7 @@ func (b *ApplicationBuilder) WithConfigFile(path string) *ApplicationBuilder {
 }
 
 // Build builds the application with all dependencies configured
-func (b *ApplicationBuilder) Build(ctx context.Context) (*Application, error) {
+func (b *ApplicationBuilder) Build(_ context.Context) (*Application, error) {
 	// Register configuration loader with optional file
 	b.container.MustProvide(func() *config.Loader {
 		loader := config.NewLoader()
@@ -100,7 +100,7 @@ func (a *Application) Start(ctx context.Context) error {
 }
 
 // Stop stops the application
-func (a *Application) Stop(ctx context.Context) error {
+func (a *Application) Stop(_ context.Context) error {
 	fmt.Println("Stopping Spotalis operator")
 	return nil
 }
