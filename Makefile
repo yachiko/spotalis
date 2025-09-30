@@ -76,7 +76,7 @@ kind-load: docker-build-local ## Load Docker image into Kind cluster
 	kind load docker-image spotalis:local --name spotalis || true; \
 	kubectl set image deployment/spotalis-controller controller=spotalis:local -n spotalis-system || true
 	kubectl rollout restart deployment spotalis-controller -n spotalis-system
-
+	
 ENVTEST = $(TOOLS_DIR)/setup-envtest
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

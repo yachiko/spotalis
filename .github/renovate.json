@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests",
+    "schedule:monthly"
+  ],
+  "constraints": {
+    "go": "1.24"
+  },
+  "labels": ["dependencies"],
+  "assignees": ["@ahoma"],
+  "reviewers": ["@ahoma"],
+  "timezone": "Europe/Warsaw"
+}
