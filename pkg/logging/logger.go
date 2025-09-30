@@ -40,11 +40,22 @@ type Logger struct {
 // DefaultConfig returns default logging configuration
 func DefaultConfig() *LoggingConfig {
 	return &LoggingConfig{
-		Level:       "info",
+		Level:       "info", // Default to info level for general logging
 		Format:      "json",
 		Output:      "stdout",
 		AddCaller:   true,
 		Development: false,
+	}
+}
+
+// DefaultDebugConfig returns logging configuration optimized for debug mode
+func DefaultDebugConfig() *LoggingConfig {
+	return &LoggingConfig{
+		Level:       "debug",
+		Format:      "json",
+		Output:      "stdout",
+		AddCaller:   true,
+		Development: true, // Enable development mode for better debug experience
 	}
 }
 

@@ -1,7 +1,25 @@
 /*
 Copyright 2024 The Spotalis Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License")	if lastDeletionInterface, exists := r.lastPodDeletions.Load(statefulSetKey); exists {
+Licensed under the Apache License, Version 2.0 (the "License")	if lastDeletionInterface, exists := r.l	// Check if StatefulSet is stable and ready for rebalancing
+	if		// After performing rebalancing, requeue sooner to check the results
+		logger.V(1).Info("Pod rebalancing initiated, will check status sooner")
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+	logger.V(1).Info("No pod rebalancing needed")
+
+	logger.V(1).Info("StatefulSet reconciliation completed successfully")tatefulSetStableAndReady(ctx, &statefulSet) {
+		logger.V(1).Info("StatefulSet is not stable or ready, skipping rebalancing",
+			"replicas", statefulSet.Status.Replicas,
+			"readyReplicas", statefulSet.Status.ReadyReplicas,
+			"updatedReplicas", statefulSet.Status.UpdatedReplicas,
+			"availableReplicas", statefulSet.Status.AvailableReplicas)
+
+		// Requeue with longer interval when StatefulSet is not stable
+		return ctrl.Result{RequeueAfter: 2 * r.ReconcileInterval}, nil
+	}
+
+	logger.V(1).Info("Reconciling StatefulSet with Spotalis annotations")ns.Load(statefulSetKey); exists {
 		lastDeletion, ok := lastDeletionInterface.(time.Time)
 		if !ok {
 			logger.Error(nil, "Invalid type for last deletion time", "statefulSetKey", statefulSetKey)
@@ -79,45 +97,40 @@ func (r *StatefulSetReconciler) SetNodeClassifier(classifier *config.NodeClassif
 
 // Reconcile handles the reconciliation of StatefulSet objects
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("statefulset", req.NamespacedName)
-
-	// With controller-runtime's built-in leader election, only the leader will receive reconcile events
-	// so we don't need manual leader election checks here
-
 	// Fetch the StatefulSet
 	var statefulSet appsv1.StatefulSet
 	if err := r.Get(ctx, req.NamespacedName, &statefulSet); err != nil {
 		if errors.IsNotFound(err) {
-			logger.Info("StatefulSet not found, ignoring")
+			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Info("StatefulSet not found, ignoring")
 			// Clean up tracking data for deleted statefulset
 			r.lastDeletionTimes.Delete(req.String())
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "Failed to get StatefulSet")
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to get StatefulSet")
 		return ctrl.Result{}, err
 	}
 
 	// Check if Spotalis is explicitly enabled for this StatefulSet
 	if !r.AnnotationParser.IsSpotalisEnabled(&statefulSet) {
-		logger.Info("StatefulSet does not have spotalis.io/enabled=true, skipping")
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("StatefulSet does not have spotalis.io/enabled=true, skipping")
 		return ctrl.Result{}, nil
 	}
 
 	// Check if the namespace is allowed for Spotalis management
 	if r.NamespaceFilter != nil {
-		logger.Info("Checking namespace permissions with namespace filter", "namespace", statefulSet.Namespace)
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "namespace", statefulSet.Namespace).V(1).Info("Checking namespace permissions with namespace filter")
 		result, err := r.NamespaceFilter.IsNamespaceAllowed(ctx, statefulSet.Namespace)
 		if err != nil {
-			logger.Error(err, "Failed to check namespace permissions")
+			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to check namespace permissions")
 			return ctrl.Result{}, err
 		}
 		if !result.Allowed {
-			logger.Info("Namespace is not allowed for Spotalis management", "reason", result.Reason, "rule", result.MatchedRule)
+			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "reason", result.Reason, "rule", result.MatchedRule).V(1).Info("Namespace is not allowed for Spotalis management")
 			return ctrl.Result{}, nil
 		}
-		logger.Info("Namespace is allowed for Spotalis management", "rule", result.MatchedRule)
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "rule", result.MatchedRule).V(1).Info("Namespace is allowed for Spotalis management")
 	} else {
-		logger.Info("No namespace filter configured, allowing all namespaces")
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("No namespace filter configured, allowing all namespaces")
 	}
 
 	// Implement cooldown period after pod deletion to avoid constant rescheduling
@@ -125,7 +138,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(statefulsetKey); exists {
 		lastDeletion, ok := lastDeletionInterface.(time.Time)
 		if !ok {
-			logger.Error(nil, "Invalid type for last deletion time", "statefulsetKey", statefulsetKey)
+			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "statefulsetKey", statefulsetKey).Error(nil, "Invalid type for last deletion time")
 			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
 		}
 		cooldownPeriod := 3 * time.Minute // Wait 3 minutes after deleting a pod
@@ -133,39 +146,43 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 		if timeSinceLastDeletion < cooldownPeriod {
 			remainingCooldown := cooldownPeriod - timeSinceLastDeletion
-			logger.Info("In cooldown period after recent pod deletion, skipping rebalancing",
+			log.FromContext(ctx).WithValues(
+				"statefulset", req.NamespacedName,
 				"lastDeletion", lastDeletion,
 				"timeSince", timeSinceLastDeletion,
-				"remainingCooldown", remainingCooldown)
+				"remainingCooldown", remainingCooldown,
+			).V(1).Info("In cooldown period after recent pod deletion, skipping rebalancing")
 			return ctrl.Result{RequeueAfter: remainingCooldown}, nil
 		}
 	}
 
 	// Check if StatefulSet is stable and ready for rebalancing
 	if !r.isStatefulSetStableAndReady(&statefulSet) {
-		logger.Info("StatefulSet is not stable or ready, skipping rebalancing",
+		log.FromContext(ctx).WithValues(
+			"statefulset", req.NamespacedName,
 			"replicas", statefulSet.Status.Replicas,
 			"readyReplicas", statefulSet.Status.ReadyReplicas,
 			"currentReplicas", statefulSet.Status.CurrentReplicas,
-			"updatedReplicas", statefulSet.Status.UpdatedReplicas)
+			"updatedReplicas", statefulSet.Status.UpdatedReplicas,
+		).V(1).Info("StatefulSet is not stable or ready, skipping rebalancing")
 
 		// Requeue with longer interval when StatefulSet is not stable
 		return ctrl.Result{RequeueAfter: 2 * r.ReconcileInterval}, nil
 	}
 
-	logger.Info("Reconciling StatefulSet with Spotalis annotations")
+	log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("Reconciling StatefulSet with Spotalis annotations")
 
 	// Parse the workload configuration from annotations
 	workloadConfig, err := r.AnnotationParser.ParseWorkloadConfiguration(&statefulSet)
 	if err != nil {
-		logger.Error(err, "Failed to parse workload configuration")
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to parse workload configuration")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
 
 	// Get the current replica state
 	replicaState, err := r.calculateCurrentReplicaState(ctx, &statefulSet)
 	if err != nil {
-		logger.Error(err, "Failed to calculate current replica state")
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to calculate current replica state")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
 
@@ -182,24 +199,26 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	needsRebalancing := r.needsRebalancing(replicaState)
 
 	if needsRebalancing {
-		logger.Info("Rebalancing StatefulSet pods",
+		log.FromContext(ctx).WithValues(
+			"statefulset", req.NamespacedName,
 			"currentSpot", replicaState.CurrentSpot,
 			"currentOnDemand", replicaState.CurrentOnDemand,
 			"desiredSpot", replicaState.DesiredSpot,
-			"desiredOnDemand", replicaState.DesiredOnDemand)
+			"desiredOnDemand", replicaState.DesiredOnDemand,
+		).Info("Rebalancing StatefulSet pods")
 
 		if err := r.performPodRebalancing(ctx, &statefulSet, replicaState, statefulsetKey); err != nil {
-			logger.Error(err, "Failed to rebalance StatefulSet pods")
+			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to rebalance StatefulSet pods")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
 
 		// After performing rebalancing, requeue sooner to check the results
-		logger.Info("Pod rebalancing initiated, will check status sooner")
+		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("Pod rebalancing initiated, will check status sooner")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
 	}
-	logger.Info("No pod rebalancing needed")
+	log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("No pod rebalancing needed")
 
-	logger.Info("StatefulSet reconciliation completed successfully")
+	log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("StatefulSet reconciliation completed successfully")
 
 	// Use longer interval when no action is needed to reduce load
 	return ctrl.Result{RequeueAfter: r.ReconcileInterval * 2}, nil
@@ -302,7 +321,6 @@ func (r *StatefulSetReconciler) performPodRebalancing(ctx context.Context, state
 
 // categorizePodsByNodeType gets all pods for a StatefulSet and categorizes them by node type
 func (r *StatefulSetReconciler) categorizePodsByNodeType(ctx context.Context, statefulSet *appsv1.StatefulSet) (spotPods, onDemandPods []corev1.Pod, err error) {
-	logger := log.FromContext(ctx)
 
 	// Get all pods for this StatefulSet
 	podList := &corev1.PodList{}
@@ -326,7 +344,7 @@ func (r *StatefulSetReconciler) categorizePodsByNodeType(ctx context.Context, st
 
 		nodeType, err := r.getNodeTypeForPod(ctx, pod)
 		if err != nil {
-			logger.Info("Could not get node for pod", "pod", pod.Name, "node", pod.Spec.NodeName)
+			log.FromContext(ctx).WithValues("pod", pod.Name, "node", pod.Spec.NodeName).V(1).Info("Could not get node for pod")
 			continue
 		}
 
@@ -394,20 +412,22 @@ func (r *StatefulSetReconciler) executeGradualRebalancing(ctx context.Context, s
 		return nil
 	}
 
-	logger := log.FromContext(ctx)
-
 	// Only delete the first pod to avoid overwhelming the system
 	pod := podsToDelete[0]
-	logger.Info("Deleting one pod for rebalancing (gradual approach)", "pod", pod.Name, "node", pod.Spec.NodeName, "remaining", len(podsToDelete)-1)
+	log.FromContext(ctx).WithValues(
+		"pod", pod.Name,
+		"node", pod.Spec.NodeName,
+		"remaining", len(podsToDelete)-1,
+	).V(1).Info("Deleting one pod for rebalancing (gradual approach)")
 
 	if err := r.Delete(ctx, &pod); err != nil {
-		logger.Error(err, "Failed to delete pod for rebalancing", "pod", pod.Name)
+		log.FromContext(ctx).WithValues("pod", pod.Name).Error(err, "Failed to delete pod for rebalancing")
 		return err
 	}
 
 	// Record the deletion time for cooldown tracking
 	r.lastDeletionTimes.Store(statefulsetKey, time.Now())
-	logger.Info("Deleted one pod for rebalancing - will continue with remaining pods in next reconcile", "deleted", pod.Name)
+	log.FromContext(ctx).WithValues("deleted", pod.Name).V(1).Info("Deleted one pod for rebalancing - will continue with remaining pods in next reconcile")
 
 	// Update pod template and trigger rolling update
 	return r.updateStatefulSetForRebalancing(ctx, statefulSet, desiredState)

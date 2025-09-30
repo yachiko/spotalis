@@ -91,6 +91,13 @@ func main() {
 	// Get configuration for logging context
 	config := app.GetConfig()
 	setupLog := logger.WithName("setup")
+
+	// Log debug information if debug level is enabled
+	if config.Observability.Logging.Level == "debug" {
+		setupLog.Info("Debug logging enabled - reconciliation details will be shown at debug level")
+		setupLog.V(1).Info("Using controller-runtime logger with JSON format and structured logging")
+	}
+
 	setupLog.Info("Starting Spotalis controller",
 		"version", version,
 		"commit", commit,
