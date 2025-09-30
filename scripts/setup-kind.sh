@@ -45,7 +45,7 @@ create_cluster() {
     echo "📦 Creating Kind cluster 'spotalis'..."
     
     # Check if cluster config exists
-    local cluster_config="build/kind/cluster.yaml"
+    local cluster_config="kind.yaml"
     if [ ! -f "$cluster_config" ]; then
         echo "❌ Cluster configuration not found at $cluster_config"
         exit 1
