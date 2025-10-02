@@ -41,6 +41,7 @@ Thumbs.db
 # Test coverage
 cover.out
 coverage.html
+controller 
 
 # Temporary files
 *.tmp
