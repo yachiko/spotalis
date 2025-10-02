@@ -1,0 +1,142 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  GO_VERSION: "1.24"
+  
+jobs:
+  lint:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Verify go.mod and go.sum
+        run: |
+          mmake deps
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Download dependencies
+        run: 
+          make deps
+
+      - name: Build application
+        run: |
+          make build
+
+      - name: Run unit tests
+        run: |
+          make test
+  
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build docker image
+        uses: docker/bake-action@v6
+        with: 
+          set:  |
+            *.tags=spotalis:local
+            *.output=type=,dest=${{ runner.temp }}/spotalis.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotalis
+          path: ${{ runner.temp }}/spotalis.tar
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: spotalis
+          path: ${{ runner.temp }}
+
+      - name: Load image
+        run: |
+          docker load --input ${{ runner.temp }}/spotalis.tar
+          docker image ls -a
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: spotalis:local
+          format: 'table'
+          exit-code: '1'
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: spotalis
+          path: ${{ runner.temp }}
+
+      - name: Load image
+        run: |
+          docker load --input ${{ runner.temp }}/spotalis.tar
+          docker image ls -a
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+
+      - name: Create Kind cluster
+        run: |
+          make kind
+
+      - name: Load Docker image to Kind
+        run: |
+          kind load docker-image spotalis:local --name spotalis
+
+      - name: Run integration tests
+        run: |
+          make test-integration
