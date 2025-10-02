@@ -18,8 +18,11 @@ group "default" {
   targets = ["controller"]
 }
 
+target "docker-metadata-action" {}
+
 # Main controller target
 target "controller" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "Dockerfile"
   platforms  = split(",", PLATFORM)
