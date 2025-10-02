@@ -3,13 +3,14 @@
   "extends": [
     "config:recommended",
     "docker:pinDigests",
-    "schedule:monthly"
+    "schedule:monthly",
+    "helpers:pinGitHubActionDigests"
   ],
   "constraints": {
     "go": "1.24"
   },
   "labels": ["dependencies"],
-  "assignees": ["@ahoma"],
-  "reviewers": ["@ahoma"],
+  "assignees": ["@Yachiko"],
+  "reviewers": ["@Yachiko"],
   "timezone": "Europe/Warsaw"
 }
