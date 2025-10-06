@@ -43,6 +43,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ahoma/spotalis/internal/annotations"
@@ -72,6 +73,10 @@ type StatefulSetReconciler struct {
 
 	// Track last pod deletion time per statefulset to implement cooldown
 	lastDeletionTimes sync.Map // map[string]time.Time
+
+	// Metrics tracking
+	reconcileCount atomic.Int64
+	errorCount     atomic.Int64
 }
 
 // NewStatefulSetReconciler creates a new StatefulSetReconciler
@@ -97,6 +102,9 @@ func (r *StatefulSetReconciler) SetNodeClassifier(classifier *config.NodeClassif
 
 // Reconcile handles the reconciliation of StatefulSet objects
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Increment reconcile counter
+	r.reconcileCount.Add(1)
+
 	// Fetch the StatefulSet
 	var statefulSet appsv1.StatefulSet
 	if err := r.Get(ctx, req.NamespacedName, &statefulSet); err != nil {
@@ -106,6 +114,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			r.lastDeletionTimes.Delete(req.String())
 			return ctrl.Result{}, nil
 		}
+		r.errorCount.Add(1)
 		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to get StatefulSet")
 		return ctrl.Result{}, err
 	}
@@ -555,4 +564,14 @@ func statefulSetLabelSelector(statefulSet *appsv1.StatefulSet) (client.MatchingL
 	}
 
 	return client.MatchingLabels(statefulSet.Spec.Selector.MatchLabels), nil
+}
+
+// GetReconcileCount returns the total number of reconciliations performed
+func (r *StatefulSetReconciler) GetReconcileCount() int64 {
+	return r.reconcileCount.Load()
+}
+
+// GetErrorCount returns the total number of reconciliation errors
+func (r *StatefulSetReconciler) GetErrorCount() int64 {
+	return r.errorCount.Load()
 }

@@ -164,7 +164,7 @@ func (cm *ControllerManager) GetControllerStatus() map[string]ControllerStatus {
 			Name:       "deployment",
 			Enabled:    cm.config.EnableDeployments,
 			Registered: cm.controllersRegistered["deployment"],
-			Reconciles: 0,   // TODO: Implement reconcile count tracking
+			Reconciles: cm.deploymentController.GetReconcileCount(),
 			LastError:  nil, // TODO: Implement error tracking
 		}
 	}
@@ -174,7 +174,7 @@ func (cm *ControllerManager) GetControllerStatus() map[string]ControllerStatus {
 			Name:       "statefulset",
 			Enabled:    cm.config.EnableStatefulSets,
 			Registered: cm.controllersRegistered["statefulset"],
-			Reconciles: 0,   // TODO: Implement reconcile count tracking
+			Reconciles: cm.statefulSetController.GetReconcileCount(),
 			LastError:  nil, // TODO: Implement error tracking
 		}
 	}
@@ -274,10 +274,10 @@ func (cm *ControllerManager) GetManagerMetrics() map[string]interface{} {
 
 	// Add controller-specific metrics
 	if cm.deploymentController != nil {
-		metrics["deployment_reconciles"] = int64(0) // TODO: Implement reconcile count tracking
+		metrics["deployment_reconciles"] = cm.deploymentController.GetReconcileCount()
 	}
 	if cm.statefulSetController != nil {
-		metrics["statefulset_reconciles"] = int64(0) // TODO: Implement reconcile count tracking
+		metrics["statefulset_reconciles"] = cm.statefulSetController.GetReconcileCount()
 	}
 
 	return metrics

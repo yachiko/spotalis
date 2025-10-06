@@ -96,6 +96,123 @@ var _ = Describe("DeploymentReconciler", func() {
 		})
 	})
 
+	Describe("Reconcile Count Tracking", func() {
+		var deployment *appsv1.Deployment
+
+		BeforeEach(func() {
+			deployment = &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"spotalis.io/spot-percentage": "70",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: int32Ptr(5),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "test",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "test-container",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+			}
+		})
+
+		It("should increment reconcile count on each reconcile", func() {
+			Expect(fakeClient.Create(ctx, deployment)).To(Succeed())
+
+			// Verify initial count is 0
+			Expect(reconciler.GetReconcileCount()).To(BeZero())
+
+			// First reconcile
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-deployment",
+					Namespace: "default",
+				},
+			}
+
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(reconciler.GetReconcileCount()).To(Equal(int64(1)))
+
+			// Second reconcile
+			_, err = reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(reconciler.GetReconcileCount()).To(Equal(int64(2)))
+
+			// Third reconcile
+			_, err = reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(reconciler.GetReconcileCount()).To(Equal(int64(3)))
+		})
+
+		It("should increment count even when deployment not found", func() {
+			// Verify initial count is 0
+			Expect(reconciler.GetReconcileCount()).To(BeZero())
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "nonexistent",
+					Namespace: "default",
+				},
+			}
+
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(reconciler.GetReconcileCount()).To(Equal(int64(1)))
+		})
+
+		It("should increment count when deployment has no annotations", func() {
+			deploymentWithoutAnnotations := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "default",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"app": "test",
+						},
+					},
+				},
+			}
+
+			Expect(fakeClient.Create(ctx, deploymentWithoutAnnotations)).To(Succeed())
+
+			// Verify initial count is 0
+			Expect(reconciler.GetReconcileCount()).To(BeZero())
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-deployment",
+					Namespace: "default",
+				},
+			}
+
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(reconciler.GetReconcileCount()).To(Equal(int64(1)))
+		})
+	})
+
 	Describe("Reconcile", func() {
 		var deployment *appsv1.Deployment
 
