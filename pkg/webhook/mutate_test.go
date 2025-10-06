@@ -195,4 +195,131 @@ var _ = Describe("MutationHandler", func() {
 			Expect(response.Result.Message).To(ContainSubstring("unsupported resource kind"))
 		})
 	})
+
+	Describe("JSON Pointer Escaping (RFC 6901)", func() {
+		Context("jsonPointerEscape", func() {
+			It("should escape tilde characters", func() {
+				result := jsonPointerEscape("foo~bar")
+				Expect(result).To(Equal("foo~0bar"))
+			})
+
+			It("should escape forward slashes", func() {
+				result := jsonPointerEscape("foo/bar")
+				Expect(result).To(Equal("foo~1bar"))
+			})
+
+			It("should escape both tilde and slash in correct order", func() {
+				result := jsonPointerEscape("~/path")
+				Expect(result).To(Equal("~0~1path"))
+			})
+
+			It("should escape path with tilde first then slash", func() {
+				result := jsonPointerEscape("~foo/bar")
+				Expect(result).To(Equal("~0foo~1bar"))
+			})
+
+			It("should handle multiple tildes", func() {
+				result := jsonPointerEscape("foo~bar~baz")
+				Expect(result).To(Equal("foo~0bar~0baz"))
+			})
+
+			It("should handle multiple slashes", func() {
+				result := jsonPointerEscape("foo/bar/baz")
+				Expect(result).To(Equal("foo~1bar~1baz"))
+			})
+
+			It("should handle empty string", func() {
+				result := jsonPointerEscape("")
+				Expect(result).To(Equal(""))
+			})
+
+			It("should handle string with no special characters", func() {
+				result := jsonPointerEscape("normal-key")
+				Expect(result).To(Equal("normal-key"))
+			})
+
+			It("should handle complex Kubernetes label key", func() {
+				// Real-world example with organization/team structure
+				result := jsonPointerEscape("example.com/team~alpha")
+				Expect(result).To(Equal("example.com~1team~0alpha"))
+			})
+		})
+
+		Context("jsonPointerUnescape", func() {
+			It("should unescape tilde characters", func() {
+				result := jsonPointerUnescape("foo~0bar")
+				Expect(result).To(Equal("foo~bar"))
+			})
+
+			It("should unescape forward slashes", func() {
+				result := jsonPointerUnescape("foo~1bar")
+				Expect(result).To(Equal("foo/bar"))
+			})
+
+			It("should unescape both in correct order", func() {
+				result := jsonPointerUnescape("~0~1path")
+				Expect(result).To(Equal("~/path"))
+			})
+
+			It("should handle empty string", func() {
+				result := jsonPointerUnescape("")
+				Expect(result).To(Equal(""))
+			})
+		})
+
+		Context("roundtrip escape/unescape", func() {
+			It("should roundtrip simple tilde", func() {
+				original := "foo~bar"
+				escaped := jsonPointerEscape(original)
+				unescaped := jsonPointerUnescape(escaped)
+				Expect(unescaped).To(Equal(original))
+			})
+
+			It("should roundtrip simple slash", func() {
+				original := "foo/bar"
+				escaped := jsonPointerEscape(original)
+				unescaped := jsonPointerUnescape(escaped)
+				Expect(unescaped).To(Equal(original))
+			})
+
+			It("should roundtrip both characters", func() {
+				original := "~/path/to~file"
+				escaped := jsonPointerEscape(original)
+				unescaped := jsonPointerUnescape(escaped)
+				Expect(unescaped).To(Equal(original))
+			})
+
+			It("should roundtrip complex Kubernetes label", func() {
+				original := "example.com/team~alpha/project~beta"
+				escaped := jsonPointerEscape(original)
+				unescaped := jsonPointerUnescape(escaped)
+				Expect(unescaped).To(Equal(original))
+			})
+		})
+
+		Context("integration with node selector patches", func() {
+			It("should correctly escape node selector keys with slashes", func() {
+				pod := &corev1.Pod{
+					Spec: corev1.PodSpec{
+						NodeSelector: map[string]string{},
+					},
+				}
+
+				patches := handler.generateNodeSelectorPatches(pod, nil)
+
+				// Find the patch for karpenter.sh/capacity-type
+				var foundPatch map[string]interface{}
+				for _, patch := range patches {
+					if patch["path"] == "/spec/nodeSelector/karpenter.sh~1capacity-type" {
+						foundPatch = patch
+						break
+					}
+				}
+
+				Expect(foundPatch).NotTo(BeNil(), "Should find patch with escaped path")
+				Expect(foundPatch["op"]).To(Equal("add"))
+				Expect(foundPatch["path"]).To(Equal("/spec/nodeSelector/karpenter.sh~1capacity-type"))
+			})
+		})
+	})
 })

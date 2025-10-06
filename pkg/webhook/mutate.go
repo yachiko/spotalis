@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ahoma/spotalis/internal/annotations"
 	"github.com/ahoma/spotalis/internal/config"
@@ -223,11 +224,23 @@ func (m *MutationHandler) generatePodPatches(pod *corev1.Pod, config *apis.Workl
 	return patches
 }
 
-// jsonPointerEscape escapes a string for use in JSON Pointer
+// jsonPointerEscape escapes a string for use in JSON Pointer according to RFC 6901
+// Order is critical: ~ must be escaped before / to avoid double-escaping
 func jsonPointerEscape(s string) string {
-	// Replace ~ with ~0 and / with ~1 as per RFC 6901
-	// Note: Currently just returns the string as-is
-	// TODO: Implement proper JSON Pointer escaping if needed
+	// Replace ~ with ~0 first (to avoid double-escaping)
+	s = strings.ReplaceAll(s, "~", "~0")
+	// Then replace / with ~1
+	s = strings.ReplaceAll(s, "/", "~1")
+	return s
+}
+
+// jsonPointerUnescape reverses the JSON Pointer escaping
+// Order is critical: ~1 must be unescaped before ~0 to avoid incorrect results
+func jsonPointerUnescape(s string) string {
+	// Replace ~1 with / first
+	s = strings.ReplaceAll(s, "~1", "/")
+	// Then replace ~0 with ~
+	s = strings.ReplaceAll(s, "~0", "~")
 	return s
 }
 
