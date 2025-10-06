@@ -112,6 +112,97 @@ tests/integration/         # Kind cluster integration tests
 
 **Configuration Loading**: Check environment variable precedence in `pkg/config/loader.go`. Environment variables override YAML file values with `SPOTALIS_` prefix.
 
+## Git Commit Convention
+
+**Spotalis follows Angular commit message convention** for consistency and automated changelog generation.
+
+### Commit Message Format
+
+```
+<type>(<scope>): <short summary>
+  │       │             │
+  │       │             └─> Summary in present tense. Not capitalized. No period.
+  │       │
+  │       └─> Scope: controllers|webhook|config|di|operator|metrics|etc.
+  │
+  └─> Type: feat|fix|docs|style|refactor|test|chore|perf|ci|build
+
+<BLANK LINE>
+
+<body: detailed explanation of what and why, not how>
+
+<BLANK LINE>
+
+<footer: breaking changes, issue references, etc.>
+```
+
+### Commit Types
+
+- `feat`: New feature for the user or significant addition
+- `fix`: Bug fix for the user
+- `docs`: Documentation only changes
+- `style`: Code style changes (formatting, missing semicolons, etc.)
+- `refactor`: Code restructuring without behavior change
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks, dependency updates, build scripts
+- `perf`: Performance improvements
+- `ci`: CI/CD pipeline changes
+- `build`: Build system or external dependency changes
+
+### Commit Scopes
+
+Scopes identify which part of the codebase is affected:
+
+- `controllers`: DeploymentReconciler, StatefulSetReconciler, ControllerManager
+- `webhook`: Admission webhook, mutating webhook logic
+- `config`: Configuration loading, validation, types
+- `di`: Dependency injection container, application lifecycle
+- `operator`: Operator core, leader election, lifecycle management
+- `metrics`: Prometheus metrics, collectors, recording
+- `annotations`: Annotation parsing and validation
+- `apis`: API types, configurations, state objects
+- `logging`: Logging infrastructure and utilities
+- `utils`: Shared utility functions
+- `server`: HTTP servers (metrics, health, webhook endpoints)
+- `nodeclassifier`: Node classification logic
+- `tests`: Test infrastructure, helpers, integration tests
+- `docs`: Documentation files
+- `build`: Build scripts, Makefiles, Dockerfiles
+- `ci`: GitHub Actions, CI/CD workflows
+
+### Examples
+
+```
+feat(controllers): add atomic reconcile count tracking
+
+Add thread-safe reconcile count tracking using atomic.Int64 to both
+DeploymentReconciler and StatefulSetReconciler.
+
+- Add reconcileCount and errorCount atomic.Int64 fields
+- Increment reconcileCount at Reconcile() method entry
+- Add GetReconcileCount() and GetErrorCount() getter methods
+
+Related to Task 2 from improvements.md
+```
+
+```
+fix(webhook): prevent nil pointer in pod mutation
+
+Add nil check for pod.Spec.NodeSelector before mutation to prevent
+panic when processing pods without existing nodeSelector.
+
+Fixes #123
+```
+
+```
+test(controllers): add reconcile count tracking tests
+
+Add comprehensive test coverage for reconcile count tracking behavior
+in both DeploymentReconciler and StatefulSetReconciler.
+
+Closes Task 2 from improvements.md
+```
+
 <!-- MANUAL ADDITIONS START -->
 Consult files from [specs/](../specs/001-build-kubernetes-native/) for additional context on design decisions and architecture.
 <!-- MANUAL ADDITIONS END -->
