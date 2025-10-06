@@ -3,6 +3,21 @@
 ## Overview
 This document defines the key data structures and entities used by the Kubernetes Workload Replica Manager.
 
+## Architecture Overview
+
+The Spotalis application uses a modern dependency injection architecture built on Uber Dig v1.19.0 for improved testability and maintainability. The system follows a single binary pattern integrating controller, webhook, and HTTP servers in a unified operator.
+
+### Dependency Injection System
+
+**DI Container**: Central container (`pkg/di/Container`) wrapping Uber Dig with Spotalis-specific functionality
+**Service Registry**: (`pkg/di/ServiceRegistry`) manages registration of all services with typed constructors
+**Application Lifecycle**: (`pkg/di/Application`) manages startup, configuration loading, and service resolution
+
+**Key Components**:
+- **Configuration Loading**: YAML files with environment variable overrides loaded through DI
+- **Service Resolution**: All operator components resolved via DI container with automatic dependency injection
+- **Testability**: DI container can be tested without Kubernetes cluster connection
+
 ## Core Entities
 
 ### WorkloadConfiguration
@@ -119,36 +134,43 @@ func (d *DisruptionPolicy) CanDisruptPod() bool {
 }
 ```
 
-### ControllerConfiguration
-Represents the global controller configuration including rate limiting and multi-tenancy settings.
+### SpotalisConfiguration
+Represents the consolidated root configuration structure for the entire Spotalis operator.
 
 **Fields**:
-- `ResyncPeriod` (time.Duration): Controller reconciliation interval (default 30s, min 5s)
-- `Workers` (int): Number of concurrent worker goroutines
-- `NamespaceSelector` (*metav1.LabelSelector): Optional namespace filtering for multi-tenant clusters
+- `Operator` (OperatorConfig): Core operator configuration including namespace, read-only mode, leader election
+- `Controllers` (ControllerConfig): Controller-specific configuration for reconciliation behavior
+- `Webhook` (WebhookConfig): Webhook server configuration including port, certificates, TLS settings
+- `Observability` (ObservabilityConfig): Metrics, logging, and health check configuration
+
+**Sub-configurations**:
+
+**OperatorConfig**:
+- `Namespace` (string): Namespace where the operator is deployed
+- `ReadOnlyMode` (bool): When true, prevents the operator from making changes
 - `LeaderElection` (LeaderElectionConfig): Leader election settings
-- `NodeLabels` (NodeLabelConfig): Node classification label configuration
 
-**Validation Rules**:
-- `ResyncPeriod` must be >= 5 seconds to prevent API server overload
-- `Workers` must be > 0 and typically <= 10 for reasonable resource usage
-- `NamespaceSelector` supports both matchLabels and matchExpressions
+**ControllerConfig**:
+- `MaxConcurrentReconciles` (int): Maximum number of concurrent reconciles per controller
+- `ReconcileInterval` (time.Duration): Interval between reconciliations (default 30s, min 5s)
 
-**Usage**:
-```go
-// Multi-tenant configuration example
-func (c *ControllerConfiguration) ShouldMonitorNamespace(ns *corev1.Namespace) bool {
-    if c.NamespaceSelector == nil {
-        return true // Monitor all namespaces
-    }
-    
-    selector, err := metav1.LabelSelectorAsSelector(c.NamespaceSelector)
-    if err != nil {
-        return false
-    }
-    
-    return selector.Matches(labels.Set(ns.Labels))
-}
+**WebhookConfig**:
+- `Enabled` (bool): Enables/disables the webhook server
+- `Port` (int): Port for the webhook server (default 9443)
+- `CertDir` (string): Directory containing TLS certificates
+
+**ObservabilityConfig**:
+- `Metrics` (MetricsConfig): Prometheus metrics configuration
+- `Logging` (LoggingConfig): Structured logging configuration using Go slog
+- `Health` (HealthConfig): Health check endpoint configuration
+
+**Environment Variable Overrides**:
+All configuration values can be overridden using environment variables with `SPOTALIS_` prefix:
+```bash
+SPOTALIS_OPERATOR_NAMESPACE=spotalis-system
+SPOTALIS_CONTROLLERS_RECONCILEINTERVAL=60s
+SPOTALIS_LOGGING_LEVEL=debug
+```
 ```
 
 ### NamespaceFilter

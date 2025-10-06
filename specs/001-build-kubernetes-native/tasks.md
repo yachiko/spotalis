@@ -3,6 +3,22 @@
 **Input**: Design documents from `/Users/ahoma/Projects/side/spotalis/specs/001-build-kubernetes-native/`
 **Prerequisites**: plan.md (required), research.md, data-model.md, contracts/api-contracts.md, quickstart.md
 
+## Project Evolution Summary
+
+During implementation, the project evolved significantly beyond the initial specification to improve maintainability, testability, and operational experience:
+
+### Key Architectural Changes
+1. **Dependency Injection System**: Added Uber Dig v1.19.0 for service lifecycle management (Phase 4)
+2. **Consolidated Configuration**: Unified YAML configuration with environment variable overrides (Phase 5)  
+3. **Structured Logging**: Migrated from generic logging to Go slog with JSON output
+4. **Service Interfaces**: Added comprehensive interface definitions for improved testability
+
+### Development Phases Beyond Original Spec
+- **Phase 4**: Dependency injection migration for better testability and service management
+- **Phase 5**: Configuration consolidation for improved operational experience
+
+These changes align with the project's constitutional principles of testability, maintainability, and following industry best practices (Karpenter architecture pattern).
+
 ## Execution Flow (main)
 ```
 1. Load plan.md from feature directory ✓
@@ -104,22 +120,56 @@ Single project with Karpenter architecture pattern:
 - [x] T042 [P] Rate limiting and API server protection in pkg/utils/rate_limiter.go
 - [x] T043 [P] Multi-tenant namespace filtering implementation in pkg/controllers/namespace_filter.go
 
-## Phase 3.5: Polish
+## Phase 3.5: Polish ✅ COMPLETE
 
-### Unit Tests
-- [ ] T044 [P] Unit tests for WorkloadConfiguration validation in tests/unit/configuration_test.go
-- [ ] T045 [P] Unit tests for ReplicaState calculations in tests/unit/replica_state_test.go
-- [ ] T046 [P] Unit tests for NodeClassification logic in tests/unit/node_classification_test.go
-- [ ] T047 [P] Unit tests for annotation parsing in tests/unit/annotations_test.go
-- [ ] T048 [P] Unit tests for webhook mutation logic in tests/unit/webhook_test.go
+### Unit Tests ✅ COMPLETE
+- [x] T044 [P] Unit tests for WorkloadConfiguration validation in tests/unit/configuration_test.go
+- [x] T045 [P] Unit tests for ReplicaState calculations in tests/unit/replica_state_test.go
+- [x] T046 [P] Unit tests for NodeClassification logic in tests/unit/node_classification_test.go
+- [x] T047 [P] Unit tests for annotation parsing in tests/unit/annotations_test.go
+- [x] T048 [P] Unit tests for webhook mutation logic in tests/unit/webhook_test.go
 
-### Performance and Documentation
-- [ ] T049 Performance validation tests (<5s reconciliation, <100MB memory) in tests/e2e/performance_test.go
-- [ ] T050 [P] Kind cluster setup for local testing in tests/e2e/kind_cluster_test.go
-- [ ] T051 [P] Update README.md with installation and usage instructions
-- [ ] T052 [P] Create deployment manifests in build/k8s/
-- [ ] T053 Remove code duplication and optimize imports
-- [ ] T054 Run manual testing scenarios from quickstart.md
+### Performance and Documentation ✅ COMPLETE
+- [x] T049 Performance validation tests (<5s reconciliation, <100MB memory) in tests/e2e/performance_test.go
+- [x] T050 [P] Kind cluster setup for local testing in tests/e2e/kind_cluster_test.go
+- [x] T051 [P] Update README.md with installation and usage instructions
+- [x] T052 [P] Create deployment manifests in build/k8s/
+- [x] T053 Remove code duplication and optimize imports
+- [x] T054 Run manual testing scenarios from quickstart.md
+
+## Phase 4: Dependency Injection Migration ✅ COMPLETE
+*This phase emerged during development to improve testability and maintainability*
+
+### DI Architecture Implementation
+- [x] T055 [P] Create DI container wrapper using Uber Dig in pkg/di/container.go
+- [x] T056 [P] Implement service registry for DI management in pkg/di/registry.go  
+- [x] T057 [P] Create application lifecycle manager in pkg/di/application.go
+- [x] T058 Integrate DI system into main.go for operator startup
+- [x] T059 [P] Migrate operator services to DI pattern in pkg/operator/operator.go
+- [x] T060 [P] Create consolidated configuration loader in pkg/config/loader.go
+- [x] T061 [P] Implement structured logging system using Go slog in pkg/logging/logger.go
+
+### DI Testing and Validation
+- [x] T062 [P] Unit tests for DI container functionality in pkg/di/application_test.go
+- [x] T063 [P] Integration tests for service registration and resolution
+- [x] T064 [P] Performance tests for DI container overhead and memory usage
+- [x] T065 Validate all services properly injected and configured
+
+## Phase 5: Configuration Consolidation ✅ COMPLETE  
+*This phase emerged to unify configuration management and improve operational experience*
+
+### Consolidated Configuration System
+- [x] T066 [P] Create unified SpotalisConfig structure in pkg/config/consolidated.go
+- [x] T067 [P] Implement environment variable override system with SPOTALIS_ prefix
+- [x] T068 [P] Create configuration validation and default value system
+- [x] T069 [P] Update all services to use consolidated configuration
+- [x] T070 [P] Create example configuration files for different environments
+
+### Configuration Testing and Documentation
+- [x] T071 [P] Unit tests for configuration loading and validation
+- [x] T072 [P] Integration tests for environment variable overrides
+- [x] T073 [P] Update documentation with configuration examples and migration guide
+- [x] T074 [P] Validate configuration works in all deployment scenarios
 
 ## Dependencies
 
@@ -129,6 +179,8 @@ Single project with Karpenter architecture pattern:
 - **Models Before Services**: T017-T023 before T024-T029
 - **Services Before Integration**: T024-T034 before T035-T043
 - **Core Before Polish**: T035-T043 before T044-T054
+- **Polish Before DI Migration**: T044-T054 before T055-T065 (DI migration required working system)
+- **DI Before Configuration**: T055-T065 before T066-T074 (consolidated config built on DI foundation)
 
 ### File-Level Dependencies (Same File = Sequential)
 - T030, T031, T032 (internal/server/) must be sequential
@@ -182,3 +234,8 @@ Task: "Integration test multi-tenant namespace filtering in tests/integration/na
 - ✓ Kubernetes integration complete (T035-T043)
 - ✓ Unit test coverage for critical logic (T044-T048)
 - ✓ Performance requirements validated (T049)
+- ✓ Dependency injection architecture implemented (T055-T065)
+- ✓ Consolidated configuration system completed (T066-T074)
+- ✓ All services migrated to DI pattern with proper testing
+- ✓ Environment variable overrides working with SPOTALIS_ prefix
+- ✓ Structured logging implemented using Go slog with JSON output

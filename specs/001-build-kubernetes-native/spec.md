@@ -34,16 +34,18 @@ As a Kubernetes platform operator, I need an automated system that ensures criti
 - **FR-005**: System MUST support leader election to enable multiple concurrent instances with only one active controller
 - **FR-006**: System MUST provide health check endpoints for monitoring system status
 - **FR-007**: System MUST be stateless and use Kubernetes API as the source of truth for all state information
-- **FR-008**: System MUST support configuration via YAML file with environment variable overrides
-- **FR-009**: System MUST operate in a controller loop pattern for continuous monitoring
+- **FR-008**: System MUST support configuration via consolidated YAML file with environment variable overrides using `SPOTALIS_` prefix
+- **FR-009**: System MUST operate in a controller loop pattern for continuous monitoring with configurable intervals
 - **FR-010**: System MUST be able to delete and reschedule pods to maintain target replica distribution
-- **FR-011**: System MUST distinguish between spot and on-demand nodes through node labels or taints, labels MUST be configurable, with default being labels used by Karpeneter. 
-- **FR-012**: System MUST handle only workloads that have `enabled` annotation set to true. 
+- **FR-011**: System MUST distinguish between spot and on-demand nodes through node labels or taints, labels MUST be configurable, with default being labels used by Karpenter
+- **FR-012**: System MUST handle only workloads that have `enabled` annotation set to true
 - **FR-013**: System MUST define annotation schema for workload configuration, defined in [annotations.md](annotations.md)
-- **FR-014**: System MUST implement retry logic for failed operations. Retries shall happen idefiniately with adequate log records. 
-- **FR-015**: System MUST provide logging and metrics for operational observability, log level MUST cover debug,info,warn and error.
+- **FR-014**: System MUST implement retry logic for failed operations with exponential backoff and adequate log records
+- **FR-015**: System MUST provide structured logging using Go slog with JSON output and metrics collection for operational observability
 - **FR-016**: System MUST support optional namespace filtering through namespaceSelector configuration to accommodate multi-tenant clusters and limit scope of monitoring
-- **FR-017**: System MUST allow configurable controller loop intervals to prevent API server overload, with sensible defaults (e.g., 30s) and minimum limits (e.g., 5s) 
+- **FR-017**: System MUST allow configurable controller loop intervals to prevent API server overload, with sensible defaults (e.g., 30s) and minimum limits (e.g., 5s)
+- **FR-018**: System MUST use dependency injection pattern for service lifecycle management and testability
+- **FR-019**: System MUST follow single binary architecture integrating controller, webhook, and HTTP servers in unified operator following Karpenter pattern 
   
 ### Key Entities
 - **Workload Configuration**: Annotation-based policy defining replica distribution preferences, node type requirements, and rescheduling behavior
@@ -58,8 +60,10 @@ As a Kubernetes platform operator, I need an automated system that ensures criti
 - **Kubernetes Cluster**: Version 1.26+ with admission controller support
 - **Node Labeling**: Nodes labeled with spot/on-demand identifiers (default: Karpenter labels)
 - **RBAC**: ServiceAccount with permissions for deployments, pods, nodes, events, leases
-- **WebhookConfiguration**: MutatingWebhookConfiguration created externally. 
+- **WebhookConfiguration**: MutatingWebhookConfiguration created externally
 - **Network**: Webhook endpoint accessible from API server
+- **Go Runtime**: Go 1.21+ for structured logging (slog) support
+- **Uber Dig**: Dependency injection framework v1.19.0+ for service lifecycle management
 
 ### Assumptions  
 - Spot nodes may terminate with minimal notice

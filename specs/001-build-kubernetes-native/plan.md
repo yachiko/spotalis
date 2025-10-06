@@ -33,7 +33,7 @@ Kubernetes-native application that monitors Deployments and StatefulSets to ensu
 
 ## Technical Context
 **Language/Version**: Go 1.21+  
-**Primary Dependencies**: k8s.io/client-go, k8s.io/controller-runtime, github.com/gin-gonic/gin, github.com/onsi/ginkgo/v2  
+**Primary Dependencies**: k8s.io/client-go, k8s.io/controller-runtime, github.com/gin-gonic/gin, github.com/onsi/ginkgo/v2, go.uber.org/dig v1.19.0  
 **Storage**: Kubernetes API server (stateless application)  
 **Testing**: Ginkgo + Gomega for BDD testing, Kind cluster for integration testing  
 **Target Platform**: Kubernetes cluster (containerized application)
@@ -42,7 +42,7 @@ Kubernetes-native application that monitors Deployments and StatefulSets to ensu
 **Constraints**: Stateless operation, leader election coordination, webhook latency <200ms  
 **Scale/Scope**: Multi-tenant cluster support, 10k+ pods, HA deployment with 3 replicas
 
-**Technical Details**: Single binary controller following Karpenter architecture. Uses pkg/operator pattern with integrated webhook, Gin for HTTP endpoints, slog for logging, Ginkgo for testing. Controller manager handles all registrations. Development via `make run` command. Kind cluster for integration testing. Configurable namespace filtering for multi-tenant clusters. Adjustable controller loop intervals (default 30s, min 5s) to prevent API server overload.
+**Technical Details**: Single binary controller following Karpenter architecture with **Uber Dig v1.19.0 dependency injection system**. Uses pkg/operator pattern with integrated webhook, Gin for HTTP endpoints, Go slog for structured JSON logging, Ginkgo for BDD testing. All services managed through DI container with consolidated YAML configuration supporting environment variable overrides. Controller manager handles all registrations. Development via `make run` command. Kind cluster for integration testing. Configurable namespace filtering for multi-tenant clusters. Adjustable controller loop intervals (default 30s, min 5s) to prevent API server overload.
 
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
@@ -102,15 +102,19 @@ cmd/
     └── main.go         # Controller + webhook + HTTP server
 
 pkg/
-├── operator/           # Operator setup and management
-├── controllers/        # All controller logic
+├── di/                # Dependency injection system (Uber Dig)
+├── config/            # Consolidated configuration structures
+├── logging/           # Structured logging (Go slog)
+├── operator/          # Operator setup and management
+├── controllers/       # All controller logic
 ├── webhook/           # Webhook handlers (integrated with operator)
 ├── metrics/           # Observability and metrics
 ├── apis/              # API types and schemas
+├── interfaces/        # Service interfaces
 └── utils/             # Shared utilities
 
 internal/
-├── config/            # Configuration management
+├── config/            # Configuration loading and validation
 ├── annotations/       # Annotation parsing and validation
 └── server/            # HTTP server helpers
 
