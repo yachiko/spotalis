@@ -69,7 +69,7 @@ func NewControllerLogger(ctx context.Context, controllerName string, req ctrl.Re
 // WithWorkload adds workload-specific fields to the logger
 func (cl *ControllerLogger) WithWorkload(workloadType string, replicas int32) *ControllerLogger {
 	return &ControllerLogger{
-		Logger: cl.Logger.WithValues(
+		Logger: cl.WithValues(
 			"workload_type", workloadType,
 			"replicas", replicas,
 		),
@@ -80,7 +80,7 @@ func (cl *ControllerLogger) WithWorkload(workloadType string, replicas int32) *C
 // WithPhase adds reconciliation phase information
 func (cl *ControllerLogger) WithPhase(phase string) *ControllerLogger {
 	return &ControllerLogger{
-		Logger:  cl.Logger.WithValues("phase", phase),
+		Logger:  cl.WithValues("phase", phase),
 		Context: cl.Context,
 	}
 }
@@ -88,7 +88,7 @@ func (cl *ControllerLogger) WithPhase(phase string) *ControllerLogger {
 // WithReplicaState adds replica state information to the logger
 func (cl *ControllerLogger) WithReplicaState(spotReplicas, onDemandReplicas int32) *ControllerLogger {
 	return &ControllerLogger{
-		Logger: cl.Logger.WithValues(
+		Logger: cl.WithValues(
 			"spot_replicas", spotReplicas,
 			"on_demand_replicas", onDemandReplicas,
 		),
@@ -99,7 +99,7 @@ func (cl *ControllerLogger) WithReplicaState(spotReplicas, onDemandReplicas int3
 // WithDuration adds timing information to log entries
 func (cl *ControllerLogger) WithDuration(duration time.Duration) *ControllerLogger {
 	return &ControllerLogger{
-		Logger: cl.Logger.WithValues(
+		Logger: cl.WithValues(
 			"duration_ms", duration.Milliseconds(),
 		),
 		Context: cl.Context,
@@ -109,7 +109,7 @@ func (cl *ControllerLogger) WithDuration(duration time.Duration) *ControllerLogg
 // WithError adds error context while preserving the error for controller-runtime
 func (cl *ControllerLogger) WithError(err error) *ControllerLogger {
 	return &ControllerLogger{
-		Logger: cl.Logger.WithValues(
+		Logger: cl.WithValues(
 			"error_type", fmt.Sprintf("%T", err),
 		),
 		Context: cl.Context,
@@ -118,12 +118,12 @@ func (cl *ControllerLogger) WithError(err error) *ControllerLogger {
 
 // ReconcileStarted logs the start of reconciliation with standard fields
 func (cl *ControllerLogger) ReconcileStarted(msg string) {
-	cl.Logger.Info(msg, "event", "reconcile_started")
+	cl.Info(msg, "event", "reconcile_started")
 }
 
 // ReconcileCompleted logs successful reconciliation completion
 func (cl *ControllerLogger) ReconcileCompleted(msg string, requeue bool, requeueAfter time.Duration) {
-	logger := cl.Logger.WithValues(
+	logger := cl.WithValues(
 		"event", "reconcile_completed",
 		"requeue", requeue,
 	)
@@ -137,14 +137,14 @@ func (cl *ControllerLogger) ReconcileCompleted(msg string, requeue bool, requeue
 
 // ReconcileFailed logs failed reconciliation
 func (cl *ControllerLogger) ReconcileFailed(err error, msg string) {
-	cl.Logger.Error(err, msg,
+	cl.Error(err, msg,
 		"event", "reconcile_failed",
 	)
 }
 
 // WorkloadProcessed logs when a workload has been processed
 func (cl *ControllerLogger) WorkloadProcessed(msg string, rebalanced bool, podsDeleted int) {
-	cl.Logger.Info(msg,
+	cl.Info(msg,
 		"event", "workload_processed",
 		"rebalanced", rebalanced,
 		"pods_deleted", podsDeleted,
@@ -153,7 +153,7 @@ func (cl *ControllerLogger) WorkloadProcessed(msg string, rebalanced bool, podsD
 
 // RebalancePerformed logs when rebalancing has been performed
 func (cl *ControllerLogger) RebalancePerformed(msg string, deletedCount int, targetSpot, targetOnDemand int32) {
-	cl.Logger.Info(msg,
+	cl.Info(msg,
 		"event", "rebalance_performed",
 		"pods_deleted", deletedCount,
 		"target_spot_replicas", targetSpot,
@@ -163,7 +163,7 @@ func (cl *ControllerLogger) RebalancePerformed(msg string, deletedCount int, tar
 
 // NamespaceCheck logs namespace permission check results
 func (cl *ControllerLogger) NamespaceCheck(allowed bool, reason, rule string) {
-	logger := cl.Logger.WithValues(
+	logger := cl.WithValues(
 		"event", "namespace_check",
 		"allowed", allowed,
 	)
@@ -184,7 +184,7 @@ func (cl *ControllerLogger) NamespaceCheck(allowed bool, reason, rule string) {
 
 // AnnotationCheck logs annotation parsing results
 func (cl *ControllerLogger) AnnotationCheck(enabled bool, spotPercentage int) {
-	cl.Logger.Info("Checked Spotalis annotations",
+	cl.Info("Checked Spotalis annotations",
 		"event", "annotation_check",
 		"spotalis_enabled", enabled,
 		"spot_percentage", spotPercentage,

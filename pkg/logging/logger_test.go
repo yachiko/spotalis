@@ -20,8 +20,8 @@ func TestDefaultConfig(t *testing.T) {
 func TestNewLogger(t *testing.T) {
 	tests := []struct {
 		name   string
-		config *LoggingConfig
-		want   *LoggingConfig
+		config *Config
+		want   *Config
 	}{
 		{
 			name:   "nil config uses defaults",
@@ -30,14 +30,14 @@ func TestNewLogger(t *testing.T) {
 		},
 		{
 			name: "json format configuration",
-			config: &LoggingConfig{
+			config: &Config{
 				Level:       "debug",
 				Format:      "json",
 				Output:      "stdout",
 				AddCaller:   true,
 				Development: false,
 			},
-			want: &LoggingConfig{
+			want: &Config{
 				Level:       "debug",
 				Format:      "json",
 				Output:      "stdout",
@@ -47,14 +47,14 @@ func TestNewLogger(t *testing.T) {
 		},
 		{
 			name: "console format configuration",
-			config: &LoggingConfig{
+			config: &Config{
 				Level:       "warn",
 				Format:      "console",
 				Output:      "stderr",
 				AddCaller:   false,
 				Development: true,
 			},
-			want: &LoggingConfig{
+			want: &Config{
 				Level:       "warn",
 				Format:      "console",
 				Output:      "stderr",
@@ -100,7 +100,7 @@ func TestParseLogLevel(t *testing.T) {
 }
 
 func TestLoggerWithMethods(t *testing.T) {
-	config := &LoggingConfig{
+	config := &Config{
 		Level:       "info",
 		Format:      "json",
 		Output:      "stdout",
@@ -152,11 +152,11 @@ func TestGetLoggerFromEnv(t *testing.T) {
 func TestBuildZapConfig(t *testing.T) {
 	tests := []struct {
 		name   string
-		config *LoggingConfig
+		config *Config
 	}{
 		{
 			name: "json format",
-			config: &LoggingConfig{
+			config: &Config{
 				Level:       "debug",
 				Format:      "json",
 				Output:      "stdout",
@@ -166,7 +166,7 @@ func TestBuildZapConfig(t *testing.T) {
 		},
 		{
 			name: "console format",
-			config: &LoggingConfig{
+			config: &Config{
 				Level:       "info",
 				Format:      "console",
 				Output:      "stderr",

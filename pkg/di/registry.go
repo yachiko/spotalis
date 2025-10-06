@@ -85,7 +85,7 @@ func (r *ServiceRegistry) RegisterLogger() error {
 	// Register logger with configuration dependency
 	r.container.MustProvide(func(config *config.SpotalisConfig) (*logging.Logger, error) {
 		// Convert config logging settings to logger config
-		logConfig := &logging.LoggingConfig{
+		logConfig := &logging.Config{
 			Level:       config.Observability.Logging.Level,
 			Format:      config.Observability.Logging.Format,
 			Output:      config.Observability.Logging.Output,

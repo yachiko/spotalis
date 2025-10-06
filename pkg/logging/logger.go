@@ -13,8 +13,8 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-// LoggingConfig defines the logging configuration
-type LoggingConfig struct {
+// Config defines the logging configuration
+type Config struct {
 	// Level is the log level (debug, info, warn, error)
 	Level string `yaml:"level" json:"level"`
 
@@ -34,12 +34,12 @@ type LoggingConfig struct {
 // Logger wraps the controller-runtime logger with additional functionality
 type Logger struct {
 	logr.Logger
-	config *LoggingConfig
+	config *Config
 }
 
 // DefaultConfig returns default logging configuration
-func DefaultConfig() *LoggingConfig {
-	return &LoggingConfig{
+func DefaultConfig() *Config {
+	return &Config{
 		Level:       "info", // Default to info level for general logging
 		Format:      "json",
 		Output:      "stdout",
@@ -49,8 +49,8 @@ func DefaultConfig() *LoggingConfig {
 }
 
 // DefaultDebugConfig returns logging configuration optimized for debug mode
-func DefaultDebugConfig() *LoggingConfig {
-	return &LoggingConfig{
+func DefaultDebugConfig() *Config {
+	return &Config{
 		Level:       "debug",
 		Format:      "json",
 		Output:      "stdout",
@@ -60,7 +60,7 @@ func DefaultDebugConfig() *LoggingConfig {
 }
 
 // NewLogger creates a new structured logger based on the provided configuration
-func NewLogger(config *LoggingConfig) (*Logger, error) {
+func NewLogger(config *Config) (*Logger, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -100,7 +100,7 @@ func NewLogger(config *LoggingConfig) (*Logger, error) {
 }
 
 // buildZapConfig creates a zap configuration based on logging config
-func buildZapConfig(config *LoggingConfig) zap.Config {
+func buildZapConfig(config *Config) zap.Config {
 	var zapConfig zap.Config
 
 	if config.Format == "json" {
@@ -234,7 +234,7 @@ func (l *Logger) WithWebhook(operation, namespace, name, kind string) *Logger {
 }
 
 // GetConfig returns the logging configuration
-func (l *Logger) GetConfig() *LoggingConfig {
+func (l *Logger) GetConfig() *Config {
 	return l.config
 }
 
@@ -255,7 +255,7 @@ func SetGlobalLogger(logger *Logger) error {
 
 // GetLoggerFromEnv creates a logger from environment variables
 func GetLoggerFromEnv() (*Logger, error) {
-	config := &LoggingConfig{
+	config := &Config{
 		Level:       getEnvOrDefault("SPOTALIS_LOG_LEVEL", "info"),
 		Format:      getEnvOrDefault("SPOTALIS_LOG_FORMAT", "json"),
 		Output:      getEnvOrDefault("SPOTALIS_LOG_OUTPUT", "stdout"),

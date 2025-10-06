@@ -321,7 +321,6 @@ func (r *StatefulSetReconciler) performPodRebalancing(ctx context.Context, state
 
 // categorizePodsByNodeType gets all pods for a StatefulSet and categorizes them by node type
 func (r *StatefulSetReconciler) categorizePodsByNodeType(ctx context.Context, statefulSet *appsv1.StatefulSet) (spotPods, onDemandPods []corev1.Pod, err error) {
-
 	// Get all pods for this StatefulSet
 	podList := &corev1.PodList{}
 	selector, err := statefulSetLabelSelector(statefulSet)

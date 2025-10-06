@@ -227,7 +227,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // isDeploymentStableAndReady checks if deployment is in a stable state for rebalancing
-func (r *DeploymentReconciler) isDeploymentStableAndReady(ctx context.Context, deployment *appsv1.Deployment) bool {
+func (r *DeploymentReconciler) isDeploymentStableAndReady(_ context.Context, deployment *appsv1.Deployment) bool {
 	// Don't rebalance if deployment doesn't have desired replica count set
 	if deployment.Spec.Replicas == nil {
 		return false
@@ -352,7 +352,6 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 
 // categorizeDeploymentPods retrieves and categorizes all pods for a deployment by node type
 func (r *DeploymentReconciler) categorizeDeploymentPods(ctx context.Context, deployment *appsv1.Deployment) ([]corev1.Pod, []corev1.Pod, error) {
-
 	// Get all pods for this deployment
 	podList := &corev1.PodList{}
 	selector, err := deploymentLabelSelector(deployment)
