@@ -47,9 +47,12 @@ var _ = Describe("HealthChecker", func() {
 		mgr           manager.Manager
 		namespace     string
 		engine        *gin.Engine
+		ctx           context.Context
+		cancel        context.CancelFunc
 	)
 
 	BeforeEach(func() {
+		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 		namespace = "spotalis-system"
 		fakeClient = fake.NewSimpleClientset()
 
@@ -58,6 +61,12 @@ var _ = Describe("HealthChecker", func() {
 
 		healthChecker = NewHealthChecker(mgr, fakeClient, namespace)
 		engine = createTestEngine()
+	})
+
+	AfterEach(func() {
+		if cancel != nil {
+			cancel()
+		}
 	})
 
 	Describe("NewHealthChecker", func() {
@@ -137,7 +146,7 @@ var _ = Describe("HealthChecker", func() {
 						Name: namespace,
 					},
 				}
-				_, err := fakeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+				_, err := fakeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -220,7 +229,7 @@ var _ = Describe("HealthChecker", func() {
 						Name: namespace,
 					},
 				}
-				_, err := fakeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+				_, err := fakeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				engine.GET("/readyz", healthChecker.ReadyzHandler)
@@ -253,7 +262,7 @@ var _ = Describe("HealthChecker", func() {
 						Name: namespace,
 					},
 				}
-				_, err := fakeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+				_, err := fakeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				engine.GET("/healthz", healthChecker.HealthzHandler)
@@ -295,10 +304,10 @@ var _ = Describe("HealthChecker", func() {
 						Name: "test-namespace",
 					},
 				}
-				_, err := fakeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+				_, err := fakeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
-				err = healthChecker.checkKubernetesAPI(context.TODO())
+				err = healthChecker.checkKubernetesAPI(ctx)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -311,15 +320,15 @@ var _ = Describe("HealthChecker", func() {
 						Name: namespace,
 					},
 				}
-				_, err := fakeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+				_, err := fakeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
-				err = healthChecker.checkNamespaceAccess(context.TODO())
+				err = healthChecker.checkNamespaceAccess(ctx)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should fail when namespace does not exist", func() {
-				err := healthChecker.checkNamespaceAccess(context.TODO())
+				err := healthChecker.checkNamespaceAccess(ctx)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("not found"))
 			})
@@ -353,7 +362,7 @@ var _ = Describe("HealthChecker", func() {
 					Name: namespace,
 				},
 			}
-			_, err := fakeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			_, err := fakeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Clear states to ensure clean starting point
@@ -384,14 +393,23 @@ var _ = Describe("HealthHandler", func() {
 		healthChecker *HealthChecker
 		fakeClient    *fake.Clientset
 		engine        *gin.Engine
+		ctx           context.Context
+		cancel        context.CancelFunc
 	)
 
 	BeforeEach(func() {
+		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 		fakeClient = fake.NewSimpleClientset()
 		healthChecker = NewHealthChecker(nil, fakeClient, "test-namespace")
 		healthHandler = NewHealthHandler()
 		healthHandler.SetChecker(healthChecker)
 		engine = createTestEngine()
+	})
+
+	AfterEach(func() {
+		if cancel != nil {
+			cancel()
+		}
 	})
 
 	Describe("Healthz", func() {
@@ -422,7 +440,7 @@ var _ = Describe("HealthHandler", func() {
 					Name: "test-namespace",
 				},
 			}
-			_, err := fakeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			_, err := fakeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Clear states to ensure clean starting point
