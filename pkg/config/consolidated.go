@@ -4,6 +4,8 @@ package config
 import (
 	"fmt"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 // SpotalisConfig is the root configuration structure for the entire Spotalis operator
@@ -31,6 +33,44 @@ type OperatorConfig struct {
 
 	// LeaderElection configuration
 	LeaderElection LeaderElectionConfig `yaml:"leaderElection" json:"leaderElection"`
+
+	// DisruptionWindow defines when pod disruptions (rebalancing) are allowed
+	DisruptionWindow DisruptionWindowConfig `yaml:"disruptionWindow" json:"disruptionWindow"`
+}
+
+// DisruptionWindowConfig defines time windows when pod disruptions are allowed
+type DisruptionWindowConfig struct {
+	// Schedule is a 5-field cron expression in UTC (e.g., "0 2 * * *" for daily at 2 AM)
+	Schedule string `yaml:"schedule" json:"schedule"`
+
+	// Duration is how long the window lasts (e.g., "4h", "30m", "2h30m")
+	Duration string `yaml:"duration" json:"duration"`
+}
+
+// Validate validates the disruption window configuration
+func (c *DisruptionWindowConfig) Validate() error {
+	// Empty schedule and duration means no window configured (always allowed)
+	if c.Schedule == "" && c.Duration == "" {
+		return nil
+	}
+
+	// Both must be present or both absent
+	if c.Schedule == "" || c.Duration == "" {
+		return fmt.Errorf("both schedule and duration must be specified together")
+	}
+
+	// Validate cron expression
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	if _, err := parser.Parse(c.Schedule); err != nil {
+		return fmt.Errorf("invalid cron schedule %q: %w", c.Schedule, err)
+	}
+
+	// Validate duration
+	if _, err := time.ParseDuration(c.Duration); err != nil {
+		return fmt.Errorf("invalid duration %q: %w", c.Duration, err)
+	}
+
+	return nil
 }
 
 // LeaderElectionConfig contains leader election configuration
@@ -167,6 +207,11 @@ func (c *SpotalisConfig) Validate() error {
 
 	if c.Webhook.Enabled && c.Webhook.Port <= 0 {
 		return fmt.Errorf("webhook.port must be positive when webhook is enabled")
+	}
+
+	// Validate disruption window configuration
+	if err := c.Operator.DisruptionWindow.Validate(); err != nil {
+		return fmt.Errorf("operator.disruptionWindow: %w", err)
 	}
 
 	return nil

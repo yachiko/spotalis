@@ -8,6 +8,13 @@ operator:
     id: "spotalis-controller-leader"
     namespace: "spotalis-system"
   readOnlyMode: false
+  
+  # Global disruption window (optional)
+  # Defines when pod disruptions (rebalancing) are allowed
+  # Can be overridden at namespace or workload level using annotations
+  disruptionWindow:
+    schedule: "0 2 * * *"  # Daily at 2 AM UTC (5-field cron expression)
+    duration: "4h"         # 4-hour window (2 AM - 6 AM UTC)
 
 controllers:
   reconcileInterval: "30s"  # Faster reconciliation for development

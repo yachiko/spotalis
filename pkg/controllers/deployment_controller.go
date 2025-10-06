@@ -12,6 +12,7 @@ import (
 	"github.com/ahoma/spotalis/internal/annotations"
 	"github.com/ahoma/spotalis/internal/config"
 	"github.com/ahoma/spotalis/pkg/apis"
+	pkgconfig "github.com/ahoma/spotalis/pkg/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +41,8 @@ type DeploymentReconciler struct {
 	NamespaceFilter     *NamespaceFilter // Filter for namespace-level permissions
 	ReconcileInterval   time.Duration
 	MaxConcurrentRecons int
-	MetricsCollector    MetricsRecorder // Interface for recording metrics
+	MetricsCollector    MetricsRecorder           // Interface for recording metrics
+	Config              *pkgconfig.SpotalisConfig // Global configuration
 
 	// Track last pod deletion time per deployment to implement cooldown
 	lastDeletionTimes sync.Map // map[string]time.Time
@@ -249,6 +251,30 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	needsRebalancing := r.needsRebalancing(replicaState)
 
 	if needsRebalancing {
+		// Check disruption window before performing rebalancing
+		disruptionWindow, err := r.resolveDisruptionWindow(ctx, &deployment)
+		if err != nil {
+			r.errorCount.Add(1)
+			r.setLastError(&ControllerError{
+				Error:     err,
+				Timestamp: time.Now(),
+				Request:   req.NamespacedName,
+				Recovered: false,
+			})
+			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to resolve disruption window")
+			return ctrl.Result{RequeueAfter: time.Minute}, nil // Retry after 1 minute
+		}
+
+		// Check if we're within the disruption window
+		if disruptionWindow != nil && !disruptionWindow.IsWithinWindow(time.Now().UTC()) {
+			nextWindow := disruptionWindow.Schedule.Next(time.Now().UTC())
+			log.FromContext(ctx).WithValues(
+				"deployment", req.NamespacedName,
+				"nextWindow", nextWindow,
+			).Info("Outside disruption window, skipping rebalancing")
+			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil // Check again in 10 minutes
+		}
+
 		log.FromContext(ctx).WithValues(
 			"deployment", req.NamespacedName,
 			"currentSpot", replicaState.CurrentSpot,
@@ -372,6 +398,68 @@ func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context,
 		CurrentOnDemand: onDemandReplicas,
 		LastReconciled:  time.Now(),
 	}, nil
+}
+
+// resolveDisruptionWindow resolves the disruption window from the configuration hierarchy:
+// 1. Workload-level annotations (highest priority)
+// 2. Namespace-level annotations
+// 3. Global configuration
+// 4. No window (always allowed)
+func (r *DeploymentReconciler) resolveDisruptionWindow(
+	ctx context.Context,
+	deployment *appsv1.Deployment,
+) (*annotations.DisruptionWindow, error) {
+	logger := log.FromContext(ctx).WithValues(
+		"deployment", deployment.Name,
+		"namespace", deployment.Namespace,
+	)
+
+	// Priority 1: Workload-level annotations
+	if window, err := annotations.ParseDisruptionWindow(deployment.Annotations); err != nil {
+		logger.Error(err, "Invalid disruption window annotations on Deployment")
+		return nil, err
+	} else if window != nil {
+		logger.V(1).Info("Using Deployment-level disruption window",
+			"schedule", deployment.Annotations[annotations.DisruptionScheduleAnnotation],
+			"duration", deployment.Annotations[annotations.DisruptionDurationAnnotation])
+		return window, nil
+	}
+
+	// Priority 2: Namespace-level annotations (using labels)
+	ns := &corev1.Namespace{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deployment.Namespace}, ns); err != nil {
+		return nil, fmt.Errorf("getting namespace: %w", err)
+	}
+
+	if window, err := annotations.ParseDisruptionWindow(ns.Labels); err != nil {
+		logger.Error(err, "Invalid disruption window labels on Namespace")
+		return nil, err
+	} else if window != nil {
+		logger.V(1).Info("Using Namespace-level disruption window",
+			"schedule", ns.Labels[annotations.DisruptionScheduleAnnotation],
+			"duration", ns.Labels[annotations.DisruptionDurationAnnotation])
+		return window, nil
+	}
+
+	// Priority 3: Global configuration
+	if r.Config != nil && r.Config.Operator.DisruptionWindow.Schedule != "" {
+		window, err := annotations.ParseDisruptionWindow(map[string]string{
+			annotations.DisruptionScheduleAnnotation: r.Config.Operator.DisruptionWindow.Schedule,
+			annotations.DisruptionDurationAnnotation: r.Config.Operator.DisruptionWindow.Duration,
+		})
+		if err != nil {
+			// Should never happen - validated at startup
+			return nil, fmt.Errorf("invalid global disruption window: %w", err)
+		}
+		logger.V(1).Info("Using global disruption window",
+			"schedule", r.Config.Operator.DisruptionWindow.Schedule,
+			"duration", r.Config.Operator.DisruptionWindow.Duration)
+		return window, nil
+	}
+
+	// No window configured = always allowed
+	logger.V(2).Info("No disruption window configured, disruptions always allowed")
+	return nil, nil
 }
 
 // needsRebalancing checks if pod rebalancing is needed based on target distribution

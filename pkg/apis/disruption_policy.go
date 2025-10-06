@@ -50,23 +50,10 @@ type DisruptionPolicy struct {
 	// LastChecked is when the policy was last evaluated
 	LastChecked time.Time `json:"lastChecked"`
 
-	// DisruptionWindow defines when disruptions are allowed
-	DisruptionWindow *DisruptionWindow `json:"disruptionWindow,omitempty"`
-}
-
-// DisruptionWindow defines time-based constraints for when disruptions can occur
-type DisruptionWindow struct {
-	// StartTime is when disruptions are allowed to begin (RFC3339 format)
-	StartTime string `json:"startTime,omitempty"`
-
-	// EndTime is when disruptions must stop (RFC3339 format)
-	EndTime string `json:"endTime,omitempty"`
-
-	// Timezone for the window (default UTC)
-	Timezone string `json:"timezone,omitempty"`
-
-	// Days of week when disruptions are allowed (0=Sunday, 6=Saturday)
-	DaysOfWeek []int `json:"daysOfWeek,omitempty"`
+	// DisruptionWindow defines when disruptions are allowed (from annotations)
+	// This is intentionally an interface{} to avoid import cycles
+	// Controllers set this to *annotations.DisruptionWindow
+	DisruptionWindow interface{} `json:"disruptionWindow,omitempty"`
 }
 
 // NewDisruptionPolicy creates a new disruption policy from a PDB
@@ -158,30 +145,27 @@ func (d *DisruptionPolicy) resolveIntOrString(val *intstr.IntOrString, totalRepl
 // isWithinDisruptionWindow checks if current time is within allowed disruption window
 func (d *DisruptionPolicy) isWithinDisruptionWindow() bool {
 	if d.DisruptionWindow == nil {
-		return true // No time constraints
+		return true // No time constraints = always allowed
 	}
 
-	now := time.Now()
-
-	// Check day of week constraints
-	if len(d.DisruptionWindow.DaysOfWeek) > 0 {
-		currentDay := int(now.Weekday())
-		allowed := false
-		for _, day := range d.DisruptionWindow.DaysOfWeek {
-			if day == currentDay {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return false
-		}
+	// Type assert to the window checker interface
+	// Controllers will set this to *annotations.DisruptionWindow which has IsWithinWindow(time.Time) bool
+	type WindowChecker interface {
+		IsWithinWindow(time.Time) bool
 	}
 
-	// TODO: Implement start/end time checking with timezone support
-	// This would require parsing RFC3339 times and timezone handling
+	if checker, ok := d.DisruptionWindow.(WindowChecker); ok {
+		return checker.IsWithinWindow(time.Now())
+	}
 
+	// If type assertion fails, allow disruption (backward compatibility)
 	return true
+}
+
+// IsWithinDisruptionWindow is a public method for checking disruption window
+// This method is used by controllers to check if current time is within the window
+func (d *DisruptionPolicy) IsWithinDisruptionWindow() bool {
+	return d.isWithinDisruptionWindow()
 }
 
 // RecordDisruption updates the count of currently disrupted pods

@@ -37,6 +37,12 @@ const (
 	// MinOnDemandAnnotation configures minimum number of on-demand replicas
 	MinOnDemandAnnotation = "spotalis.io/min-on-demand"
 
+	// DisruptionScheduleAnnotation defines when disruptions are allowed (cron format, UTC)
+	DisruptionScheduleAnnotation = "spotalis.io/disruption-schedule"
+
+	// DisruptionDurationAnnotation defines how long the disruption window lasts
+	DisruptionDurationAnnotation = "spotalis.io/disruption-duration"
+
 	// BooleanTrue represents the string "true" for annotation values
 	BooleanTrue = "true"
 
