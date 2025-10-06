@@ -23,6 +23,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// ControllerError represents a detailed error that occurred during reconciliation
+type ControllerError struct {
+	Error     error
+	Timestamp time.Time
+	Request   types.NamespacedName
+	Recovered bool
+}
+
 // DeploymentReconciler reconciles Deployment objects for spot/on-demand pod distribution management
 type DeploymentReconciler struct {
 	client.Client
@@ -40,6 +48,10 @@ type DeploymentReconciler struct {
 	// Metrics tracking
 	reconcileCount atomic.Int64
 	errorCount     atomic.Int64
+
+	// Error tracking
+	lastError     *ControllerError
+	lastErrorLock sync.RWMutex
 }
 
 // MetricsRecorder interface for recording workload metrics
@@ -83,6 +95,12 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, nil
 		}
 		r.errorCount.Add(1)
+		r.setLastError(&ControllerError{
+			Error:     err,
+			Timestamp: time.Now(),
+			Request:   req.NamespacedName,
+			Recovered: false,
+		})
 		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
@@ -110,6 +128,13 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log.FromContext(ctx).WithValues("deployment", req.NamespacedName, "namespace", deployment.Namespace).V(1).Info("Checking namespace permissions with namespace filter")
 		result, err := r.NamespaceFilter.IsNamespaceAllowed(ctx, deployment.Namespace)
 		if err != nil {
+			r.errorCount.Add(1)
+			r.setLastError(&ControllerError{
+				Error:     err,
+				Timestamp: time.Now(),
+				Request:   req.NamespacedName,
+				Recovered: false,
+			})
 			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to check namespace permissions")
 			return ctrl.Result{}, err
 		}
@@ -178,6 +203,13 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Parse the workload configuration from annotations
 	workloadConfig, err := r.AnnotationParser.ParseWorkloadConfiguration(&deployment)
 	if err != nil {
+		r.errorCount.Add(1)
+		r.setLastError(&ControllerError{
+			Error:     err,
+			Timestamp: time.Now(),
+			Request:   req.NamespacedName,
+			Recovered: false,
+		})
 		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to parse workload configuration")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
@@ -185,6 +217,13 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Get the current replica state
 	replicaState, err := r.calculateCurrentReplicaState(ctx, &deployment)
 	if err != nil {
+		r.errorCount.Add(1)
+		r.setLastError(&ControllerError{
+			Error:     err,
+			Timestamp: time.Now(),
+			Request:   req.NamespacedName,
+			Recovered: false,
+		})
 		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to calculate current replica state")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
@@ -219,15 +258,29 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		).Info("Rebalancing deployment pods")
 
 		if err := r.performPodRebalancing(ctx, &deployment, replicaState, deploymentKey); err != nil {
+			r.errorCount.Add(1)
+			r.setLastError(&ControllerError{
+				Error:     err,
+				Timestamp: time.Now(),
+				Request:   req.NamespacedName,
+				Recovered: false,
+			})
 			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to rebalance deployment pods")
 			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 		}
 
 		// After performing rebalancing, requeue sooner to check the results
 		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("Pod rebalancing initiated, will check status sooner")
+
+		// Mark as recovered since we successfully completed rebalancing
+		r.markRecovered()
+
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
 	}
 	log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("No pod rebalancing needed")
+
+	// Mark as recovered since reconcile completed successfully
+	r.markRecovered()
 
 	log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("Deployment reconciliation completed successfully")
 
@@ -503,4 +556,27 @@ func (r *DeploymentReconciler) GetReconcileCount() int64 {
 // GetErrorCount returns the total number of reconciliation errors
 func (r *DeploymentReconciler) GetErrorCount() int64 {
 	return r.errorCount.Load()
+}
+
+// setLastError records a controller error with timestamp and context
+func (r *DeploymentReconciler) setLastError(err *ControllerError) {
+	r.lastErrorLock.Lock()
+	defer r.lastErrorLock.Unlock()
+	r.lastError = err
+}
+
+// GetLastError returns the most recent controller error, if any
+func (r *DeploymentReconciler) GetLastError() *ControllerError {
+	r.lastErrorLock.RLock()
+	defer r.lastErrorLock.RUnlock()
+	return r.lastError
+}
+
+// markRecovered marks the last error as recovered if one existed
+func (r *DeploymentReconciler) markRecovered() {
+	r.lastErrorLock.Lock()
+	defer r.lastErrorLock.Unlock()
+	if r.lastError != nil && !r.lastError.Recovered {
+		r.lastError.Recovered = true
+	}
 }

@@ -160,22 +160,30 @@ func (cm *ControllerManager) GetControllerStatus() map[string]ControllerStatus {
 	status := make(map[string]ControllerStatus)
 
 	if cm.deploymentController != nil {
+		var lastError error
+		if errInfo := cm.deploymentController.GetLastError(); errInfo != nil {
+			lastError = errInfo.Error
+		}
 		status["deployment"] = ControllerStatus{
 			Name:       "deployment",
 			Enabled:    cm.config.EnableDeployments,
 			Registered: cm.controllersRegistered["deployment"],
 			Reconciles: cm.deploymentController.GetReconcileCount(),
-			LastError:  nil, // TODO: Implement error tracking
+			LastError:  lastError,
 		}
 	}
 
 	if cm.statefulSetController != nil {
+		var lastError error
+		if errInfo := cm.statefulSetController.GetLastError(); errInfo != nil {
+			lastError = errInfo.Error
+		}
 		status["statefulset"] = ControllerStatus{
 			Name:       "statefulset",
 			Enabled:    cm.config.EnableStatefulSets,
 			Registered: cm.controllersRegistered["statefulset"],
 			Reconciles: cm.statefulSetController.GetReconcileCount(),
-			LastError:  nil, // TODO: Implement error tracking
+			LastError:  lastError,
 		}
 	}
 
