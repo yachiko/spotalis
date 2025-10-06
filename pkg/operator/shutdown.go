@@ -286,21 +286,34 @@ func (sm *ShutdownManager) performForceShutdown() error {
 }
 
 // stopNewRequests stops accepting new HTTP requests
-func (sm *ShutdownManager) stopNewRequests(_ context.Context) error {
+func (sm *ShutdownManager) stopNewRequests(ctx context.Context) error {
+	setupLog := ctrl.Log.WithName("shutdown-manager")
 	sm.updateComponentState("http-server", ShutdownStateStarted)
 
-	// TODO: Implement graceful HTTP server shutdown
-	// This would typically involve:
-	// 1. Removing the service from load balancer
-	// 2. Stopping acceptance of new connections
-	// 3. Setting readiness probe to fail
+	// Set health checks to fail to signal unhealthy state
+	if sm.operator != nil && sm.operator.healthChecker != nil {
+		sm.operator.healthChecker.SetNotReady("shutting down")
+		setupLog.Info("Set readiness probe to fail - removing from load balancer")
+	}
+
+	// Give load balancers time to detect unhealthy state and stop routing traffic
+	// This ensures new requests are not sent to this instance
+	if sm.config.PreShutdownDelay > 0 {
+		setupLog.Info("Waiting for load balancers to detect unhealthy state", "delay", sm.config.PreShutdownDelay)
+		select {
+		case <-time.After(sm.config.PreShutdownDelay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 
 	sm.updateComponentState("http-server", ShutdownStateCompleted)
 	return nil
 }
 
 // transferLeadership transfers leadership to another instance
-func (sm *ShutdownManager) transferLeadership(_ context.Context) error {
+func (sm *ShutdownManager) transferLeadership(ctx context.Context) error {
+	setupLog := ctrl.Log.WithName("shutdown-manager")
 	sm.updateComponentState("leader-election", ShutdownStateStarted)
 
 	if sm.operator == nil {
@@ -308,14 +321,49 @@ func (sm *ShutdownManager) transferLeadership(_ context.Context) error {
 		return nil
 	}
 
-	// TODO: Implement leadership transfer
-	// This would typically involve:
-	// 1. Releasing the leader lease
-	// 2. Waiting for another instance to become leader
-	// 3. Verifying leadership transfer
+	// Check if we're currently the leader
+	if sm.operator.leaderElectionManager == nil || !sm.operator.leaderElectionManager.IsLeader() {
+		setupLog.Info("Not currently leader, no leadership transfer needed")
+		sm.updateComponentState("leader-election", ShutdownStateCompleted)
+		return nil
+	}
 
-	sm.updateComponentState("leader-election", ShutdownStateCompleted)
-	return nil
+	setupLog.Info("Initiating leadership transfer")
+
+	// Release leader election lease
+	if sm.operator.leaderElectionManager != nil {
+		if err := sm.operator.leaderElectionManager.Resign(); err != nil {
+			setupLog.Error(err, "Failed to resign from leadership")
+			// Continue anyway - not critical
+		} else {
+			setupLog.Info("Released leader election lease")
+		}
+	}
+
+	// Wait for new leader to be elected (with timeout)
+	timeout := time.After(15 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			setupLog.Info("Leadership transfer timeout - proceeding with shutdown")
+			sm.updateComponentState("leader-election", ShutdownStateCompleted)
+			return nil
+		case <-ticker.C:
+			// Check if we're still leader
+			if sm.operator.leaderElectionManager != nil && !sm.operator.leaderElectionManager.IsLeader() {
+				setupLog.Info("Leadership successfully transferred")
+				sm.updateComponentState("leader-election", ShutdownStateCompleted)
+				return nil
+			}
+		case <-ctx.Done():
+			setupLog.Info("Context cancelled during leadership transfer")
+			sm.updateComponentState("leader-election", ShutdownStateCompleted)
+			return ctx.Err()
+		}
+	}
 }
 
 // drainConnections drains existing HTTP connections
@@ -330,14 +378,39 @@ func (sm *ShutdownManager) drainConnections(_ context.Context) error {
 }
 
 // finishReconciliations waits for ongoing reconciliations to complete
-func (sm *ShutdownManager) finishReconciliations(_ context.Context) error {
+func (sm *ShutdownManager) finishReconciliations(ctx context.Context) error {
+	setupLog := ctrl.Log.WithName("shutdown-manager")
 	sm.updateComponentState("reconciliation", ShutdownStateStarted)
 
-	// TODO: Implement reconciliation finishing
-	// This would typically involve:
-	// 1. Stopping new reconciliation requests
-	// 2. Waiting for ongoing reconciliations to complete
-	// 3. Setting a timeout for maximum wait time
+	if sm.operator == nil {
+		sm.updateComponentState("reconciliation", ShutdownStateCompleted)
+		return nil
+	}
+
+	setupLog.Info("Waiting for in-flight reconciliations to complete")
+
+	// Since we don't have active reconciliation tracking yet, we'll wait a fixed time
+	// to allow most reconciliations to complete. This is a best-effort approach.
+	// TODO: Enhance with actual active reconciliation tracking (see Task improvements)
+	reconciliationWaitTime := 5 * time.Second
+	if sm.config.GracefulTimeout > 0 {
+		// Use a portion of the graceful timeout
+		reconciliationWaitTime = sm.config.GracefulTimeout / 3
+		if reconciliationWaitTime > 30*time.Second {
+			reconciliationWaitTime = 30 * time.Second
+		}
+	}
+
+	setupLog.Info("Allowing time for reconciliations to complete", "waitTime", reconciliationWaitTime)
+
+	select {
+	case <-time.After(reconciliationWaitTime):
+		setupLog.Info("Reconciliation wait period completed")
+	case <-ctx.Done():
+		setupLog.Info("Context cancelled during reconciliation wait")
+		sm.updateComponentState("reconciliation", ShutdownStateCompleted)
+		return ctx.Err()
+	}
 
 	sm.updateComponentState("reconciliation", ShutdownStateCompleted)
 	return nil
@@ -357,16 +430,52 @@ func (sm *ShutdownManager) stopControllers(_ context.Context) error {
 }
 
 // cleanupResources performs final resource cleanup
-func (sm *ShutdownManager) cleanupResources(_ context.Context) error {
+func (sm *ShutdownManager) cleanupResources(ctx context.Context) error {
+	setupLog := ctrl.Log.WithName("shutdown-manager")
 	sm.updateComponentState("cleanup", ShutdownStateStarted)
 
-	// TODO: Implement resource cleanup
-	// This would typically involve:
-	// 1. Cleaning up temporary files
-	// 2. Closing database connections
-	// 3. Releasing locks
-	// 4. Flushing logs
+	if sm.operator == nil {
+		sm.updateComponentState("cleanup", ShutdownStateCompleted)
+		return nil
+	}
 
+	setupLog.Info("Starting resource cleanup")
+
+	var cleanupErrors []error
+
+	// Flush metrics if metrics collector exists
+	if sm.operator.metricsCollector != nil {
+		setupLog.V(1).Info("Flushing metrics before shutdown")
+		// Metrics are automatically flushed when scraped, no explicit flush needed
+	}
+
+	// Clear health checker state
+	if sm.operator.healthChecker != nil {
+		sm.operator.healthChecker.SetUnhealthy("shutdown complete")
+		setupLog.V(1).Info("Set health checker to unhealthy state")
+	}
+
+	// Note: Kubernetes client connections are managed by controller-runtime
+	// and will be closed when the manager context is cancelled
+	setupLog.V(1).Info("Kubernetes client connections will be closed by manager shutdown")
+
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		setupLog.Info("Context cancelled during cleanup")
+		sm.updateComponentState("cleanup", ShutdownStateCompleted)
+		return ctx.Err()
+	default:
+	}
+
+	if len(cleanupErrors) > 0 {
+		err := fmt.Errorf("resource cleanup errors: %v", cleanupErrors)
+		setupLog.Error(err, "Resource cleanup completed with errors")
+		sm.updateComponentState("cleanup", ShutdownStateFailed)
+		return err
+	}
+
+	setupLog.Info("Resource cleanup completed successfully")
 	sm.updateComponentState("cleanup", ShutdownStateCompleted)
 	return nil
 }
