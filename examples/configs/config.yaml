@@ -22,6 +22,19 @@ controllers:
   rateLimit:
     qps: 100.0
     burst: 150
+  
+  # Node classifier configuration
+  # Defines how to identify spot vs on-demand nodes
+  nodeClassifier:
+    # Label selectors for spot nodes
+    spotLabels:
+      - matchLabels:
+          karpenter.sh/capacity-type: "spot"
+    
+    # Label selectors for on-demand nodes
+    onDemandLabels:
+      - matchLabels:
+          karpenter.sh/capacity-type: "on-demand"
 
 webhook:
   enabled: true

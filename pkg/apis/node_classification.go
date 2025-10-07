@@ -140,46 +140,20 @@ type DefaultNodeClassifier struct {
 	OnDemandLabels []metav1.LabelSelector `json:"onDemandLabels"`
 }
 
-// NewDefaultNodeClassifier creates a classifier with common cloud provider patterns
+// NewDefaultNodeClassifier creates a classifier with Karpenter labels as default
 func NewDefaultNodeClassifier() *DefaultNodeClassifier {
 	return &DefaultNodeClassifier{
 		SpotLabels: []metav1.LabelSelector{
-			// Karpenter
 			{
 				MatchLabels: map[string]string{
 					"karpenter.sh/capacity-type": "spot",
 				},
 			},
-			// AWS
-			{
-				MatchLabels: map[string]string{
-					"node.kubernetes.io/lifecycle": "spot",
-				},
-			},
-			// GCP
-			{
-				MatchLabels: map[string]string{
-					"cloud.google.com/gke-preemptible": "true",
-				},
-			},
-			// Azure
-			{
-				MatchLabels: map[string]string{
-					"kubernetes.azure.com/scalesetpriority": "spot",
-				},
-			},
 		},
 		OnDemandLabels: []metav1.LabelSelector{
-			// Karpenter
 			{
 				MatchLabels: map[string]string{
 					"karpenter.sh/capacity-type": "on-demand",
-				},
-			},
-			// AWS
-			{
-				MatchLabels: map[string]string{
-					"node.kubernetes.io/lifecycle": "normal",
 				},
 			},
 		},

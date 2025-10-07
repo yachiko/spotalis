@@ -216,64 +216,6 @@ var _ = Describe("DefaultNodeClassifier", func() {
 			})
 		})
 
-		Context("with AWS labels", func() {
-			It("should classify spot nodes", func() {
-				node := &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"node.kubernetes.io/lifecycle": "spot",
-						},
-					},
-				}
-
-				nodeType := classifier.ClassifyNode(node)
-				Expect(nodeType).To(Equal(NodeTypeSpot))
-			})
-
-			It("should classify on-demand nodes", func() {
-				node := &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"node.kubernetes.io/lifecycle": "normal",
-						},
-					},
-				}
-
-				nodeType := classifier.ClassifyNode(node)
-				Expect(nodeType).To(Equal(NodeTypeOnDemand))
-			})
-		})
-
-		Context("with GCP labels", func() {
-			It("should classify preemptible nodes as spot", func() {
-				node := &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"cloud.google.com/gke-preemptible": "true",
-						},
-					},
-				}
-
-				nodeType := classifier.ClassifyNode(node)
-				Expect(nodeType).To(Equal(NodeTypeSpot))
-			})
-		})
-
-		Context("with Azure labels", func() {
-			It("should classify spot nodes", func() {
-				node := &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"kubernetes.azure.com/scalesetpriority": "spot",
-						},
-					},
-				}
-
-				nodeType := classifier.ClassifyNode(node)
-				Expect(nodeType).To(Equal(NodeTypeSpot))
-			})
-		})
-
 		Context("with unknown labels", func() {
 			It("should classify as unknown", func() {
 				node := &corev1.Node{
@@ -332,6 +274,48 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				"karpenter.sh/capacity-type": "spot",
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeFalse())
+		})
+	})
+
+	Describe("Custom label configuration", func() {
+		It("should support custom cloud provider labels", func() {
+			// Create classifier with AWS labels
+			customClassifier := &DefaultNodeClassifier{
+				SpotLabels: []metav1.LabelSelector{
+					{
+						MatchLabels: map[string]string{
+							"node.kubernetes.io/lifecycle": "spot",
+						},
+					},
+				},
+				OnDemandLabels: []metav1.LabelSelector{
+					{
+						MatchLabels: map[string]string{
+							"node.kubernetes.io/lifecycle": "normal",
+						},
+					},
+				},
+			}
+
+			// Test AWS spot node
+			awsSpotNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"node.kubernetes.io/lifecycle": "spot",
+					},
+				},
+			}
+			Expect(customClassifier.ClassifyNode(awsSpotNode)).To(Equal(NodeTypeSpot))
+
+			// Test AWS on-demand node
+			awsOnDemandNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"node.kubernetes.io/lifecycle": "normal",
+					},
+				},
+			}
+			Expect(customClassifier.ClassifyNode(awsOnDemandNode)).To(Equal(NodeTypeOnDemand))
 		})
 	})
 })

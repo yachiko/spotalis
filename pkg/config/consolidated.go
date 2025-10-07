@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // SpotalisConfig is the root configuration structure for the entire Spotalis operator
@@ -92,6 +93,20 @@ type ControllerConfig struct {
 
 	// ReconcileInterval is the interval between reconciliations
 	ReconcileInterval time.Duration `yaml:"reconcileInterval" json:"reconcileInterval"`
+
+	// NodeClassifier contains node classification configuration
+	NodeClassifier NodeClassifierConfig `yaml:"nodeClassifier" json:"nodeClassifier"`
+}
+
+// NodeClassifierConfig contains node classification configuration
+type NodeClassifierConfig struct {
+	// SpotLabels are label selectors that identify spot nodes
+	// Default: karpenter.sh/capacity-type=spot
+	SpotLabels []metav1.LabelSelector `yaml:"spotLabels" json:"spotLabels"`
+
+	// OnDemandLabels are label selectors that identify on-demand nodes
+	// Default: karpenter.sh/capacity-type=on-demand
+	OnDemandLabels []metav1.LabelSelector `yaml:"onDemandLabels" json:"onDemandLabels"`
 }
 
 // WebhookConfig contains webhook server configuration
@@ -169,6 +184,22 @@ func DefaultConfig() *SpotalisConfig {
 		Controllers: ControllerConfig{
 			MaxConcurrentReconciles: 1,
 			ReconcileInterval:       5 * time.Minute,
+			NodeClassifier: NodeClassifierConfig{
+				SpotLabels: []metav1.LabelSelector{
+					{
+						MatchLabels: map[string]string{
+							"karpenter.sh/capacity-type": "spot",
+						},
+					},
+				},
+				OnDemandLabels: []metav1.LabelSelector{
+					{
+						MatchLabels: map[string]string{
+							"karpenter.sh/capacity-type": "on-demand",
+						},
+					},
+				},
+			},
 		},
 		Webhook: WebhookConfig{
 			Enabled: true,
