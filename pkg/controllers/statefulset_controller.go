@@ -88,11 +88,15 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Increment reconcile counter
 	r.reconcileCount.Add(1)
 
+	// Create structured logger for this reconciliation
+	logger := NewControllerLogger(ctx, "statefulset-controller", req, "StatefulSet")
+	logger.V(2).Info("Starting reconciliation")
+
 	// Fetch the StatefulSet
 	var statefulSet appsv1.StatefulSet
 	if err := r.Get(ctx, req.NamespacedName, &statefulSet); err != nil {
 		if errors.IsNotFound(err) {
-			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Info("StatefulSet not found, ignoring")
+			logger.Info("StatefulSet not found, cleaning up")
 			// Clean up tracking data for deleted statefulset
 			r.lastDeletionTimes.Delete(req.String())
 			return ctrl.Result{}, nil
@@ -104,19 +108,26 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Request:   req.NamespacedName,
 			Recovered: false,
 		})
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to get StatefulSet")
+		logger.ReconcileFailed(err, "Failed to get StatefulSet")
 		return ctrl.Result{}, err
 	}
 
+	// Add workload context to logger
+	var replicas int32
+	if statefulSet.Spec.Replicas != nil {
+		replicas = *statefulSet.Spec.Replicas
+	}
+	logger = logger.WithWorkload("statefulset", replicas)
+
 	// Check if Spotalis is explicitly enabled for this StatefulSet
 	if !r.AnnotationParser.IsSpotalisEnabled(&statefulSet) {
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("StatefulSet does not have spotalis.io/enabled=true, skipping")
+		logger.V(2).Info("Spotalis not enabled, skipping")
 		return ctrl.Result{}, nil
 	}
 
 	// Check if the namespace is allowed for Spotalis management
 	if r.NamespaceFilter != nil {
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "namespace", statefulSet.Namespace).V(1).Info("Checking namespace permissions with namespace filter")
+		logger.V(1).Info("Checking namespace permissions")
 		result, err := r.NamespaceFilter.IsNamespaceAllowed(ctx, statefulSet.Namespace)
 		if err != nil {
 			r.errorCount.Add(1)
@@ -126,16 +137,16 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				Request:   req.NamespacedName,
 				Recovered: false,
 			})
-			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to check namespace permissions")
+			logger.ReconcileFailed(err, "Failed to check namespace permissions")
 			return ctrl.Result{}, err
 		}
 		if !result.Allowed {
-			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "reason", result.Reason, "rule", result.MatchedRule).V(1).Info("Namespace is not allowed for Spotalis management")
+			logger.V(1).Info("Namespace not allowed for Spotalis management",
+				"reason", result.Reason,
+				"rule", result.MatchedRule)
 			return ctrl.Result{}, nil
 		}
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "rule", result.MatchedRule).V(1).Info("Namespace is allowed for Spotalis management")
-	} else {
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("No namespace filter configured, allowing all namespaces")
+		logger.V(1).Info("Namespace allowed for management", "rule", result.MatchedRule)
 	}
 
 	// Implement cooldown period after pod deletion to avoid constant rescheduling
@@ -143,39 +154,34 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(statefulsetKey); exists {
 		lastDeletion, ok := lastDeletionInterface.(time.Time)
 		if !ok {
-			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "statefulsetKey", statefulsetKey).Error(nil, "Invalid type for last deletion time")
-			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+			err := fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+			logger.Error(err, "Invalid deletion timestamp type")
+			return ctrl.Result{}, err
 		}
 		cooldownPeriod := 10 * time.Second // Wait 10 seconds after deleting a pod
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
 		if timeSinceLastDeletion < cooldownPeriod {
 			remainingCooldown := cooldownPeriod - timeSinceLastDeletion
-			log.FromContext(ctx).WithValues(
-				"statefulset", req.NamespacedName,
-				"lastDeletion", lastDeletion,
-				"timeSince", timeSinceLastDeletion,
-				"remainingCooldown", remainingCooldown,
-			).V(1).Info("In cooldown period after recent pod deletion, skipping rebalancing")
+			logger.V(1).Info("In cooldown period, skipping rebalancing",
+				"remaining_ms", remainingCooldown.Milliseconds())
 			return ctrl.Result{RequeueAfter: remainingCooldown}, nil
 		}
 	}
 
 	// Check if StatefulSet is stable and ready for rebalancing
 	if !r.isStatefulSetStableAndReady(&statefulSet) {
-		log.FromContext(ctx).WithValues(
-			"statefulset", req.NamespacedName,
+		logger.V(1).Info("StatefulSet not stable, skipping rebalancing",
 			"replicas", statefulSet.Status.Replicas,
-			"readyReplicas", statefulSet.Status.ReadyReplicas,
-			"currentReplicas", statefulSet.Status.CurrentReplicas,
-			"updatedReplicas", statefulSet.Status.UpdatedReplicas,
-		).V(1).Info("StatefulSet is not stable or ready, skipping rebalancing")
+			"ready", statefulSet.Status.ReadyReplicas,
+			"current", statefulSet.Status.CurrentReplicas,
+			"updated", statefulSet.Status.UpdatedReplicas)
 
 		// Requeue with longer interval when StatefulSet is not stable
 		return ctrl.Result{RequeueAfter: 2 * r.ReconcileInterval}, nil
 	}
 
-	log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("Reconciling StatefulSet with Spotalis annotations")
+	logger.V(1).Info("Processing Spotalis-enabled StatefulSet")
 
 	// Parse the workload configuration from annotations
 	workloadConfig, err := r.AnnotationParser.ParseWorkloadConfiguration(&statefulSet)
@@ -187,7 +193,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Request:   req.NamespacedName,
 			Recovered: false,
 		})
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to parse workload configuration")
+		logger.ReconcileFailed(err, "Failed to parse workload configuration")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
 
@@ -201,7 +207,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Request:   req.NamespacedName,
 			Recovered: false,
 		})
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to calculate current replica state")
+		logger.ReconcileFailed(err, "Failed to calculate replica state")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
 
@@ -215,6 +221,14 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	replicaState.CalculateDesiredDistribution(*workloadConfig)
 
 	// Check if rebalancing is needed by comparing current vs desired state
+	logger.V(1).Info("Calculated replica distribution",
+		"current_spot", replicaState.CurrentSpot,
+		"current_on_demand", replicaState.CurrentOnDemand,
+		"desired_spot", replicaState.DesiredSpot,
+		"desired_on_demand", replicaState.DesiredOnDemand,
+		"spot_percentage", workloadConfig.SpotPercentage,
+		"min_on_demand", workloadConfig.MinOnDemand)
+
 	needsRebalancing := r.needsRebalancing(replicaState)
 
 	if needsRebalancing {
@@ -228,27 +242,23 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				Request:   req.NamespacedName,
 				Recovered: false,
 			})
-			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to resolve disruption window")
+			logger.ReconcileFailed(err, "Failed to resolve disruption window")
 			return ctrl.Result{RequeueAfter: time.Minute}, nil // Retry after 1 minute
 		}
 
 		// Check if we're within the disruption window
 		if disruptionWindow != nil && !disruptionWindow.IsWithinWindow(time.Now().UTC()) {
 			nextWindow := disruptionWindow.Schedule.Next(time.Now().UTC())
-			log.FromContext(ctx).WithValues(
-				"statefulset", req.NamespacedName,
-				"nextWindow", nextWindow,
-			).Info("Outside disruption window, skipping rebalancing")
+			logger.Info("Outside disruption window, deferring rebalancing",
+				"next_window", nextWindow)
 			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil // Check again in 10 minutes
 		}
 
-		log.FromContext(ctx).WithValues(
-			"statefulset", req.NamespacedName,
-			"currentSpot", replicaState.CurrentSpot,
-			"currentOnDemand", replicaState.CurrentOnDemand,
-			"desiredSpot", replicaState.DesiredSpot,
-			"desiredOnDemand", replicaState.DesiredOnDemand,
-		).V(1).Info("Rebalancing StatefulSet pods")
+		logger.Info("Rebalancing StatefulSet pods",
+			"current_spot", replicaState.CurrentSpot,
+			"current_on_demand", replicaState.CurrentOnDemand,
+			"target_spot", replicaState.DesiredSpot,
+			"target_on_demand", replicaState.DesiredOnDemand)
 
 		// Track rebalancing metrics
 		var rebalanceErr error
@@ -262,7 +272,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				Request:   req.NamespacedName,
 				Recovered: false,
 			})
-			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to rebalance StatefulSet pods")
+			logger.ReconcileFailed(err, "Failed to rebalance pods")
 		}
 
 		// Record rebalancing metrics
@@ -281,19 +291,19 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 
 		// After performing rebalancing, requeue sooner to check the results
-		log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("Pod rebalancing initiated, will check status sooner")
+		logger.V(1).Info("Rebalancing initiated, will check status soon")
 
 		// Mark as recovered since we successfully completed rebalancing
 		r.markRecovered()
 
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
 	}
-	log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("No pod rebalancing needed")
+	logger.V(2).Info("No rebalancing needed")
 
 	// Mark as recovered since reconcile completed successfully
 	r.markRecovered()
 
-	log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).V(1).Info("StatefulSet reconciliation completed successfully")
+	logger.V(2).Info("Reconciliation completed successfully")
 
 	// Use longer interval when no action is needed to reduce load
 	return ctrl.Result{RequeueAfter: r.ReconcileInterval * 2}, nil
@@ -548,22 +558,23 @@ func (r *StatefulSetReconciler) executeGradualRebalancing(ctx context.Context, s
 		return nil
 	}
 
+	logger := log.FromContext(ctx)
+
 	// Only delete the first pod to avoid overwhelming the system
 	pod := podsToDelete[0]
-	log.FromContext(ctx).WithValues(
+	logger.Info("Deleting pod for rebalancing",
 		"pod", pod.Name,
 		"node", pod.Spec.NodeName,
-		"remaining", len(podsToDelete)-1,
-	).V(1).Info("Deleting one pod for rebalancing (gradual approach)")
+		"remaining", len(podsToDelete)-1)
 
 	if err := r.Delete(ctx, &pod); err != nil {
-		log.FromContext(ctx).WithValues("pod", pod.Name).Error(err, "Failed to delete pod for rebalancing")
+		logger.Error(err, "Failed to delete pod", "pod", pod.Name)
 		return err
 	}
 
 	// Record the deletion time for cooldown tracking
 	r.lastDeletionTimes.Store(statefulsetKey, time.Now())
-	log.FromContext(ctx).WithValues("deleted", pod.Name).V(1).Info("Deleted one pod for rebalancing - will continue with remaining pods in next reconcile")
+	logger.V(1).Info("Pod deleted successfully, will continue in next reconcile", "pod", pod.Name)
 
 	// Update pod template and trigger rolling update
 	return r.updateStatefulSetForRebalancing(ctx, statefulSet, desiredState)

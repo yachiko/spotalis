@@ -26,13 +26,13 @@ import (
 	"github.com/ahoma/spotalis/internal/annotations"
 	"github.com/ahoma/spotalis/internal/config"
 	"github.com/ahoma/spotalis/pkg/apis"
+	"github.com/ahoma/spotalis/pkg/controllers"
 	"github.com/ahoma/spotalis/pkg/metrics"
 	"gomodules.xyz/jsonpatch/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -80,21 +80,16 @@ func (m *MutationHandler) SetMetricsCollector(collector *metrics.Collector) {
 
 // Handle processes admission webhook requests
 func (m *MutationHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	logger := log.FromContext(ctx).WithValues(
-		"kind", req.Kind.Kind,
-		"namespace", req.Namespace,
-		"name", req.Name,
-		"operation", req.Operation,
-	)
-
-	logger.Info("Processing admission webhook request")
+	// Create structured logger for this webhook request
+	logger := controllers.NewWebhookLogger(ctx, req)
+	logger.V(2).Info("Processing admission request")
 
 	var response admission.Response
 	switch req.Kind.Kind {
 	case "Pod":
-		response = m.mutatePod(ctx, req)
+		response = m.mutatePod(ctx, req, logger)
 	default:
-		logger.Info("Unsupported resource kind, allowing", "kind", req.Kind.Kind)
+		logger.V(1).Info("Unsupported resource kind, allowing")
 		response = admission.Allowed("unsupported resource kind")
 	}
 
@@ -111,9 +106,7 @@ func (m *MutationHandler) Handle(ctx context.Context, req admission.Request) adm
 }
 
 // mutatePod handles pod mutation for node affinity and tolerations
-func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request) admission.Response {
-	logger := log.FromContext(ctx)
-
+func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request, logger *controllers.WebhookLogger) admission.Response {
 	var pod corev1.Pod
 	if err := m.decoder.Decode(req, &pod); err != nil {
 		logger.Error(err, "Failed to decode pod")
@@ -121,41 +114,36 @@ func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request) 
 	}
 
 	// Check if this pod belongs to a workload with Spotalis annotations
-	workloadConfig, err := m.getWorkloadConfigForPod(ctx, &pod)
+	workloadConfig, workloadKind, workloadName, err := m.getWorkloadConfigForPod(ctx, &pod)
 	if err != nil {
-		logger.Error(err, "Failed to get workload configuration for pod")
+		logger.Error(err, "Failed to get workload configuration")
 		return admission.Allowed("failed to get workload config")
 	}
 
 	if workloadConfig == nil {
-		logger.Info("Pod does not belong to a Spotalis-managed workload")
+		logger.V(2).Info("Pod not managed by Spotalis")
 		return admission.Allowed("not managed by Spotalis")
 	}
 
-	logger.Info("Mutating pod for Spotalis workload management")
+	// Add workload and config context to logger
+	logger = logger.WithWorkload(workloadKind, workloadName).
+		WithConfig(int(workloadConfig.SpotPercentage), workloadConfig.MinOnDemand)
+
+	logger.V(1).Info("Mutating pod for Spotalis workload")
 
 	// Apply mutations based on workload configuration
-	patches := m.generatePodPatches(&pod, workloadConfig)
+	patches, mutationTypes := m.generatePodPatches(&pod, workloadConfig)
 
 	if len(patches) == 0 {
+		logger.MutationSkipped("no mutations needed")
 		return admission.Allowed("no mutations needed")
 	}
 
-	logger.Info("Applied pod mutations", "patches", len(patches))
-	logger.Info("Patches: ", "patches", patches)
+	logger.MutationApplied("Applied pod mutations", len(patches), mutationTypes)
 
 	// Record mutation metrics
 	if m.MetricsCollector != nil {
-		for _, patch := range patches {
-			// Determine mutation type from patch path
-			mutationType := "nodeSelector"
-			if path, ok := patch["path"].(string); ok {
-				if strings.Contains(path, "tolerations") {
-					mutationType = "tolerations"
-				} else if strings.Contains(path, "affinity") {
-					mutationType = "affinity"
-				}
-			}
+		for _, mutationType := range mutationTypes {
 			m.MetricsCollector.RecordWebhookMutation("Pod", mutationType)
 		}
 	}
@@ -181,44 +169,48 @@ func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request) 
 }
 
 // getWorkloadConfigForPod retrieves workload configuration for a pod
-func (m *MutationHandler) getWorkloadConfigForPod(ctx context.Context, pod *corev1.Pod) (*apis.WorkloadConfiguration, error) {
+func (m *MutationHandler) getWorkloadConfigForPod(ctx context.Context, pod *corev1.Pod) (*apis.WorkloadConfiguration, string, string, error) {
 	// Check if pod has owner references to a Deployment or StatefulSet
 	for _, ownerRef := range pod.OwnerReferences {
 		switch ownerRef.Kind {
 		case workloadTypeReplicaSet:
 			// For deployments, we need to get the ReplicaSet's owner (Deployment)
-			if config, err := m.getConfigFromReplicaSet(ctx, pod.Namespace, ownerRef.Name); err == nil && config != nil {
-				return config, nil
+			if config, kind, name, err := m.getConfigFromReplicaSet(ctx, pod.Namespace, ownerRef.Name); err == nil && config != nil {
+				return config, kind, name, nil
 			}
 		case workloadTypeStatefulSet:
 			if config, err := m.getConfigFromStatefulSet(ctx, pod.Namespace, ownerRef.Name); err == nil && config != nil {
-				return config, nil
+				return config, workloadTypeStatefulSet, ownerRef.Name, nil
 			}
 		case workloadTypeDeployment:
 			if config, err := m.getConfigFromDeployment(ctx, pod.Namespace, ownerRef.Name); err == nil && config != nil {
-				return config, nil
+				return config, workloadTypeDeployment, ownerRef.Name, nil
 			}
 		}
 	}
 
-	return nil, nil
+	return nil, "", "", nil
 }
 
 // getConfigFromReplicaSet gets configuration from a ReplicaSet's owner Deployment
-func (m *MutationHandler) getConfigFromReplicaSet(ctx context.Context, namespace, name string) (*apis.WorkloadConfiguration, error) {
+func (m *MutationHandler) getConfigFromReplicaSet(ctx context.Context, namespace, name string) (*apis.WorkloadConfiguration, string, string, error) {
 	var rs appsv1.ReplicaSet
 	if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &rs); err != nil {
-		return nil, err
+		return nil, "", "", err
 	}
 
 	// Get the Deployment that owns this ReplicaSet
 	for _, ownerRef := range rs.OwnerReferences {
 		if ownerRef.Kind == workloadTypeDeployment {
-			return m.getConfigFromDeployment(ctx, namespace, ownerRef.Name)
+			config, err := m.getConfigFromDeployment(ctx, namespace, ownerRef.Name)
+			if err != nil {
+				return nil, "", "", err
+			}
+			return config, workloadTypeDeployment, ownerRef.Name, nil
 		}
 	}
 
-	return nil, nil
+	return nil, "", "", nil
 }
 
 // getConfigFromDeployment gets configuration from a Deployment
@@ -247,16 +239,20 @@ func (m *MutationHandler) getConfigFromWorkload(ctx context.Context, namespace, 
 }
 
 // generatePodPatches generates JSON patches for pod mutation
-func (m *MutationHandler) generatePodPatches(pod *corev1.Pod, config *apis.WorkloadConfiguration) []map[string]interface{} {
+func (m *MutationHandler) generatePodPatches(pod *corev1.Pod, config *apis.WorkloadConfiguration) ([]map[string]interface{}, []string) {
 	var patches []map[string]interface{}
+	var mutationTypes []string
 
 	// Add nodeSelector for spot instances if spot percentage > 0
 	if config.SpotPercentage > 0 {
 		nodeSelectorPatches := m.generateNodeSelectorPatches(pod, config)
 		patches = append(patches, nodeSelectorPatches...)
+		if len(nodeSelectorPatches) > 0 {
+			mutationTypes = append(mutationTypes, "nodeSelector")
+		}
 	}
 
-	return patches
+	return patches, mutationTypes
 }
 
 // jsonPointerEscape escapes a string for use in JSON Pointer according to RFC 6901

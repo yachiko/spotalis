@@ -88,11 +88,15 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Increment reconcile counter
 	r.reconcileCount.Add(1)
 
+	// Create structured logger for this reconciliation
+	logger := NewControllerLogger(ctx, "deployment-controller", req, "Deployment")
+	logger.V(2).Info("Starting reconciliation")
+
 	// Fetch the Deployment
 	var deployment appsv1.Deployment
 	if err := r.Get(ctx, req.NamespacedName, &deployment); err != nil {
 		if errors.IsNotFound(err) {
-			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Info("Deployment not found, ignoring")
+			logger.Info("Deployment not found, cleaning up")
 			// Clean up tracking data for deleted deployment
 			r.lastDeletionTimes.Delete(req.String())
 			return ctrl.Result{}, nil
@@ -104,31 +108,26 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Request:   req.NamespacedName,
 			Recovered: false,
 		})
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to get Deployment")
+		logger.ReconcileFailed(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
 
-	// Add workload context to all logs
+	// Add workload context to logger
 	var replicas int32
 	if deployment.Spec.Replicas != nil {
 		replicas = *deployment.Spec.Replicas
 	}
-
-	log.FromContext(ctx).WithValues(
-		"deployment", req.NamespacedName,
-		"replicas", replicas,
-	).V(1).Info("Successfully fetched deployment")
+	logger = logger.WithWorkload("deployment", replicas)
 
 	// Check if Spotalis is explicitly enabled for this deployment
 	if !r.AnnotationParser.IsSpotalisEnabled(&deployment) {
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("Spotalis not enabled for deployment, skipping")
+		logger.V(2).Info("Spotalis not enabled, skipping")
 		return ctrl.Result{}, nil
 	}
-	log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("Spotalis enabled for deployment")
 
 	// Check if the namespace is allowed for Spotalis management
 	if r.NamespaceFilter != nil {
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName, "namespace", deployment.Namespace).V(1).Info("Checking namespace permissions with namespace filter")
+		logger.V(1).Info("Checking namespace permissions")
 		result, err := r.NamespaceFilter.IsNamespaceAllowed(ctx, deployment.Namespace)
 		if err != nil {
 			r.errorCount.Add(1)
@@ -138,16 +137,16 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Request:   req.NamespacedName,
 				Recovered: false,
 			})
-			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to check namespace permissions")
+			logger.ReconcileFailed(err, "Failed to check namespace permissions")
 			return ctrl.Result{}, err
 		}
 		if !result.Allowed {
-			log.FromContext(ctx).WithValues("deployment", req.NamespacedName, "reason", result.Reason, "rule", result.MatchedRule).V(1).Info("Namespace is not allowed for Spotalis management")
+			logger.V(1).Info("Namespace not allowed for Spotalis management",
+				"reason", result.Reason,
+				"rule", result.MatchedRule)
 			return ctrl.Result{}, nil
 		}
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName, "rule", result.MatchedRule).V(1).Info("Namespace is allowed for Spotalis management")
-	} else {
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("No namespace filter configured, allowing all namespaces")
+		logger.V(1).Info("Namespace allowed for management", "rule", result.MatchedRule)
 	}
 
 	// Record that this workload is now managed (for metrics) - do this early
@@ -168,40 +167,35 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if lastDeletionInterface, exists := r.lastDeletionTimes.Load(deploymentKey); exists {
 		lastDeletion, ok := lastDeletionInterface.(time.Time)
 		if !ok {
-			log.FromContext(ctx).WithValues("deployment", req.NamespacedName, "deploymentKey", deploymentKey).Error(nil, "Invalid type for last deletion time")
-			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+			err := fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
+			logger.Error(err, "Invalid deletion timestamp type")
+			return ctrl.Result{}, err
 		}
 		cooldownPeriod := 10 * time.Second // Wait 10 seconds after deleting a pod
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
 		if timeSinceLastDeletion < cooldownPeriod {
 			remainingCooldown := cooldownPeriod - timeSinceLastDeletion
-			log.FromContext(ctx).WithValues(
-				"deployment", req.NamespacedName,
-				"lastDeletion", lastDeletion,
-				"timeSince", timeSinceLastDeletion,
-				"remainingCooldown", remainingCooldown,
-			).V(1).Info("In cooldown period after recent pod deletion, skipping rebalancing")
+			logger.V(1).Info("In cooldown period, skipping rebalancing",
+				"remaining_ms", remainingCooldown.Milliseconds())
 			return ctrl.Result{RequeueAfter: remainingCooldown}, nil
 		}
 	}
 
 	// Check if deployment is stable and ready for rebalancing
 	if !r.isDeploymentStableAndReady(ctx, &deployment) {
-		log.FromContext(ctx).WithValues(
-			"deployment", req.NamespacedName,
+		logger.V(1).Info("Deployment not stable, skipping rebalancing",
 			"replicas", deployment.Status.Replicas,
-			"readyReplicas", deployment.Status.ReadyReplicas,
-			"updatedReplicas", deployment.Status.UpdatedReplicas,
-			"availableReplicas", deployment.Status.AvailableReplicas,
-			"unavailableReplicas", deployment.Status.UnavailableReplicas,
-		).V(1).Info("Deployment is not stable or ready, skipping rebalancing")
+			"ready", deployment.Status.ReadyReplicas,
+			"updated", deployment.Status.UpdatedReplicas,
+			"available", deployment.Status.AvailableReplicas,
+			"unavailable", deployment.Status.UnavailableReplicas)
 
 		// Requeue with longer interval when deployment is not stable
 		return ctrl.Result{RequeueAfter: 2 * r.ReconcileInterval}, nil
 	}
 
-	log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("Reconciling Deployment with Spotalis annotations")
+	logger.V(1).Info("Processing Spotalis-enabled deployment")
 
 	// Parse the workload configuration from annotations
 	workloadConfig, err := r.AnnotationParser.ParseWorkloadConfiguration(&deployment)
@@ -213,7 +207,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Request:   req.NamespacedName,
 			Recovered: false,
 		})
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to parse workload configuration")
+		logger.ReconcileFailed(err, "Failed to parse workload configuration")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
 
@@ -227,7 +221,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Request:   req.NamespacedName,
 			Recovered: false,
 		})
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to calculate current replica state")
+		logger.ReconcileFailed(err, "Failed to calculate replica state")
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
 	}
 
@@ -241,13 +235,13 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	replicaState.CalculateDesiredDistribution(*workloadConfig)
 
 	// Check if rebalancing is needed by comparing current vs desired state
-	log.FromContext(ctx).WithValues(
-		"deployment", req.NamespacedName,
-		"currentSpot", replicaState.CurrentSpot,
-		"currentOnDemand", replicaState.CurrentOnDemand,
-		"desiredSpot", replicaState.DesiredSpot,
-		"desiredOnDemand", replicaState.DesiredOnDemand,
-	).V(1).Info("Current replica distribution state")
+	logger.V(1).Info("Calculated replica distribution",
+		"current_spot", replicaState.CurrentSpot,
+		"current_on_demand", replicaState.CurrentOnDemand,
+		"desired_spot", replicaState.DesiredSpot,
+		"desired_on_demand", replicaState.DesiredOnDemand,
+		"spot_percentage", workloadConfig.SpotPercentage,
+		"min_on_demand", workloadConfig.MinOnDemand)
 
 	needsRebalancing := r.needsRebalancing(replicaState)
 
@@ -262,27 +256,23 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Request:   req.NamespacedName,
 				Recovered: false,
 			})
-			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to resolve disruption window")
+			logger.ReconcileFailed(err, "Failed to resolve disruption window")
 			return ctrl.Result{RequeueAfter: time.Minute}, nil // Retry after 1 minute
 		}
 
 		// Check if we're within the disruption window
 		if disruptionWindow != nil && !disruptionWindow.IsWithinWindow(time.Now().UTC()) {
 			nextWindow := disruptionWindow.Schedule.Next(time.Now().UTC())
-			log.FromContext(ctx).WithValues(
-				"deployment", req.NamespacedName,
-				"nextWindow", nextWindow,
-			).Info("Outside disruption window, skipping rebalancing")
+			logger.Info("Outside disruption window, deferring rebalancing",
+				"next_window", nextWindow)
 			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil // Check again in 10 minutes
 		}
 
-		log.FromContext(ctx).WithValues(
-			"deployment", req.NamespacedName,
-			"currentSpot", replicaState.CurrentSpot,
-			"currentOnDemand", replicaState.CurrentOnDemand,
-			"desiredSpot", replicaState.DesiredSpot,
-			"desiredOnDemand", replicaState.DesiredOnDemand,
-		).V(1).Info("Rebalancing deployment pods")
+		logger.Info("Rebalancing deployment pods",
+			"current_spot", replicaState.CurrentSpot,
+			"current_on_demand", replicaState.CurrentOnDemand,
+			"target_spot", replicaState.DesiredSpot,
+			"target_on_demand", replicaState.DesiredOnDemand)
 
 		// Track rebalancing metrics
 		var rebalanceErr error
@@ -296,7 +286,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Request:   req.NamespacedName,
 				Recovered: false,
 			})
-			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to rebalance deployment pods")
+			logger.ReconcileFailed(err, "Failed to rebalance pods")
 		}
 
 		// Record rebalancing metrics
@@ -315,19 +305,19 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		// After performing rebalancing, requeue sooner to check the results
-		log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("Pod rebalancing initiated, will check status sooner")
+		logger.V(1).Info("Rebalancing initiated, will check status soon")
 
 		// Mark as recovered since we successfully completed rebalancing
 		r.markRecovered()
 
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
 	}
-	log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("No pod rebalancing needed")
+	logger.V(2).Info("No rebalancing needed")
 
 	// Mark as recovered since reconcile completed successfully
 	r.markRecovered()
 
-	log.FromContext(ctx).WithValues("deployment", req.NamespacedName).V(1).Info("Deployment reconciliation completed successfully")
+	logger.V(2).Info("Reconciliation completed successfully")
 
 	// Use longer interval when no action is needed to reduce load
 	return ctrl.Result{RequeueAfter: r.ReconcileInterval * 2}, nil
@@ -606,23 +596,24 @@ func (r *DeploymentReconciler) executeDeploymentRebalancing(ctx context.Context,
 		return nil
 	}
 
+	logger := log.FromContext(ctx)
+
 	// Only delete the first pod to avoid overwhelming the system
 	pod := podsToDelete[0]
-	log.FromContext(ctx).WithValues(
+	logger.Info("Deleting pod for rebalancing",
 		"pod", pod.Name,
 		"node", pod.Spec.NodeName,
-		"remaining", len(podsToDelete)-1,
-	).V(1).Info("Deleting one pod for rebalancing (gradual approach)")
+		"remaining", len(podsToDelete)-1)
 
 	if err := r.Delete(ctx, &pod); err != nil {
-		log.FromContext(ctx).WithValues("pod", pod.Name).Error(err, "Failed to delete pod for rebalancing")
+		logger.Error(err, "Failed to delete pod", "pod", pod.Name)
 		return err
 	}
 
 	// Record the deletion time for cooldown tracking
 	r.lastDeletionTimes.Store(deploymentKey, time.Now())
 
-	log.FromContext(ctx).WithValues("deleted", pod.Name).V(1).Info("Deleted one pod for rebalancing - will continue with remaining pods in next reconcile")
+	logger.V(1).Info("Pod deleted successfully, will continue in next reconcile", "pod", pod.Name)
 	return nil
 }
 

@@ -190,3 +190,110 @@ func (cl *ControllerLogger) AnnotationCheck(enabled bool, spotPercentage int) {
 		"spot_percentage", spotPercentage,
 	)
 }
+
+// WebhookLogger provides enhanced structured logging for webhooks
+type WebhookLogger struct {
+	logr.Logger
+	Kind      string
+	Namespace string
+	Name      string
+	Operation string
+	RequestID string
+}
+
+// NewWebhookLogger creates a logger with webhook-specific structured fields
+func NewWebhookLogger(ctx context.Context, req interface{}) *WebhookLogger {
+	baseLogger := log.FromContext(ctx)
+
+	// Extract admission.Request fields if available
+	var kind, namespace, name, operation, requestID string
+
+	// Use type assertion to get admission.Request fields
+	if admissionReq, ok := req.(interface {
+		GetKind() interface{ GetKind() string }
+		GetNamespace() string
+		GetName() string
+		GetOperation() interface{ String() string }
+		GetUID() interface{ String() string }
+	}); ok {
+		kind = admissionReq.GetKind().GetKind()
+		namespace = admissionReq.GetNamespace()
+		name = admissionReq.GetName()
+		operation = admissionReq.GetOperation().String()
+		requestID = admissionReq.GetUID().String()[:8]
+	}
+
+	// Create structured logger with all context fields
+	structuredLogger := baseLogger.WithValues(
+		"webhook", "mutation",
+		"kind", kind,
+		"namespace", namespace,
+		"name", name,
+		"operation", operation,
+		"request_id", requestID,
+	)
+
+	return &WebhookLogger{
+		Logger:    structuredLogger,
+		Kind:      kind,
+		Namespace: namespace,
+		Name:      name,
+		Operation: operation,
+		RequestID: requestID,
+	}
+}
+
+// WithWorkload adds workload-specific context
+func (wl *WebhookLogger) WithWorkload(workloadKind, workloadName string) *WebhookLogger {
+	return &WebhookLogger{
+		Logger: wl.WithValues(
+			"workload_kind", workloadKind,
+			"workload_name", workloadName,
+		),
+		Kind:      wl.Kind,
+		Namespace: wl.Namespace,
+		Name:      wl.Name,
+		Operation: wl.Operation,
+		RequestID: wl.RequestID,
+	}
+}
+
+// WithConfig adds workload configuration context
+func (wl *WebhookLogger) WithConfig(spotPercentage int, minOnDemand int32) *WebhookLogger {
+	return &WebhookLogger{
+		Logger: wl.WithValues(
+			"spot_percentage", spotPercentage,
+			"min_on_demand", minOnDemand,
+		),
+		Kind:      wl.Kind,
+		Namespace: wl.Namespace,
+		Name:      wl.Name,
+		Operation: wl.Operation,
+		RequestID: wl.RequestID,
+	}
+}
+
+// MutationApplied logs successful mutation with patch count
+func (wl *WebhookLogger) MutationApplied(msg string, patchCount int, mutationTypes []string) {
+	wl.Info(msg,
+		"event", "mutation_applied",
+		"patch_count", patchCount,
+		"mutation_types", mutationTypes,
+	)
+}
+
+// MutationSkipped logs when mutation is skipped with reason
+func (wl *WebhookLogger) MutationSkipped(reason string) {
+	wl.V(1).Info("Mutation skipped",
+		"event", "mutation_skipped",
+		"reason", reason,
+	)
+}
+
+// RequestDenied logs denied admission requests
+func (wl *WebhookLogger) RequestDenied(reason string, err error) {
+	wl.Error(err, "Admission request denied",
+		"event", "request_denied",
+		"reason", reason,
+	)
+}
