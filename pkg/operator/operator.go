@@ -483,6 +483,9 @@ func (o *Operator) Start(ctx context.Context) error {
 	// Start the manager (includes controllers and webhooks)
 	o.started = true
 
+	// Start periodic controller health metrics update
+	go o.updateControllerHealthPeriodically(ctx)
+
 	// Controller-runtime handles leader election automatically when configured
 	return o.Manager.Start(ctx)
 }
@@ -564,6 +567,36 @@ func (o *Operator) GetLeaderElectionDebugInfo() string {
 // IsFollower returns true if this operator is ready but not the leader
 func (o *Operator) IsFollower() bool {
 	return o.IsReady() && !o.IsLeader()
+}
+
+// updateControllerHealthPeriodically updates controller health metrics every 30 seconds
+func (o *Operator) updateControllerHealthPeriodically(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	// Initial update
+	o.updateControllerHealthMetrics()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			o.updateControllerHealthMetrics()
+		}
+	}
+}
+
+// updateControllerHealthMetrics updates the controller health and leader election metrics
+func (o *Operator) updateControllerHealthMetrics() {
+	if o.metricsCollector == nil {
+		return
+	}
+
+	controllerName := "spotalis-controller"
+	isLeader := o.IsLeader()
+
+	o.metricsCollector.UpdateControllerHealth(controllerName, isLeader)
 }
 
 // Stop gracefully stops the operator and releases leader election
@@ -675,6 +708,7 @@ func (o *Operator) initializeCoreServices() error {
 	// Initialize mutation handler
 	o.mutationHandler = webhookMutate.NewMutationHandler(o.GetClient(), o.GetScheme())
 	o.mutationHandler.SetNodeClassifier(o.nodeClassifier)
+	o.mutationHandler.SetMetricsCollector(o.metricsCollector)
 
 	return nil
 }

@@ -125,20 +125,13 @@ func initializeMetrics() {
 	// webhookMutations: []string{"resource_kind", "mutation_type"}
 	webhookMutations.WithLabelValues("", "").Add(0)
 
-	// apiRequestErrors: []string{"api_group", "resource", "error_type"}
-	apiRequestErrors.WithLabelValues("", "", "").Add(0)
-
-	// rateLimitHits: []string{"api_group", "resource"}
-	rateLimitHits.WithLabelValues("", "").Add(0)
-
 	// Initialize gauges to 0
-	// totalNodes: []string{"node_type", "status"}
-	totalNodes.WithLabelValues("spot", "ready").Set(0)
-	totalNodes.WithLabelValues("on-demand", "ready").Set(0)
+	// workloadReplicas: []string{"namespace", "workload", "workload_type", "replica_type"}
+	workloadReplicas.WithLabelValues("", "", "", "spot").Set(0)
+	workloadReplicas.WithLabelValues("", "", "", "on-demand").Set(0)
 
-	// readyNodes: []string{"node_type"}
-	readyNodes.WithLabelValues("spot").Set(0)
-	readyNodes.WithLabelValues("on-demand").Set(0)
+	// controllerLastSeen: []string{"controller_name"}
+	controllerLastSeen.WithLabelValues("").Set(0)
 
 	// leaderElectionStatus: []string{"controller_name"}
 	leaderElectionStatus.WithLabelValues("").Set(0)
@@ -160,32 +153,19 @@ func (c *Collector) RegisterMetrics(registry prometheus.Registerer) {
 	// Use Register instead of MustRegister to avoid panics on duplicate registration
 	// This can happen during controller restarts or in tests
 	collectors := []prometheus.Collector{
-		totalNodes,
-		readyNodes,
-		managedWorkloads,
 		workloadReplicas,
-		spotUtilization,
-		reconciliationDuration,
 		reconciliationTotal,
 		reconciliationErrors,
 		webhookRequests,
-		webhookDuration,
 		webhookMutations,
-		apiRequestRate,
-		apiRequestErrors,
-		rateLimitHits,
 		controllerLastSeen,
 		leaderElectionStatus,
 	}
 
 	for _, collector := range collectors {
-		if err := registry.Register(collector); err != nil {
-			// Ignore "already registered" errors, but log others
-			if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
-				// In production, you might want to log this error
-				// For now, we silently ignore registration errors
-			}
-		}
+		_ = registry.Register(collector)
+		// Ignore all registration errors (including "already registered")
+		// In production, you might want to log unexpected errors
 	}
 }
 
@@ -194,94 +174,38 @@ func (c *Collector) RegisterMetricsGlobal() {
 	c.RegisterMetrics(metrics.Registry)
 }
 
-// UpdateNodeMetrics updates node-related metrics
-func (c *Collector) UpdateNodeMetrics(ctx context.Context) error {
-	c.mutex.RLock()
-	classifier := c.nodeClassifier
-	c.mutex.RUnlock()
-
-	if classifier == nil {
-		return nil // No classifier available
-	}
-
-	summary, err := classifier.GetNodeClassificationSummary(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Update node count metrics
-	totalNodes.WithLabelValues("spot", "total").Set(float64(summary.TotalSpotNodes))
-	totalNodes.WithLabelValues("on-demand", "total").Set(float64(summary.TotalOnDemandNodes))
-
-	readyNodes.WithLabelValues("spot").Set(float64(summary.ReadySpotNodes))
-	readyNodes.WithLabelValues("on-demand").Set(float64(summary.ReadyOnDemandNodes))
-
-	c.mutex.Lock()
-	c.lastUpdate = time.Now()
-	c.mutex.Unlock()
-
-	return nil
-}
-
 // RecordWorkloadMetrics records metrics for a managed workload
 func (c *Collector) RecordWorkloadMetrics(namespace, workloadName, workloadType string, replicaState *apis.ReplicaState) {
 	c.mutex.Lock()
 	c.managedWorkloadsCount++
 	c.mutex.Unlock()
 
-	// Update managed workload count
-	managedWorkloads.WithLabelValues(namespace, workloadType).Inc()
-
 	if replicaState != nil {
 		// Update replica counts
 		workloadReplicas.WithLabelValues(namespace, workloadName, workloadType, "spot").Set(float64(replicaState.CurrentSpot))
 		workloadReplicas.WithLabelValues(namespace, workloadName, workloadType, "on-demand").Set(float64(replicaState.CurrentOnDemand))
-
-		// Calculate and record spot utilization percentage
-		totalReplicas := replicaState.CurrentSpot + replicaState.CurrentOnDemand
-		if totalReplicas > 0 {
-			utilizationPercent := float64(replicaState.CurrentSpot) / float64(totalReplicas) * 100
-			spotUtilization.WithLabelValues(namespace, workloadName, workloadType).Set(utilizationPercent)
-		}
 	}
 }
 
 // RecordReconciliation records metrics for a reconciliation operation
-func (c *Collector) RecordReconciliation(namespace, workloadName, workloadType, action string, duration time.Duration, err error) {
+func (c *Collector) RecordReconciliation(namespace, workloadName, workloadType, action string, err error) {
 	result := "success"
 	if err != nil {
 		result = "error"
 		reconciliationErrors.WithLabelValues(namespace, workloadName, workloadType, "reconciliation").Inc()
 	}
 
-	reconciliationDuration.WithLabelValues(namespace, workloadName, workloadType, action).Observe(duration.Seconds())
 	reconciliationTotal.WithLabelValues(namespace, workloadName, workloadType, action, result).Inc()
 }
 
 // RecordWebhookRequest records metrics for webhook requests
-func (c *Collector) RecordWebhookRequest(operation, resourceKind, result string, duration time.Duration) {
+func (c *Collector) RecordWebhookRequest(operation, resourceKind, result string) {
 	webhookRequests.WithLabelValues(operation, resourceKind, result).Inc()
-	webhookDuration.WithLabelValues(operation, resourceKind).Observe(duration.Seconds())
 }
 
 // RecordWebhookMutation records metrics for webhook mutations
 func (c *Collector) RecordWebhookMutation(resourceKind, mutationType string) {
 	webhookMutations.WithLabelValues(resourceKind, mutationType).Inc()
-}
-
-// RecordAPIRequest records metrics for API requests
-func (c *Collector) RecordAPIRequest(apiGroup, resource string, requestRate float64) {
-	apiRequestRate.WithLabelValues(apiGroup, resource).Set(requestRate)
-}
-
-// RecordAPIError records metrics for API errors
-func (c *Collector) RecordAPIError(apiGroup, resource, errorType string) {
-	apiRequestErrors.WithLabelValues(apiGroup, resource, errorType).Inc()
-}
-
-// RecordRateLimitHit records metrics for rate limit hits
-func (c *Collector) RecordRateLimitHit(apiGroup, resource string) {
-	rateLimitHits.WithLabelValues(apiGroup, resource).Inc()
 }
 
 // UpdateControllerHealth updates controller health metrics
@@ -320,20 +244,11 @@ func (c *Collector) ResetMetrics() {
 	c.managedWorkloadsCount = 0
 	c.mutex.Unlock()
 
-	totalNodes.Reset()
-	readyNodes.Reset()
-	managedWorkloads.Reset()
 	workloadReplicas.Reset()
-	spotUtilization.Reset()
-	reconciliationDuration.Reset()
 	reconciliationTotal.Reset()
 	reconciliationErrors.Reset()
 	webhookRequests.Reset()
-	webhookDuration.Reset()
 	webhookMutations.Reset()
-	apiRequestRate.Reset()
-	apiRequestErrors.Reset()
-	rateLimitHits.Reset()
 	controllerLastSeen.Reset()
 	leaderElectionStatus.Reset()
 }
@@ -348,10 +263,8 @@ func (c *Collector) StartMetricsCollection(ctx context.Context, interval time.Du
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := c.UpdateNodeMetrics(ctx); err != nil {
-				// Log error but continue
-				continue
-			}
+			// Metrics collection logic can be added here if needed
+			// Currently a placeholder for future enhancements
 		}
 	}
 }
@@ -373,14 +286,12 @@ func (t *Timer) Elapsed() time.Duration {
 
 // ObserveReconciliation observes reconciliation duration and records metrics
 func (t *Timer) ObserveReconciliation(collector *Collector, namespace, workloadName, workloadType, action string, err error) {
-	duration := t.Elapsed()
-	collector.RecordReconciliation(namespace, workloadName, workloadType, action, duration, err)
+	collector.RecordReconciliation(namespace, workloadName, workloadType, action, err)
 }
 
 // ObserveWebhook observes webhook duration and records metrics
 func (t *Timer) ObserveWebhook(collector *Collector, operation, resourceKind, result string) {
-	duration := t.Elapsed()
-	collector.RecordWebhookRequest(operation, resourceKind, result, duration)
+	collector.RecordWebhookRequest(operation, resourceKind, result)
 }
 
 // GlobalCollector is the shared metrics collector instance used throughout the application
@@ -389,18 +300,13 @@ var GlobalCollector = NewCollector()
 // Helper functions for common metrics operations
 
 // RecordWorkloadReconciliation is a convenience function for recording workload reconciliation
-func RecordWorkloadReconciliation(namespace, workloadName, workloadType, action string, duration time.Duration, err error) {
-	GlobalCollector.RecordReconciliation(namespace, workloadName, workloadType, action, duration, err)
+func RecordWorkloadReconciliation(namespace, workloadName, workloadType, action string, err error) {
+	GlobalCollector.RecordReconciliation(namespace, workloadName, workloadType, action, err)
 }
 
 // RecordWebhookOperation is a convenience function for recording webhook operations
-func RecordWebhookOperation(operation, resourceKind, result string, duration time.Duration) {
-	GlobalCollector.RecordWebhookRequest(operation, resourceKind, result, duration)
-}
-
-// UpdateNodeHealth is a convenience function for updating node health metrics
-func UpdateNodeHealth(ctx context.Context) error {
-	return GlobalCollector.UpdateNodeMetrics(ctx)
+func RecordWebhookOperation(operation, resourceKind, result string) {
+	GlobalCollector.RecordWebhookRequest(operation, resourceKind, result)
 }
 
 // RecordSpotUtilization is a convenience function for recording spot utilization

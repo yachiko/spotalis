@@ -26,6 +26,7 @@ import (
 	"github.com/ahoma/spotalis/internal/annotations"
 	"github.com/ahoma/spotalis/internal/config"
 	"github.com/ahoma/spotalis/pkg/apis"
+	"github.com/ahoma/spotalis/pkg/metrics"
 	"gomodules.xyz/jsonpatch/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -54,6 +55,7 @@ type MutationHandler struct {
 	Client           client.Client
 	AnnotationParser *annotations.AnnotationParser
 	NodeClassifier   *config.NodeClassifierService
+	MetricsCollector *metrics.Collector
 	decoder          admission.Decoder
 }
 
@@ -71,6 +73,11 @@ func (m *MutationHandler) SetNodeClassifier(classifier *config.NodeClassifierSer
 	m.NodeClassifier = classifier
 }
 
+// SetMetricsCollector sets the metrics collector for recording webhook metrics
+func (m *MutationHandler) SetMetricsCollector(collector *metrics.Collector) {
+	m.MetricsCollector = collector
+}
+
 // Handle processes admission webhook requests
 func (m *MutationHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	logger := log.FromContext(ctx).WithValues(
@@ -82,13 +89,25 @@ func (m *MutationHandler) Handle(ctx context.Context, req admission.Request) adm
 
 	logger.Info("Processing admission webhook request")
 
+	var response admission.Response
 	switch req.Kind.Kind {
 	case "Pod":
-		return m.mutatePod(ctx, req)
+		response = m.mutatePod(ctx, req)
 	default:
 		logger.Info("Unsupported resource kind, allowing", "kind", req.Kind.Kind)
-		return admission.Allowed("unsupported resource kind")
+		response = admission.Allowed("unsupported resource kind")
 	}
+
+	// Record webhook metrics
+	if m.MetricsCollector != nil {
+		result := "allowed"
+		if !response.Allowed {
+			result = "denied"
+		}
+		m.MetricsCollector.RecordWebhookRequest(string(req.Operation), req.Kind.Kind, result)
+	}
+
+	return response
 }
 
 // mutatePod handles pod mutation for node affinity and tolerations
@@ -124,6 +143,22 @@ func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request) 
 
 	logger.Info("Applied pod mutations", "patches", len(patches))
 	logger.Info("Patches: ", "patches", patches)
+
+	// Record mutation metrics
+	if m.MetricsCollector != nil {
+		for _, patch := range patches {
+			// Determine mutation type from patch path
+			mutationType := "nodeSelector"
+			if path, ok := patch["path"].(string); ok {
+				if strings.Contains(path, "tolerations") {
+					mutationType = "tolerations"
+				} else if strings.Contains(path, "affinity") {
+					mutationType = "affinity"
+				}
+			}
+			m.MetricsCollector.RecordWebhookMutation("Pod", mutationType)
+		}
+	}
 
 	// Convert patches to JSON patch operations
 	var jsonPatches []jsonpatch.Operation

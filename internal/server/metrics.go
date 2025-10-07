@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -73,20 +72,8 @@ func (m *MetricsServer) MetricsHandler(c *gin.Context) {
 	// Collection errors are exposed via the health endpoint, not by failing metrics serving
 	// This allows metrics to continue working even when there are collection issues
 
-	// Update metrics before serving
-	if m.collector != nil {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-		defer cancel()
-
-		if err := m.collector.UpdateNodeMetrics(ctx); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":  "failed to update metrics",
-				"reason": err.Error(),
-				"code":   "METRICS_UPDATE_ERROR",
-			})
-			return
-		}
-	}
+	// Metrics are updated automatically by controllers and webhook handlers
+	// No need to manually update them here
 
 	// Use Prometheus HTTP handler to serve metrics
 	handler := promhttp.HandlerFor(m.gatherer, promhttp.HandlerOpts{

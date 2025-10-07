@@ -179,24 +179,12 @@ var _ = Describe("Observability and Monitoring", func() {
 		})
 
 		Context("Reconciliation count accuracy", func() {
-			It("should increment reconcile count when deployment is created", func() {
-				// Get initial reconcile count
-				initialMetrics := fetchAndParseMetrics(metricsURL)
-				initialCount := getCounterValue(initialMetrics, "spotalis_reconciliations_total", map[string]string{
-					"controller": "deployment",
-				})
-
-				// Create deployment
+			It("should increment reconcile count when deployment becomes managed", func() {
+				// Create unmanaged deployment first (no Spotalis labels/annotations)
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-reconcile-count",
 						Namespace: testNamespace,
-						Labels: map[string]string{
-							"spotalis.io/enabled": "true",
-						},
-						Annotations: map[string]string{
-							"spotalis.io/spot-percentage": "70",
-						},
 					},
 					Spec: appsv1.DeploymentSpec{
 						Replicas: int32Ptr(3),
@@ -208,6 +196,15 @@ var _ = Describe("Observability and Monitoring", func() {
 								Labels: map[string]string{"app": "test-reconcile-count"},
 							},
 							Spec: corev1.PodSpec{
+								NodeSelector: map[string]string{
+									"karpenter.sh/capacity-type": "spot",
+								},
+								Tolerations: []corev1.Toleration{
+									{
+										Key:    "node-role.kubernetes.io/control-plane",
+										Effect: corev1.TaintEffectNoSchedule,
+									},
+								},
 								Containers: []corev1.Container{
 									{
 										Name:  "nginx",
@@ -220,14 +217,51 @@ var _ = Describe("Observability and Monitoring", func() {
 				}
 				Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
 
-				// Wait for reconciliation
+				// Wait for pods to be created
+				Eventually(func() int {
+					podList := &corev1.PodList{}
+					err := k8sClient.List(ctx, podList, &client.ListOptions{
+						Namespace: testNamespace,
+						LabelSelector: labels.SelectorFromSet(map[string]string{
+							"app": "test-reconcile-count",
+						}),
+					})
+					if err != nil {
+						return 0
+					}
+					return len(podList.Items)
+				}, "30s", "2s").Should(Equal(3))
+
+				// Get initial reconcile count before enabling Spotalis
+				initialMetrics := fetchAndParseMetrics(metricsURL)
+				initialCount := getCounterValue(initialMetrics, "spotalis_reconciliations_total", map[string]string{
+					"namespace": testNamespace,
+				})
+
+				// Now enable Spotalis management by adding label and annotations
+				// This will trigger reconciliation to rebalance existing pods
+				err := k8sClient.Get(ctx, client.ObjectKey{
+					Namespace: testNamespace,
+					Name:      "test-reconcile-count",
+				}, deployment)
+				Expect(err).NotTo(HaveOccurred())
+
+				deployment.Labels = map[string]string{
+					"spotalis.io/enabled": "true",
+				}
+				deployment.Annotations = map[string]string{
+					"spotalis.io/spot-percentage": "70",
+				}
+				Expect(k8sClient.Update(ctx, deployment)).To(Succeed())
+
+				// Wait for reconciliation to occur (controller needs to rebalance existing pods)
 				Eventually(func() bool {
 					currentMetrics := fetchAndParseMetrics(metricsURL)
 					currentCount := getCounterValue(currentMetrics, "spotalis_reconciliations_total", map[string]string{
-						"controller": "deployment",
+						"namespace": testNamespace,
 					})
 					return currentCount > initialCount
-				}, "30s", "2s").Should(BeTrue(), "Reconcile count should increase after deployment creation")
+				}, "60s", "2s").Should(BeTrue(), "Reconcile count should increase after Spotalis management is enabled")
 			})
 
 			It("should track reconcile errors separately", func() {

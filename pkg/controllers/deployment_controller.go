@@ -59,7 +59,7 @@ type DeploymentReconciler struct {
 // MetricsRecorder interface for recording workload metrics
 type MetricsRecorder interface {
 	RecordWorkloadMetrics(namespace, workloadName, workloadType string, replicaState *apis.ReplicaState)
-	RecordReconciliation(namespace, workloadName, workloadType, action string, duration time.Duration, err error)
+	RecordReconciliation(namespace, workloadName, workloadType, action string, err error)
 }
 
 // NewDeploymentReconciler creates a new DeploymentReconciler
@@ -282,10 +282,9 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			"currentOnDemand", replicaState.CurrentOnDemand,
 			"desiredSpot", replicaState.DesiredSpot,
 			"desiredOnDemand", replicaState.DesiredOnDemand,
-		).Info("Rebalancing deployment pods")
+		).V(1).Info("Rebalancing deployment pods")
 
 		// Track rebalancing metrics
-		startTime := time.Now()
 		var rebalanceErr error
 
 		if err := r.performPodRebalancing(ctx, &deployment, replicaState, deploymentKey); err != nil {
@@ -302,13 +301,11 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		// Record rebalancing metrics
 		if r.MetricsCollector != nil {
-			duration := time.Since(startTime)
 			r.MetricsCollector.RecordReconciliation(
 				req.Namespace,
 				req.Name,
 				"deployment",
 				"rebalance",
-				duration,
 				rebalanceErr,
 			)
 		}

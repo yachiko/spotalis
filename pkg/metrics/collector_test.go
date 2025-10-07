@@ -29,22 +29,13 @@ import (
 var _ = Describe("Collector", func() {
 	var (
 		collector *Collector
-		ctx       context.Context
-		cancel    context.CancelFunc
 	)
 
 	BeforeEach(func() {
 		collector = NewCollector()
-		ctx, cancel = context.WithCancel(context.Background())
 
 		// Reset metrics before each test
 		collector.ResetMetrics()
-	})
-
-	AfterEach(func() {
-		if cancel != nil {
-			cancel()
-		}
 	})
 
 	Describe("NewCollector", func() {
@@ -80,41 +71,6 @@ var _ = Describe("Collector", func() {
 			for i := 0; i < 10; i++ {
 				Eventually(done).Should(Receive())
 			}
-		})
-	})
-
-	Describe("UpdateNodeMetrics", func() {
-		Context("when node classifier is not set", func() {
-			It("should return nil without error", func() {
-				err := collector.UpdateNodeMetrics(ctx)
-				Expect(err).To(BeNil())
-			})
-		})
-
-		Context("when node classifier returns error", func() {
-			It("should handle classifier errors gracefully", func() {
-				// Test the error handling path by ensuring the function
-				// can handle nil classifier without panicking
-				collector.SetNodeClassifier(nil)
-
-				err := collector.UpdateNodeMetrics(ctx)
-				Expect(err).To(BeNil()) // Should return nil when classifier is nil
-
-				// Verify that lastUpdate timestamp gets updated even when classifier is nil
-				snapshot := collector.GetMetricsSnapshot()
-				Expect(snapshot.LastUpdate).To(BeTemporally("~", time.Now(), time.Second))
-			})
-		})
-
-		Context("when context is canceled", func() {
-			It("should respect context cancellation", func() {
-				cancel() // Cancel the context
-				err := collector.UpdateNodeMetrics(ctx)
-
-				// Should either return nil (if classifier is nil) or handle cancellation
-				// The exact behavior depends on the classifier implementation
-				Expect(err).To(BeNil()) // Since classifier is nil in this test
-			})
 		})
 	})
 
@@ -168,48 +124,43 @@ var _ = Describe("Collector", func() {
 
 	Describe("RecordReconciliation", func() {
 		It("should record successful reconciliation", func() {
-			duration := 150 * time.Millisecond
-			collector.RecordReconciliation("namespace", "workload", "deployment", "update", duration, nil)
+			collector.RecordReconciliation("namespace", "workload", "deployment", "update", nil)
 
 			// In a real test, we'd verify the metrics were recorded correctly
 			// For now, ensure no panic occurs
 		})
 
 		It("should record failed reconciliation", func() {
-			duration := 300 * time.Millisecond
 			err := errors.New("reconciliation failed")
 
-			collector.RecordReconciliation("namespace", "workload", "deployment", "update", duration, err)
+			collector.RecordReconciliation("namespace", "workload", "deployment", "update", err)
 
-			// Should record both the duration and the error
+			// Should record both the action and the error
 		})
 
 		It("should handle various actions", func() {
 			actions := []string{"create", "update", "delete", "scale"}
-			duration := 100 * time.Millisecond
 
 			for _, action := range actions {
-				collector.RecordReconciliation("ns", "workload", "deployment", action, duration, nil)
+				collector.RecordReconciliation("ns", "workload", "deployment", action, nil)
 			}
 		})
 	})
 
 	Describe("RecordWebhookRequest", func() {
 		It("should record webhook request metrics", func() {
-			duration := 50 * time.Millisecond
-			collector.RecordWebhookRequest("CREATE", "Pod", "success", duration)
+			collector.RecordWebhookRequest("CREATE", "Pod", "success")
 
-			// Should record both request count and duration
+			// Should record request count
 		})
 
 		It("should handle different operations and results", func() {
 			operations := []string{"CREATE", "UPDATE", "DELETE"}
 			results := []string{"success", "failure", "timeout"}
-			duration := 25 * time.Millisecond
 
 			for _, op := range operations {
 				for _, result := range results {
-					collector.RecordWebhookRequest(op, "Pod", result, duration)
+					collector.RecordWebhookRequest(op, "Pod", result)
 				}
 			}
 		})
@@ -221,33 +172,6 @@ var _ = Describe("Collector", func() {
 			collector.RecordWebhookMutation("Deployment", "modify-spec")
 
 			// Should record mutation counts by resource and type
-		})
-	})
-
-	Describe("RecordAPIRequest", func() {
-		It("should record API request rate", func() {
-			collector.RecordAPIRequest("apps/v1", "deployments", 15.5)
-			collector.RecordAPIRequest("", "pods", 25.0)
-
-			// Should set the current request rate
-		})
-	})
-
-	Describe("RecordAPIError", func() {
-		It("should record API errors", func() {
-			collector.RecordAPIError("apps/v1", "deployments", "timeout")
-			collector.RecordAPIError("", "pods", "forbidden")
-
-			// Should increment error counters
-		})
-	})
-
-	Describe("RecordRateLimitHit", func() {
-		It("should record rate limit hits", func() {
-			collector.RecordRateLimitHit("apps/v1", "deployments")
-			collector.RecordRateLimitHit("", "pods")
-
-			// Should increment rate limit hit counters
 		})
 	})
 
@@ -302,8 +226,7 @@ var _ = Describe("Collector", func() {
 	Describe("ResetMetrics", func() {
 		It("should reset all metrics", func() {
 			// Record some metrics first
-			collector.RecordWebhookRequest("CREATE", "Pod", "success", 50*time.Millisecond)
-			collector.RecordAPIError("apps/v1", "deployments", "timeout")
+			collector.RecordWebhookRequest("CREATE", "Pod", "success")
 
 			// Reset all metrics
 			collector.ResetMetrics()
@@ -436,8 +359,7 @@ var _ = Describe("Global Functions", func() {
 
 	Describe("RecordWorkloadReconciliation", func() {
 		It("should use global collector", func() {
-			duration := 100 * time.Millisecond
-			RecordWorkloadReconciliation("namespace", "workload", "deployment", "update", duration, nil)
+			RecordWorkloadReconciliation("namespace", "workload", "deployment", "update", nil)
 
 			// Should delegate to global collector
 		})
@@ -445,20 +367,9 @@ var _ = Describe("Global Functions", func() {
 
 	Describe("RecordWebhookOperation", func() {
 		It("should use global collector", func() {
-			duration := 50 * time.Millisecond
-			RecordWebhookOperation("CREATE", "Pod", "success", duration)
+			RecordWebhookOperation("CREATE", "Pod", "success")
 
 			// Should delegate to global collector
-		})
-	})
-
-	Describe("UpdateNodeHealth", func() {
-		It("should use global collector", func() {
-			ctx := context.Background()
-			err := UpdateNodeHealth(ctx)
-
-			// Should return nil since no classifier is set
-			Expect(err).To(BeNil())
 		})
 	})
 
@@ -502,11 +413,8 @@ var _ = Describe("Metrics Integration", func() {
 		timer.ObserveReconciliation(collector, "production", "app-server", "deployment", "scale", nil)
 
 		// Record webhook operation
-		collector.RecordWebhookRequest("UPDATE", "Deployment", "success", 25*time.Millisecond)
+		collector.RecordWebhookRequest("UPDATE", "Deployment", "success")
 		collector.RecordWebhookMutation("Deployment", "add-spot-annotation")
-
-		// Record API metrics
-		collector.RecordAPIRequest("apps/v1", "deployments", 10.5)
 
 		// Update controller health
 		collector.UpdateControllerHealth("deployment-controller", true)
@@ -526,8 +434,7 @@ var _ = Describe("Metrics Integration", func() {
 				defer GinkgoRecover()
 
 				// Record various metrics concurrently
-				collector.RecordWebhookRequest("CREATE", "Pod", "success", 10*time.Millisecond)
-				collector.RecordAPIError("", "pods", "timeout")
+				collector.RecordWebhookRequest("CREATE", "Pod", "success")
 				collector.UpdateControllerHealth("test-controller", index%2 == 0)
 
 				done <- true
@@ -549,8 +456,7 @@ var _ = Describe("Metrics Integration", func() {
 		})
 
 		It("should handle empty strings in metrics", func() {
-			collector.RecordWebhookRequest("", "", "", 0)
-			collector.RecordAPIError("", "", "")
+			collector.RecordWebhookRequest("", "", "")
 			collector.UpdateControllerHealth("", true)
 
 			// Should handle empty strings without error

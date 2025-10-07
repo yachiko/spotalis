@@ -248,10 +248,9 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			"currentOnDemand", replicaState.CurrentOnDemand,
 			"desiredSpot", replicaState.DesiredSpot,
 			"desiredOnDemand", replicaState.DesiredOnDemand,
-		).Info("Rebalancing StatefulSet pods")
+		).V(1).Info("Rebalancing StatefulSet pods")
 
 		// Track rebalancing metrics
-		startTime := time.Now()
 		var rebalanceErr error
 
 		if err := r.performPodRebalancing(ctx, &statefulSet, replicaState, statefulsetKey); err != nil {
@@ -268,13 +267,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 		// Record rebalancing metrics
 		if r.MetricsCollector != nil {
-			duration := time.Since(startTime)
 			r.MetricsCollector.RecordReconciliation(
 				req.Namespace,
 				req.Name,
 				"statefulset",
 				"rebalance",
-				duration,
 				rebalanceErr,
 			)
 		}
