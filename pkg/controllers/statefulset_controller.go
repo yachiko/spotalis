@@ -250,7 +250,12 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			"desiredOnDemand", replicaState.DesiredOnDemand,
 		).Info("Rebalancing StatefulSet pods")
 
+		// Track rebalancing metrics
+		startTime := time.Now()
+		var rebalanceErr error
+
 		if err := r.performPodRebalancing(ctx, &statefulSet, replicaState, statefulsetKey); err != nil {
+			rebalanceErr = err
 			r.errorCount.Add(1)
 			r.setLastError(&ControllerError{
 				Error:     err,
@@ -259,7 +264,23 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				Recovered: false,
 			})
 			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName).Error(err, "Failed to rebalance StatefulSet pods")
-			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
+		}
+
+		// Record rebalancing metrics
+		if r.MetricsCollector != nil {
+			duration := time.Since(startTime)
+			r.MetricsCollector.RecordReconciliation(
+				req.Namespace,
+				req.Name,
+				"statefulset",
+				"rebalance",
+				duration,
+				rebalanceErr,
+			)
+		}
+
+		if rebalanceErr != nil {
+			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, rebalanceErr
 		}
 
 		// After performing rebalancing, requeue sooner to check the results

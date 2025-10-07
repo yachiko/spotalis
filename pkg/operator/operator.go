@@ -668,6 +668,10 @@ func (o *Operator) initializeCoreServices() error {
 	o.metricsCollector = metrics.NewCollector()
 	o.metricsCollector.SetNodeClassifier(o.nodeClassifier)
 
+	// Register Spotalis metrics with controller-runtime's global registry
+	// This ensures they appear alongside controller_runtime_* metrics
+	o.metricsCollector.RegisterMetricsGlobal()
+
 	// Initialize mutation handler
 	o.mutationHandler = webhookMutate.NewMutationHandler(o.GetClient(), o.GetScheme())
 	o.mutationHandler.SetNodeClassifier(o.nodeClassifier)

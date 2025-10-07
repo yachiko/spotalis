@@ -59,6 +59,7 @@ type DeploymentReconciler struct {
 // MetricsRecorder interface for recording workload metrics
 type MetricsRecorder interface {
 	RecordWorkloadMetrics(namespace, workloadName, workloadType string, replicaState *apis.ReplicaState)
+	RecordReconciliation(namespace, workloadName, workloadType, action string, duration time.Duration, err error)
 }
 
 // NewDeploymentReconciler creates a new DeploymentReconciler
@@ -283,7 +284,12 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			"desiredOnDemand", replicaState.DesiredOnDemand,
 		).Info("Rebalancing deployment pods")
 
+		// Track rebalancing metrics
+		startTime := time.Now()
+		var rebalanceErr error
+
 		if err := r.performPodRebalancing(ctx, &deployment, replicaState, deploymentKey); err != nil {
+			rebalanceErr = err
 			r.errorCount.Add(1)
 			r.setLastError(&ControllerError{
 				Error:     err,
@@ -292,7 +298,23 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Recovered: false,
 			})
 			log.FromContext(ctx).WithValues("deployment", req.NamespacedName).Error(err, "Failed to rebalance deployment pods")
-			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, err
+		}
+
+		// Record rebalancing metrics
+		if r.MetricsCollector != nil {
+			duration := time.Since(startTime)
+			r.MetricsCollector.RecordReconciliation(
+				req.Namespace,
+				req.Name,
+				"deployment",
+				"rebalance",
+				duration,
+				rebalanceErr,
+			)
+		}
+
+		if rebalanceErr != nil {
+			return ctrl.Result{RequeueAfter: r.ReconcileInterval}, rebalanceErr
 		}
 
 		// After performing rebalancing, requeue sooner to check the results

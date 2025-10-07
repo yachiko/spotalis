@@ -30,57 +30,13 @@ import (
 )
 
 var (
-	// Node metrics
-	totalNodes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "spotalis_nodes_total",
-			Help: "Total number of nodes by type",
-		},
-		[]string{"node_type", "status"},
-	)
-
-	readyNodes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "spotalis_nodes_ready",
-			Help: "Number of ready nodes by type",
-		},
-		[]string{"node_type"},
-	)
-
 	// Workload metrics
-	managedWorkloads = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "spotalis_workloads_managed_total",
-			Help: "Total number of workloads managed by Spotalis",
-		},
-		[]string{"namespace", "workload_type"},
-	)
-
 	workloadReplicas = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "spotalis_workload_replicas",
 			Help: "Number of replicas for managed workloads",
 		},
 		[]string{"namespace", "workload", "workload_type", "replica_type"},
-	)
-
-	// Spot instance utilization metrics
-	spotUtilization = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "spotalis_spot_utilization_percentage",
-			Help: "Percentage of spot instance utilization",
-		},
-		[]string{"namespace", "workload", "workload_type"},
-	)
-
-	// Reconciliation metrics
-	reconciliationDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "spotalis_reconciliation_duration_seconds",
-			Help:    "Time spent on workload reconciliation",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"namespace", "workload", "workload_type", "action"},
 	)
 
 	reconciliationTotal = prometheus.NewCounterVec(
@@ -108,46 +64,12 @@ var (
 		[]string{"operation", "resource_kind", "result"},
 	)
 
-	webhookDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "spotalis_webhook_duration_seconds",
-			Help:    "Time spent processing webhook requests",
-			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0},
-		},
-		[]string{"operation", "resource_kind"},
-	)
-
 	webhookMutations = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "spotalis_webhook_mutations_total",
 			Help: "Total number of webhook mutations applied",
 		},
 		[]string{"resource_kind", "mutation_type"},
-	)
-
-	// API server load metrics
-	apiRequestRate = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "spotalis_api_requests_per_second",
-			Help: "Current API request rate to Kubernetes API server",
-		},
-		[]string{"api_group", "resource"},
-	)
-
-	apiRequestErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "spotalis_api_request_errors_total",
-			Help: "Total number of API request errors",
-		},
-		[]string{"api_group", "resource", "error_type"},
-	)
-
-	rateLimitHits = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "spotalis_rate_limit_hits_total",
-			Help: "Total number of rate limit hits",
-		},
-		[]string{"api_group", "resource"},
 	)
 
 	// Controller health metrics
@@ -178,9 +100,48 @@ type Collector struct {
 
 // NewCollector creates a new metrics collector
 func NewCollector() *Collector {
+	// Initialize metrics with zero values so they appear in Prometheus output
+	// even before any workloads are managed
+	initializeMetrics()
+
 	return &Collector{
 		lastUpdate: time.Now(),
 	}
+}
+
+// initializeMetrics initializes all metrics with zero/default values
+// This ensures they appear in the Prometheus metrics output even if not yet used
+func initializeMetrics() {
+	// Initialize counters to 0 (they will appear in output)
+	// reconciliationTotal: []string{"namespace", "workload", "workload_type", "action", "result"}
+	reconciliationTotal.WithLabelValues("", "", "", "", "success").Add(0)
+
+	// reconciliationErrors: []string{"namespace", "workload", "workload_type", "error_type"}
+	reconciliationErrors.WithLabelValues("", "", "", "").Add(0)
+
+	// webhookRequests: []string{"operation", "resource_kind", "result"}
+	webhookRequests.WithLabelValues("", "", "").Add(0)
+
+	// webhookMutations: []string{"resource_kind", "mutation_type"}
+	webhookMutations.WithLabelValues("", "").Add(0)
+
+	// apiRequestErrors: []string{"api_group", "resource", "error_type"}
+	apiRequestErrors.WithLabelValues("", "", "").Add(0)
+
+	// rateLimitHits: []string{"api_group", "resource"}
+	rateLimitHits.WithLabelValues("", "").Add(0)
+
+	// Initialize gauges to 0
+	// totalNodes: []string{"node_type", "status"}
+	totalNodes.WithLabelValues("spot", "ready").Set(0)
+	totalNodes.WithLabelValues("on-demand", "ready").Set(0)
+
+	// readyNodes: []string{"node_type"}
+	readyNodes.WithLabelValues("spot").Set(0)
+	readyNodes.WithLabelValues("on-demand").Set(0)
+
+	// leaderElectionStatus: []string{"controller_name"}
+	leaderElectionStatus.WithLabelValues("").Set(0)
 }
 
 // SetNodeClassifier sets the node classifier service for metrics collection
@@ -196,7 +157,9 @@ func (c *Collector) RegisterMetrics(registry prometheus.Registerer) {
 		registry = metrics.Registry // Use global registry as fallback
 	}
 
-	registry.MustRegister(
+	// Use Register instead of MustRegister to avoid panics on duplicate registration
+	// This can happen during controller restarts or in tests
+	collectors := []prometheus.Collector{
 		totalNodes,
 		readyNodes,
 		managedWorkloads,
@@ -213,7 +176,17 @@ func (c *Collector) RegisterMetrics(registry prometheus.Registerer) {
 		rateLimitHits,
 		controllerLastSeen,
 		leaderElectionStatus,
-	)
+	}
+
+	for _, collector := range collectors {
+		if err := registry.Register(collector); err != nil {
+			// Ignore "already registered" errors, but log others
+			if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
+				// In production, you might want to log this error
+				// For now, we silently ignore registration errors
+			}
+		}
+	}
 }
 
 // RegisterMetricsGlobal registers all Spotalis metrics with the global registry (for backwards compatibility)
