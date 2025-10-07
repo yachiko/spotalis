@@ -87,38 +87,38 @@ Advanced usage with custom services:
 
 Services follow a consistent lifecycle:
 
-	1. Configuration Loading
-	   - Load config.yaml
-	   - Apply environment variable overrides
-	   - Validate configuration
+ 1. Configuration Loading
+    - Load config.yaml
+    - Apply environment variable overrides
+    - Validate configuration
 
-	2. Service Registration
-	   - Register configuration provider
-	   - Register Kubernetes client
-	   - Register annotation parser
-	   - Register node classifier
-	   - Register controllers
-	   - Register webhook
-	   - Register metrics collector
-	   - Register operator
+ 2. Service Registration
+    - Register configuration provider
+    - Register Kubernetes client
+    - Register annotation parser
+    - Register node classifier
+    - Register controllers
+    - Register webhook
+    - Register metrics collector
+    - Register operator
 
-	3. Dependency Resolution
-	   - DI container resolves dependency graph
-	   - Detects circular dependencies
-	   - Validates all dependencies satisfied
+ 3. Dependency Resolution
+    - DI container resolves dependency graph
+    - Detects circular dependencies
+    - Validates all dependencies satisfied
 
-	4. Service Startup
-	   - Start HTTP servers (metrics, health, webhook)
-	   - Start controller manager
-	   - Start leader election (if enabled)
-	   - Start operator
+ 4. Service Startup
+    - Start HTTP servers (metrics, health, webhook)
+    - Start controller manager
+    - Start leader election (if enabled)
+    - Start operator
 
-	5. Graceful Shutdown
-	   - Handle SIGTERM/SIGINT
-	   - Stop accepting new requests
-	   - Complete in-flight reconciliations
-	   - Stop HTTP servers
-	   - Close Kubernetes client connections
+ 5. Graceful Shutdown
+    - Handle SIGTERM/SIGINT
+    - Stop accepting new requests
+    - Complete in-flight reconciliations
+    - Stop HTTP servers
+    - Close Kubernetes client connections
 
 # Configuration Provider
 

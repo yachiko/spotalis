@@ -6,7 +6,14 @@ you may not use this file except in compliance with the License.
 You 				response := performRequest(engine, "POST", "/mutate", admissionReview)
 				Expect(response.Code).To(Equal(http.StatusOK))
 
-				var reviewResponse v1.AdmissionReview
+				var			config := WebhookServerConfig{
+				Port:     9443,
+				CertPath: "/tmp/tls.crt",
+				KeyPath:  "/tmp/tls.key",
+				Quiet:    true, // Suppress debug logs in tests
+			}
+
+			webhookServer = NewWebhookServer(config, mutateHandler, scheme)Response v1.AdmissionReview
 				err := parseJSONResponse(response, &reviewResponse)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(reviewResponse.Response.Allowed).To(BeTrue()) // Allowed but no mutations applied
@@ -63,6 +70,7 @@ var _ = Describe("WebhookServer", func() {
 			Port:     9443,
 			CertPath: "/tmp/tls.crt",
 			KeyPath:  "/tmp/tls.key",
+			Quiet:    true, // Suppress debug logs in tests
 		}
 
 		webhookServer = NewWebhookServer(config, mutateHandler, scheme)
@@ -78,6 +86,7 @@ var _ = Describe("WebhookServer", func() {
 			Expect(server.port).To(Equal(9443))
 			Expect(server.certPath).To(Equal("/tmp/tls.crt"))
 			Expect(server.keyPath).To(Equal("/tmp/tls.key"))
+			Expect(server.quiet).To(BeTrue())
 		})
 	})
 

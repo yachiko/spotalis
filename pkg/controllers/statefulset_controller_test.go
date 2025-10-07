@@ -222,6 +222,9 @@ var _ = Describe("StatefulSetReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-statefulset",
 					Namespace: "default",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
 						"spotalis.io/spot-percentage": "60",
 					},
@@ -332,7 +335,9 @@ var _ = Describe("StatefulSetReconciler", func() {
 				invalidStatefulSet := statefulSet.DeepCopy()
 				invalidStatefulSet.Name = "invalid-statefulset"
 				invalidStatefulSet.ResourceVersion = "" // Clear resourceVersion for Create
-				invalidStatefulSet.Annotations["spotalis.io/enabled"] = "true"
+				invalidStatefulSet.Labels = map[string]string{
+					"spotalis.io/enabled": "true",
+				}
 				invalidStatefulSet.Annotations["spotalis.io/spot-percentage"] = "invalid"
 
 				Expect(fakeClient.Create(ctx, invalidStatefulSet)).To(Succeed())
@@ -702,6 +707,9 @@ var _ = Describe("StatefulSetReconciler", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ordered-scaling-test",
 						Namespace: "default",
+						Labels: map[string]string{
+							"spotalis.io/enabled": "true",
+						},
 						Annotations: map[string]string{
 							"spotalis.io/spot-percentage": "50",
 						},
@@ -754,6 +762,9 @@ var _ = Describe("StatefulSetReconciler", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pvc-test",
 						Namespace: "default",
+						Labels: map[string]string{
+							"spotalis.io/enabled": "true",
+						},
 						Annotations: map[string]string{
 							"spotalis.io/spot-percentage": "40",
 						},
@@ -830,6 +841,9 @@ var _ = Describe("StatefulSetReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-statefulset",
 					Namespace: "default",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
 						"spotalis.io/spot-percentage": "50",
 					},
@@ -1070,8 +1084,10 @@ var _ = Describe("StatefulSetReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-statefulset",
 					Namespace: "default",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70",
 					},
 				},

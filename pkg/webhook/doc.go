@@ -43,12 +43,12 @@ Setting up webhook with dependency injection:
 
 The webhook determines pod placement based on owner configuration:
 
-	1. Extract pod owner reference (Deployment, StatefulSet, etc.)
-	2. Retrieve owner's spotalis.io/* annotations
-	3. Parse configuration (spot percentage, min on-demand)
-	4. Calculate pod index from pod name
-	5. Determine if pod should be spot or on-demand
-	6. Inject nodeSelector: {"spotalis.io/capacity-type": "spot|on-demand"}
+ 1. Extract pod owner reference (Deployment, StatefulSet, etc.)
+ 2. Retrieve owner's spotalis.io/* annotations
+ 3. Parse configuration (spot percentage, min on-demand)
+ 4. Calculate pod index from pod name
+ 5. Determine if pod should be spot or on-demand
+ 6. Inject nodeSelector: {"spotalis.io/capacity-type": "spot|on-demand"}
 
 # StatefulSet Handling
 

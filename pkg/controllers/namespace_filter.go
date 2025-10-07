@@ -504,7 +504,7 @@ func (nf *NamespaceFilter) applyMetadataFilters(ctx context.Context, namespace s
 
 // checkMetadataRequirements checks all label and annotation requirements
 func (nf *NamespaceFilter) checkMetadataRequirements(namespaceObj *corev1.Namespace, result *FilterResult) bool {
-	// Check required labels
+	// Check required labels (including spotalis.io/enabled)
 	if !nf.checkRequiredLabels(namespaceObj.Labels) {
 		result.Allowed = false
 		result.Reason = "missing required labels"
@@ -520,15 +520,7 @@ func (nf *NamespaceFilter) checkMetadataRequirements(namespaceObj *corev1.Namesp
 		return true
 	}
 
-	// Check required annotations
-	if !nf.checkRequiredAnnotations(namespaceObj.Annotations) {
-		result.Allowed = false
-		result.Reason = "missing required annotations"
-		result.MatchedRule = "required_annotations_check"
-		return true
-	}
-
-	// Check forbidden annotations
+	// Check forbidden annotations (still useful for blocking namespaces with problematic annotations)
 	if nf.checkForbiddenAnnotations(namespaceObj.Annotations) {
 		result.Allowed = false
 		result.Reason = "has forbidden annotations"

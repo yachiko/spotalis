@@ -107,14 +107,15 @@ func NewControllerManager(
 		config = DefaultManagerConfig()
 	}
 
-	// Create a default namespace filter that requires spotalis.io/enabled annotation on namespaces
+	// Create a default namespace filter that requires spotalis.io/enabled label on namespaces
+	// Labels are used for consistency with workload enablement and webhook namespace selectors
 	// Only create if we have a valid manager with a client
 	var namespaceFilter *NamespaceFilter
 	if mgr != nil {
 		client := mgr.GetClient()
 		if client != nil {
 			namespaceFilterConfig := DefaultNamespaceFilterConfig()
-			namespaceFilterConfig.RequiredAnnotations = map[string]string{
+			namespaceFilterConfig.RequiredLabels = map[string]string{
 				"spotalis.io/enabled": "true",
 			}
 			var err error

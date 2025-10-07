@@ -121,13 +121,13 @@ Check leader status:
 
 Operator handles shutdown gracefully:
 
-	1. Signal received (SIGTERM/SIGINT)
-	2. Stop HTTP servers (no new requests)
-	3. Complete in-flight reconciliations (30s timeout)
-	4. Stop controller manager
-	5. Release leader lease (if leader)
-	6. Close Kubernetes client connections
-	7. Exit process
+ 1. Signal received (SIGTERM/SIGINT)
+ 2. Stop HTTP servers (no new requests)
+ 3. Complete in-flight reconciliations (30s timeout)
+ 4. Stop controller manager
+ 5. Release leader lease (if leader)
+ 6. Close Kubernetes client connections
+ 7. Exit process
 
 Shutdown timeout (from config):
 

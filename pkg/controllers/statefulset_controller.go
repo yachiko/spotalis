@@ -146,7 +146,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			log.FromContext(ctx).WithValues("statefulset", req.NamespacedName, "statefulsetKey", statefulsetKey).Error(nil, "Invalid type for last deletion time")
 			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
 		}
-		cooldownPeriod := 3 * time.Minute // Wait 3 minutes after deleting a pod
+		cooldownPeriod := 10 * time.Second // Wait 10 seconds after deleting a pod
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
 		if timeSinceLastDeletion < cooldownPeriod {
@@ -347,18 +347,18 @@ func (r *StatefulSetReconciler) needsRebalancing(state *apis.ReplicaState) bool 
 		return false // No pods to rebalance
 	}
 
-	// Calculate tolerance (allow some variance to avoid constant rebalancing)
-	tolerance := int32(1)
-	if currentTotal > 10 {
-		tolerance = currentTotal / 10 // 10% tolerance for larger StatefulSets
-	}
-
 	spotDiff := state.DesiredSpot - state.CurrentSpot
 	onDemandDiff := state.DesiredOnDemand - state.CurrentOnDemand
 
-	// Need rebalancing if difference exceeds tolerance
-	return (spotDiff > tolerance || spotDiff < -tolerance) ||
-		(onDemandDiff > tolerance || onDemandDiff < -tolerance)
+	needsRebalancing := spotDiff != 0 || onDemandDiff != 0
+
+	log.Log.Info("needsRebalancing check",
+		"spotDiff", spotDiff,
+		"onDemandDiff", onDemandDiff,
+		"needsRebalancing", needsRebalancing,
+		"currentTotal", currentTotal)
+
+	return needsRebalancing
 }
 
 // resolveDisruptionWindow resolves the disruption window from the configuration hierarchy:

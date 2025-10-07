@@ -221,6 +221,9 @@ var _ = Describe("DeploymentReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-deployment",
 					Namespace: "default",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
 						"spotalis.io/spot-percentage": "70",
 					},
@@ -330,7 +333,7 @@ var _ = Describe("DeploymentReconciler", func() {
 				invalidDeployment := deployment.DeepCopy()
 				invalidDeployment.Name = "invalid-deployment"
 				invalidDeployment.ResourceVersion = "" // Clear resourceVersion for Create
-				invalidDeployment.Annotations["spotalis.io/enabled"] = "true"
+				invalidDeployment.Labels["spotalis.io/enabled"] = "true"
 				invalidDeployment.Annotations["spotalis.io/spot-percentage"] = "invalid"
 
 				Expect(fakeClient.Create(ctx, invalidDeployment)).To(Succeed())
@@ -691,6 +694,9 @@ var _ = Describe("DeploymentReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-deployment",
 					Namespace: "default",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
 						"spotalis.io/spot-percentage": "50",
 					},
@@ -957,8 +963,10 @@ var _ = Describe("DeploymentReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-deployment",
 					Namespace: "default",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70",
 					},
 				},

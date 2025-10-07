@@ -58,25 +58,28 @@ func NewAnnotationParser() *AnnotationParser {
 	return &AnnotationParser{}
 }
 
-// ParseWorkloadConfiguration extracts WorkloadConfiguration from object annotations
+// ParseWorkloadConfiguration extracts WorkloadConfiguration from object labels and annotations
+// The enabled flag MUST be set via label: spotalis.io/enabled=true
+// Configuration parameters are read from annotations
 func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.WorkloadConfiguration, error) {
-	annotations := obj.GetAnnotations()
-	if annotations == nil {
-		return nil, fmt.Errorf("no annotations found on object")
-	}
-
 	config := &apis.WorkloadConfiguration{}
 
-	// Check if Spotalis is enabled for this workload
-	if enabled, exists := annotations[EnabledAnnotation]; exists {
-		config.Enabled = enabled == BooleanTrue
-	} else {
-		// If no enabled annotation, default to false
-		config.Enabled = false
+	// Check if Spotalis is enabled via label (REQUIRED)
+	labels := obj.GetLabels()
+	if labels != nil {
+		if enabled, exists := labels[EnabledAnnotation]; exists {
+			config.Enabled = enabled == BooleanTrue
+		}
 	}
 
-	// Only process other annotations if enabled
+	// Only process configuration annotations if enabled
 	if !config.Enabled {
+		return config, nil
+	}
+
+	// Parse configuration from annotations
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
 		return config, nil
 	}
 
@@ -132,24 +135,21 @@ func (p *AnnotationParser) HasSpotalisAnnotations(obj metav1.Object) bool {
 }
 
 // IsSpotalisEnabled checks if Spotalis is enabled for the object
-// If spotalis.io/enabled exists, it must be "true"
-// If spotalis.io/enabled doesn't exist, but other Spotalis annotations exist, it's enabled by default
+// Checks for label spotalis.io/enabled=true (REQUIRED)
+// If label exists and is "true", Spotalis is enabled
+// If label doesn't exist or is not "true", Spotalis is disabled
 func (p *AnnotationParser) IsSpotalisEnabled(obj metav1.Object) bool {
-	annotations := obj.GetAnnotations()
-	if annotations == nil {
+	labels := obj.GetLabels()
+	if labels == nil {
 		return false
 	}
 
-	// Check if spotalis.io/enabled annotation exists
-	enabled, exists := annotations[EnabledAnnotation]
-	if exists {
-		// If explicit enabled annotation exists, it must be "true"
-		return strings.ToLower(enabled) == BooleanTrue
+	enabled, exists := labels[EnabledAnnotation]
+	if !exists {
+		return false
 	}
 
-	// If no explicit enabled annotation, check if any other Spotalis annotations exist
-	// This maintains backward compatibility
-	return p.HasSpotalisAnnotations(obj)
+	return strings.ToLower(enabled) == BooleanTrue
 }
 
 // GetAnnotationValue safely retrieves an annotation value

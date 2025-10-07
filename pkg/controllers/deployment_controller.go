@@ -170,7 +170,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			log.FromContext(ctx).WithValues("deployment", req.NamespacedName, "deploymentKey", deploymentKey).Error(nil, "Invalid type for last deletion time")
 			return ctrl.Result{}, fmt.Errorf("invalid type for last deletion time: %T", lastDeletionInterface)
 		}
-		cooldownPeriod := 5 * time.Second // Wait 10 seconds after deleting a pod
+		cooldownPeriod := 10 * time.Second // Wait 10 seconds after deleting a pod
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
 		if timeSinceLastDeletion < cooldownPeriod {
@@ -475,7 +475,6 @@ func (r *DeploymentReconciler) needsRebalancing(state *apis.ReplicaState) bool {
 
 	needsRebalancing := spotDiff != 0 || onDemandDiff != 0
 
-	// Add debug logging to help diagnose the issue
 	log.Log.Info("needsRebalancing check",
 		"spotDiff", spotDiff,
 		"onDemandDiff", onDemandDiff,

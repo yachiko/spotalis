@@ -33,10 +33,12 @@ var _ = Describe("AnnotationParser", func() {
 
 	Describe("ParseWorkloadConfiguration", func() {
 		Context("with valid annotations", func() {
-			It("should parse all configuration values", func() {
+			It("should parse all configuration values with label-based enablement", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70%",
 						"spotalis.io/min-on-demand":   "2",
 					},
@@ -49,10 +51,12 @@ var _ = Describe("AnnotationParser", func() {
 				Expect(config.MinOnDemand).To(Equal(int32(2)))
 			})
 
-			It("should parse minimal configuration", func() {
+			It("should parse minimal configuration with label-based enablement", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50%",
 					},
 				}
@@ -67,6 +71,9 @@ var _ = Describe("AnnotationParser", func() {
 
 			It("should handle zero values", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "0",
 						"spotalis.io/min-on-demand":   "0",
@@ -85,8 +92,10 @@ var _ = Describe("AnnotationParser", func() {
 		Context("with invalid annotations", func() {
 			It("should fail with invalid spot percentage", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "invalid",
 					},
 				}
@@ -98,8 +107,10 @@ var _ = Describe("AnnotationParser", func() {
 
 			It("should fail with invalid spot percentage", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "not-a-number",
 					},
 				}
@@ -111,8 +122,10 @@ var _ = Describe("AnnotationParser", func() {
 
 			It("should fail with invalid min-on-demand", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":       "true",
 						"spotalis.io/min-on-demand": "not-a-number",
 					},
 				}
@@ -122,14 +135,41 @@ var _ = Describe("AnnotationParser", func() {
 				Expect(err.Error()).To(ContainSubstring("invalid min-on-demand annotation"))
 			})
 
-			It("should return disabled config when no annotations exist", func() {
+			It("should return disabled config when neither labels nor annotations exist", func() {
 				obj := &MockObject{
+					labels:      nil,
 					annotations: nil,
 				}
 
-				_, err := parser.ParseWorkloadConfiguration(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("no annotations found"))
+				config, err := parser.ParseWorkloadConfiguration(obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config.Enabled).To(BeFalse())
+			})
+
+			It("should return disabled config when label is missing", func() {
+				obj := &MockObject{
+					annotations: map[string]string{
+						"spotalis.io/spot-percentage": "70%",
+					},
+				}
+
+				config, err := parser.ParseWorkloadConfiguration(obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config.Enabled).To(BeFalse())
+			})
+
+			It("should succeed with label-based enablement and no annotations", func() {
+				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
+					annotations: nil,
+				}
+
+				config, err := parser.ParseWorkloadConfiguration(obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config.Enabled).To(BeTrue())
+				Expect(config.SpotPercentage).To(Equal(int32(0))) // No config annotations, defaults to 0
 			})
 		})
 	})
@@ -449,6 +489,7 @@ var _ = Describe("AnnotationParser", func() {
 
 // MockObject implements metav1.Object for testing
 type MockObject struct {
+	labels      map[string]string
 	annotations map[string]string
 }
 
@@ -458,6 +499,14 @@ func (m *MockObject) GetAnnotations() map[string]string {
 
 func (m *MockObject) SetAnnotations(annotations map[string]string) {
 	m.annotations = annotations
+}
+
+func (m *MockObject) GetLabels() map[string]string {
+	return m.labels
+}
+
+func (m *MockObject) SetLabels(labels map[string]string) {
+	m.labels = labels
 }
 
 func (m *MockObject) GetName() string                                { return "test-object" }
@@ -480,8 +529,6 @@ func (m *MockObject) GetDeletionTimestamp() *metav1.Time             { return ni
 func (m *MockObject) SetDeletionTimestamp(_ *metav1.Time)            {}
 func (m *MockObject) GetDeletionGracePeriodSeconds() *int64          { return nil }
 func (m *MockObject) SetDeletionGracePeriodSeconds(_ *int64)         {}
-func (m *MockObject) GetLabels() map[string]string                   { return nil }
-func (m *MockObject) SetLabels(_ map[string]string)                  {}
 func (m *MockObject) GetOwnerReferences() []metav1.OwnerReference    { return nil }
 func (m *MockObject) SetOwnerReferences(_ []metav1.OwnerReference)   {}
 func (m *MockObject) GetFinalizers() []string                        { return nil }

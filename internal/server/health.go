@@ -90,15 +90,17 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	// Basic liveness check - controller is running
 	uptime := time.Since(h.startTime)
 
-	// Check if we can reach the Kubernetes API server
-	if err := h.checkKubernetesAPI(ctx); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status":    "unhealthy",
-			"component": "kubernetes-api",
-			"error":     err.Error(),
-			"uptime":    uptime.String(),
-		})
-		return
+	// Check if we can reach the Kubernetes API server (skip in test mode when kubeClient is nil)
+	if h.kubeClient != nil {
+		if err := h.checkKubernetesAPI(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":    "unhealthy",
+				"component": "kubernetes-api",
+				"error":     err.Error(),
+				"uptime":    uptime.String(),
+			})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -135,14 +137,16 @@ func (h *HealthChecker) ReadyzHandler(c *gin.Context) {
 	if kubernetesDown {
 		checks["kubernetes-api"] = "manually marked as unavailable"
 		healthy = false
-	} else {
-		// Check Kubernetes API connectivity
+	} else if h.kubeClient != nil {
+		// Check Kubernetes API connectivity (skip in test mode when kubeClient is nil)
 		if err := h.checkKubernetesAPI(ctx); err != nil {
 			checks["kubernetes-api"] = fmt.Sprintf("failed: %v", err)
 			healthy = false
 		} else {
 			checks["kubernetes-api"] = "ok"
 		}
+	} else {
+		checks["kubernetes-api"] = "skipped (test mode)"
 	}
 
 	// Check if manager is running
@@ -153,14 +157,16 @@ func (h *HealthChecker) ReadyzHandler(c *gin.Context) {
 		checks["manager"] = "ok"
 	}
 
-	// Check if we can access our deployment namespace
-	if !kubernetesDown {
+	// Check if we can access our deployment namespace (skip in test mode when kubeClient is nil)
+	if !kubernetesDown && h.kubeClient != nil {
 		if err := h.checkNamespaceAccess(ctx); err != nil {
 			checks["namespace-access"] = fmt.Sprintf("failed: %v", err)
 			healthy = false
 		} else {
 			checks["namespace-access"] = "ok"
 		}
+	} else if h.kubeClient == nil {
+		checks["namespace-access"] = "skipped (test mode)"
 	}
 
 	// Check controller manager readiness
