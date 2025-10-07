@@ -1011,6 +1011,10 @@ type MockMetricsRecorder struct {
 	}
 }
 
+func (m *MockMetricsRecorder) RecordReconciliation(namespace, workloadName, workloadType, action string, err error) {
+	// No-op for mock
+}
+
 func (m *MockMetricsRecorder) RecordWorkloadMetrics(namespace, workloadName, workloadType string, replicaState *apis.ReplicaState) {
 	m.RecordedMetrics = append(m.RecordedMetrics, struct {
 		Namespace    string
