@@ -36,11 +36,11 @@ fmt:
 
 .PHONY: test
 test: envtest ## Run unit tests
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_DIR) -p path)" go clean -testcache && go test ./pkg/... ./internal/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_DIR) -p path)" go clean -testcache && go test ./... -v --tags=unit -timeout=5m -ginkgo.v
 
 .PHONY: test-integration
-test-integration:  ## Run integration tests with Kind
-	go test ./tests/integration/... -v -tags=integration -timeout=15m
+test-integration:
+	go test ./tests/integration/... -v -tags=integration -timeout=15m -ginkgo.v
 
 ##@ Build
 .PHONY: build
@@ -70,6 +70,10 @@ docker-build: ## Build Docker images for all platforms
 kind: ## Setup Kind cluster for development
 	@chmod +x scripts/setup-kind.sh
 	@scripts/setup-kind.sh
+
+.PHONY: kind-port-forward
+kind-port-forward: ## Port-forward Spotalis controller metrics and health endpoints
+	kubectl -n spotalis-system port-forward deployment/spotalis-controller 8090:8080 8091:8081 &
 
 .PHONY: kind-load
 kind-load: docker-build-local ## Load Docker image into Kind cluster
