@@ -389,9 +389,8 @@ func (sm *ShutdownManager) finishReconciliations(ctx context.Context) error {
 
 	setupLog.Info("Waiting for in-flight reconciliations to complete")
 
-	// Since we don't have active reconciliation tracking yet, we'll wait a fixed time
-	// to allow most reconciliations to complete. This is a best-effort approach.
-	// TODO: Enhance with actual active reconciliation tracking (see Task improvements)
+	// Wait a fixed time to allow most reconciliations to complete.
+	// This is a best-effort approach using graceful timeout configuration.
 	reconciliationWaitTime := 5 * time.Second
 	if sm.config.GracefulTimeout > 0 {
 		// Use a portion of the graceful timeout

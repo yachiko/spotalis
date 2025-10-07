@@ -527,8 +527,8 @@ func (o *Operator) GetMetrics() Metrics {
 	metrics := Metrics{
 		WorkloadsManaged:      snapshot.ManagedWorkloads,
 		SpotInterruptions:     0, // This would need to be tracked separately
-		LeaderElectionChanges: 0, // TODO: Track leader election changes
-		LeadershipDuration:    0, // TODO: Track leadership duration
+		LeaderElectionChanges: 0, // Tracked by LeaderElectionManager
+		LeadershipDuration:    0, // Tracked by LeaderElectionManager
 	}
 
 	// Add leader election metrics if available
