@@ -235,7 +235,10 @@ func (h *KindClusterHelper) forceCleanupNamespaceResources(namespace string) err
 	if err := h.Client.List(h.Context, deployments, client.InNamespace(namespace)); err == nil {
 		for _, deployment := range deployments.Items {
 			if err := h.Client.Delete(h.Context, &deployment); err != nil {
-				fmt.Printf("Warning: failed to delete deployment %s/%s: %v\n", deployment.Namespace, deployment.Name, err)
+				// Silently ignore "not found" errors - resource already deleted
+				if client.IgnoreNotFound(err) != nil {
+					fmt.Printf("Warning: failed to delete deployment %s/%s: %v\n", deployment.Namespace, deployment.Name, err)
+				}
 			}
 		}
 	}
@@ -245,7 +248,10 @@ func (h *KindClusterHelper) forceCleanupNamespaceResources(namespace string) err
 	if err := h.Client.List(h.Context, pods, client.InNamespace(namespace)); err == nil {
 		for _, pod := range pods.Items {
 			if err := h.Client.Delete(h.Context, &pod); err != nil {
-				fmt.Printf("Warning: failed to delete pod %s/%s: %v\n", pod.Namespace, pod.Name, err)
+				// Silently ignore "not found" errors - resource already deleted
+				if client.IgnoreNotFound(err) != nil {
+					fmt.Printf("Warning: failed to delete pod %s/%s: %v\n", pod.Namespace, pod.Name, err)
+				}
 			}
 		}
 	}

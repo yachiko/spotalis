@@ -39,7 +39,7 @@ func TestCleanupIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Cleanup Integration Suite")
+	RunSpecs(t, "Cleanup Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Resource cleanup mechanisms", func() {

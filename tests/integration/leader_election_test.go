@@ -28,7 +28,7 @@ func TestLeaderElectionIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Leader Election Integration Suite")
+	RunSpecs(t, "Leader Election Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Leader Election Integration", func() {

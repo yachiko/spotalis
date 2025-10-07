@@ -41,7 +41,7 @@ func TestConfigChangeIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Configuration Change Integration Suite")
+	RunSpecs(t, "Configuration Change Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Configuration change scenario", func() {

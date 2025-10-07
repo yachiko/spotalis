@@ -38,7 +38,7 @@ func TestKindIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Spotalis Kind Integration Suite")
+	RunSpecs(t, "Spotalis Kind Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Spotalis Integration on Kind", func() {

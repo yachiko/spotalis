@@ -43,7 +43,7 @@ func TestScalingIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Scaling Integration Suite")
+	RunSpecs(t, "Scaling Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Pod rebalancing scenario", func() {

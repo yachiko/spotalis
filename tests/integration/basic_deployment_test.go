@@ -40,7 +40,7 @@ func TestBasicDeploymentIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Basic Deployment Integration Suite")
+	RunSpecs(t, "Basic Deployment Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Basic workload deployment with annotations", func() {

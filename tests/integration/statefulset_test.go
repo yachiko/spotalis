@@ -42,7 +42,7 @@ func TestStatefulSetIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "StatefulSet Workload Integration Suite")
+	RunSpecs(t, "StatefulSet Workload Integration Suite", Label("integration"))
 }
 
 var _ = Describe("StatefulSet workload management", func() {

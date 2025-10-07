@@ -82,6 +82,22 @@ var _ = BeforeSuite(func() {
 		"level", loggerConfig.Level,
 		"format", loggerConfig.Format)
 
+	By("Configuring test timeouts for fail-fast behavior")
+	// Set default timeout for all Eventually/Consistently calls to 2 minutes
+	// This ensures tests fail fast rather than hanging indefinitely
+	SetDefaultEventuallyTimeout(2 * time.Minute)
+	SetDefaultEventuallyPollingInterval(2 * time.Second)
+	SetDefaultConsistentlyDuration(30 * time.Second)
+	SetDefaultConsistentlyPollingInterval(1 * time.Second)
+	setupLog.Info("Test timeouts configured",
+		"eventuallyTimeout", "2m",
+		"eventuallyPollingInterval", "2s",
+		"consistentlyDuration", "30s",
+		"consistentlyPollingInterval", "1s")
+	setupLog.Info("Integration test logger initialized",
+		"level", loggerConfig.Level,
+		"format", loggerConfig.Format)
+
 	By("Setting up Kubernetes client for Kind cluster")
 
 	// Load kubeconfig - try Kind context first, then default

@@ -41,7 +41,7 @@ func TestNamespaceFilteringIntegration(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Namespace Filtering Integration Suite")
+	RunSpecs(t, "Namespace Filtering Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Multi-tenant namespace filtering", func() {

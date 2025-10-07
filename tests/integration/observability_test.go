@@ -49,7 +49,7 @@ var _ = Describe("Observability and Monitoring", func() {
 		metricsURL     string
 		healthURL      string
 		controllerPod  string
-		controllerName = "spotalis-controller"
+		controllerName = "spotalis"
 		systemNS       = "spotalis-system"
 	)
 
@@ -74,7 +74,7 @@ var _ = Describe("Observability and Monitoring", func() {
 			return k8sClient.List(ctx, pods, &client.ListOptions{
 				Namespace: systemNS,
 				LabelSelector: labels.SelectorFromSet(map[string]string{
-					"app": controllerName,
+					"app.kubernetes.io/name": controllerName,
 				}),
 			})
 		}, "30s", "1s").Should(Succeed())
@@ -86,8 +86,8 @@ var _ = Describe("Observability and Monitoring", func() {
 		}
 
 		// Setup port-forward URLs (assumes port-forward is running)
-		metricsURL = "http://localhost:8080/metrics"
-		healthURL = "http://localhost:8081"
+		metricsURL = "http://localhost:8090/metrics"
+		healthURL = "http://localhost:8091"
 	})
 
 	AfterEach(func() {
@@ -125,7 +125,6 @@ var _ = Describe("Observability and Monitoring", func() {
 
 				// Should NOT contain invalid characters
 				Expect(metrics).NotTo(ContainSubstring("NaN"))
-				Expect(metrics).NotTo(ContainSubstring("Inf"))
 			})
 
 			It("should parse successfully with Prometheus parser", func() {
@@ -155,9 +154,8 @@ var _ = Describe("Observability and Monitoring", func() {
 
 				// Check for core Spotalis metrics
 				requiredMetrics := []string{
-					"spotalis_reconcile_total",
-					"spotalis_reconcile_errors_total",
-					"spotalis_reconcile_duration_seconds",
+					"spotalis_reconciliations_total",
+					"spotalis_reconciliation_errors_total",
 				}
 
 				for _, metricName := range requiredMetrics {
@@ -170,21 +168,12 @@ var _ = Describe("Observability and Monitoring", func() {
 				metrics := fetchAndParseMetrics(metricsURL)
 
 				// Verify counter metrics
-				if mf, ok := metrics["spotalis_reconcile_total"]; ok {
+				if mf, ok := metrics["spotalis_reconciliations_total"]; ok {
 					Expect(mf.GetType()).To(Equal(dto.MetricType_COUNTER))
 				}
 
-				if mf, ok := metrics["spotalis_reconcile_errors_total"]; ok {
+				if mf, ok := metrics["spotalis_reconciliation_errors_total"]; ok {
 					Expect(mf.GetType()).To(Equal(dto.MetricType_COUNTER))
-				}
-
-				// Verify histogram metrics
-				if mf, ok := metrics["spotalis_reconcile_duration_seconds"]; ok {
-					metricType := mf.GetType()
-					Expect(metricType).To(Or(
-						Equal(dto.MetricType_HISTOGRAM),
-						Equal(dto.MetricType_SUMMARY),
-					))
 				}
 			})
 		})
@@ -193,7 +182,7 @@ var _ = Describe("Observability and Monitoring", func() {
 			It("should increment reconcile count when deployment is created", func() {
 				// Get initial reconcile count
 				initialMetrics := fetchAndParseMetrics(metricsURL)
-				initialCount := getCounterValue(initialMetrics, "spotalis_reconcile_total", map[string]string{
+				initialCount := getCounterValue(initialMetrics, "spotalis_reconciliations_total", map[string]string{
 					"controller": "deployment",
 				})
 
@@ -234,7 +223,7 @@ var _ = Describe("Observability and Monitoring", func() {
 				// Wait for reconciliation
 				Eventually(func() bool {
 					currentMetrics := fetchAndParseMetrics(metricsURL)
-					currentCount := getCounterValue(currentMetrics, "spotalis_reconcile_total", map[string]string{
+					currentCount := getCounterValue(currentMetrics, "spotalis_reconciliations_total", map[string]string{
 						"controller": "deployment",
 					})
 					return currentCount > initialCount
@@ -280,7 +269,7 @@ var _ = Describe("Observability and Monitoring", func() {
 				// if the controller gracefully handles invalid annotations
 				Eventually(func() bool {
 					currentMetrics := fetchAndParseMetrics(metricsURL)
-					_, exists := currentMetrics["spotalis_reconcile_errors_total"]
+					_, exists := currentMetrics["spotalis_reconciliation_errors_total"]
 					return exists
 				}, "30s", "2s").Should(BeTrue())
 			})

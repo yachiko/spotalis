@@ -42,7 +42,7 @@ func TestWebhookResilience(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Webhook Resilience Integration Suite")
+	RunSpecs(t, "Webhook Resilience Integration Suite", Label("integration"))
 }
 
 var _ = Describe("Webhook resilience and failure handling", func() {
