@@ -22,7 +22,7 @@ SERVICE_NAME="spotalis-webhook"
 SECRET_NAME="spotalis-webhook-certs"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEPLOY_DIR="$PROJECT_ROOT/deploy/k8s"
+DEPLOY_DIR="$PROJECT_ROOT/deploy/local"
 TEMP_DIR=$(mktemp -d)
 
 echo "🚀 Starting Spotalis deployment..."
