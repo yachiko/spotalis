@@ -35,6 +35,11 @@ import (
 )
 
 func TestNamespaceFilteringIntegration(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Namespace Filtering Integration Suite")
 }
@@ -122,8 +127,10 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 			deployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-deployment",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70%",
 					},
 				},
@@ -226,14 +233,16 @@ var _ = Describe("Multi-tenant namespace filtering", func() {
 		It("should not manage deployment with spotalis annotations in namespace without spotalis.io/enabled", func() {
 			// This test verifies that the Spotalis controller respects namespace-level permissions.
 			// Even if a deployment has valid Spotalis annotations, it should NOT be managed
-			// if the namespace doesn't have the required "spotalis.io/enabled": "true" annotation.
+			// if the namespace doesn't have the required "spotalis.io/enabled" label.
 
 			// Create a deployment with Spotalis annotations in the unmanaged namespace
 			restrictedDeployment := deployment.DeepCopy()
 			restrictedDeployment.Namespace = unmanagedNamespace
 			restrictedDeployment.Name = "restricted-deployment"
+			restrictedDeployment.Labels = map[string]string{
+				"spotalis.io/enabled": "true",
+			}
 			restrictedDeployment.Annotations = map[string]string{
-				"spotalis.io/enabled":         "true",
 				"spotalis.io/spot-percentage": "80",
 				"spotalis.io/min-on-demand":   "1",
 			}

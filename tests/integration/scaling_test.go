@@ -37,6 +37,11 @@ import (
 )
 
 func TestScalingIntegration(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Scaling Integration Suite")
 }
@@ -89,8 +94,10 @@ var _ = Describe("Pod rebalancing scenario", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rebalance-deployment",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50%",
 					},
 				},
@@ -201,8 +208,10 @@ var _ = Describe("Pod rebalancing scenario", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-distribution-deployment",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70%",
 					},
 				},
@@ -277,8 +286,10 @@ var _ = Describe("Pod rebalancing scenario", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "scale-down-deployment",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "60%",
 					},
 				},
@@ -368,8 +379,10 @@ var _ = Describe("Pod rebalancing scenario", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "stable-deployment",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "80%",
 					},
 				},

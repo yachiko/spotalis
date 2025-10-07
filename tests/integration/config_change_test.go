@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ahoma/spotalis/tests/integration/shared"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,6 +35,11 @@ import (
 )
 
 func TestConfigChangeIntegration(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Configuration Change Integration Suite")
 }
@@ -91,8 +97,10 @@ var _ = Describe("Configuration change scenario", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "config-test-deployment",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70%",
 					},
 				},
@@ -132,8 +140,10 @@ var _ = Describe("Configuration change scenario", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "annotation-test",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "80%",
 					},
 				},
@@ -194,8 +204,10 @@ func createTestDeployment(name, namespace string) *appsv1.Deployment {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"spotalis.io/enabled": "true",
+			},
 			Annotations: map[string]string{
-				"spotalis.io/enabled":         "true",
 				"spotalis.io/spot-percentage": "70%",
 			},
 		},

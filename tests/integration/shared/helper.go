@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ahoma/spotalis/pkg/logging"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,31 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crlog "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+// SetupTestLogger initializes a logger for integration tests to avoid
+// controller-runtime warning: "log.SetLogger(...) was never called"
+func SetupTestLogger() error {
+	loggerConfig := &logging.Config{
+		Level:       "info",
+		Format:      "json",
+		Output:      "stdout",
+		AddCaller:   false,
+		Development: false,
+	}
+	logger, err := logging.NewLogger(loggerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+	ctrl.SetLogger(logger.Logger)
+	crlog.SetLogger(logger.Logger)
+	klog.SetLogger(logger.Logger)
+	return nil
+}
 
 // KindClusterHelper provides utilities for connecting to a Kind cluster
 // and setting up integration tests
@@ -339,30 +363,38 @@ func (h *KindClusterHelper) AddTestLabelsToResource(obj client.Object) {
 }
 
 // AddTestAnnotationsToResource adds standard test annotations to any Kubernetes resource
+// For Spotalis enablement, uses labels (spotalis.io/enabled=true) and annotations for configuration
 func (h *KindClusterHelper) AddTestAnnotationsToResource(obj client.Object, spotalisAnnotations map[string]string) {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
 
-	// Add test metadata
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	// Add test metadata annotations
 	annotations["test.spotalis.io/created-by"] = "integration-test"
 	annotations["test.spotalis.io/created-at"] = time.Now().Format(time.RFC3339)
 
-	// Add any Spotalis-specific annotations
+	// Add any Spotalis-specific annotations (for configuration, not enabled flag)
 	for k, v := range spotalisAnnotations {
+		// Skip "enabled" - will be set as label instead
+		if k == "spotalis.io/enabled" {
+			continue
+		}
 		annotations[k] = v
 	}
 
-	// If Spotalis annotations are provided, ensure the workload is enabled
+	// If Spotalis annotations are provided, set enabled label
 	if len(spotalisAnnotations) > 0 {
-		// Only add enabled=true if not explicitly set to false
-		if _, exists := annotations["spotalis.io/enabled"]; !exists {
-			annotations["spotalis.io/enabled"] = "true"
-		}
+		labels["spotalis.io/enabled"] = "true"
 	}
 
 	obj.SetAnnotations(annotations)
+	obj.SetLabels(labels)
 }
 
 // CreateTestDeployment creates a deployment with proper test labels and annotations

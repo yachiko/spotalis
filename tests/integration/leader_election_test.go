@@ -22,6 +22,11 @@ import (
 )
 
 func TestLeaderElectionIntegration(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Leader Election Integration Suite")
 }

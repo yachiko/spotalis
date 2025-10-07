@@ -19,7 +19,6 @@ package contract_test
 import (
 	"net/http"
 	"net/http/httptest"
-	"testing"
 	"time"
 
 	"github.com/ahoma/spotalis/internal/server"
@@ -28,15 +27,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestHealthzContract(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Healthz Contract Suite")
-}
-
 var _ = Describe("GET /healthz endpoint", func() {
 	var (
-		router   *gin.Engine
-		recorder *httptest.ResponseRecorder
+		router        *gin.Engine
+		recorder      *httptest.ResponseRecorder
+		healthHandler *server.HealthHandler
+		healthChecker *server.HealthChecker
 	)
 
 	BeforeEach(func() {
@@ -44,12 +40,19 @@ var _ = Describe("GET /healthz endpoint", func() {
 		router = gin.New()
 		recorder = httptest.NewRecorder()
 
-		// This will fail until we implement the health handler
-		healthHandler := server.NewHealthHandler()
+		// Create a health checker with nil manager/client for testing
+		healthChecker = server.NewHealthChecker(nil, nil, "test-namespace")
+		healthHandler = server.NewHealthHandler()
+		healthHandler.SetChecker(healthChecker)
 		router.GET("/healthz", healthHandler.Healthz)
 	})
 
 	Context("when the controller is healthy", func() {
+		BeforeEach(func() {
+			// Reset recorder for each test
+			recorder = httptest.NewRecorder()
+		})
+
 		It("should return 200 OK status", func() {
 			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
@@ -77,13 +80,13 @@ var _ = Describe("GET /healthz endpoint", func() {
 			Expect(recorder.Body.String()).To(ContainSubstring(`"status":"healthy"`))
 		})
 
-		It("should include timestamp in response", func() {
+		It("should include uptime in response", func() {
 			req, err := http.NewRequest("GET", "/healthz", http.NoBody)
 			Expect(err).NotTo(HaveOccurred())
 
 			router.ServeHTTP(recorder, req)
 
-			Expect(recorder.Body.String()).To(ContainSubstring(`"timestamp"`))
+			Expect(recorder.Body.String()).To(ContainSubstring(`"uptime"`))
 		})
 
 		It("should respond within 100ms", func() {
@@ -103,10 +106,16 @@ var _ = Describe("GET /healthz endpoint", func() {
 
 	Context("when the controller has issues", func() {
 		BeforeEach(func() {
+			// Reset router with fresh recorder
+			recorder = httptest.NewRecorder()
+
 			// Configure health handler to simulate unhealthy state
-			healthHandler := server.NewHealthHandler()
 			healthHandler.SetUnhealthy("test error")
-			router.GET("/healthz", healthHandler.Healthz)
+		})
+
+		AfterEach(func() {
+			// Clean up unhealthy state for next context
+			healthChecker.ClearUnhealthy()
 		})
 
 		It("should return 503 Service Unavailable when unhealthy", func() {
@@ -125,7 +134,7 @@ var _ = Describe("GET /healthz endpoint", func() {
 			router.ServeHTTP(recorder, req)
 
 			Expect(recorder.Body.String()).To(ContainSubstring(`"status":"unhealthy"`))
-			Expect(recorder.Body.String()).To(ContainSubstring(`"error"`))
+			Expect(recorder.Body.String()).To(ContainSubstring(`"reason"`))
 		})
 	})
 })

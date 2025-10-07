@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ahoma/spotalis/tests/integration/shared"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -31,6 +32,11 @@ import (
 )
 
 func TestKindIntegration(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Spotalis Kind Integration Suite")
 }
@@ -87,10 +93,10 @@ var _ = Describe("Spotalis Integration on Kind", func() {
 					Name:      "test-deployment",
 					Namespace: testNamespace.Name,
 					Labels: map[string]string{
-						"app": "test-app",
+						"app":                 "test-app",
+						"spotalis.io/enabled": "true",
 					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50%",
 					},
 				},

@@ -5,78 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/li		req, e		body, err := js		req, err 		req, er		Expect(err).N		req, err := http.NewRequest("POST", "/mutate", bytes.NewBuffer(body))
-		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("Content-Type", "application/json")
-
-		GinkgoHelper()
-		start := time.Now()
-		router.ServeHTTP(recorder, req)
-		duration := time.Since(start)
-
-		// Webhook should be fast to not delay deployments
-		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
-		Expect(recorder.Code).To(Equal(http.StatusOK))Occurred())
-
-		req, err := http.NewRequest("POST", "/mutate", bytes.NewBuffer(body))
-		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("Content-Type", "application/json")
-
-		GinkgoHelper()
-		start := time.Now()
-		router.ServeHTTP(recorder, req)
-		duration := time.Since(start)
-
-		// Webhook should be fast to not delay deployments
-		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
-		Expect(recorder.Code).To(Equal(http.StatusOK))ewRequest("POST", "/mutate", bytes.NewBuffer(body))
-		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("Content-Type", "application/json")
-
-		GinkgoHelper()
-		start := time.Now()
-		router.ServeHTTP(recorder, req)
-		duration := time.Since(start)
-
-		// Webhook should be fast to not delay deployments
-		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
-		Expect(recorder.Code).To(Equal(http.StatusOK))ewRequest("POST", "/mutate", bytes.NewBuffer(body))
-		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("Content-Type", "application/json")
-
-		GinkgoHelper()
-		start := time.Now()
-		router.ServeHTTP(recorder, req)
-		duration := time.Since(start)
-
-		// Webhook should be fast to not delay deployments
-		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
-		Expect(recorder.Code).To(Equal(http.StatusOK))l(admissionReview)
-		Expect(err).NotTo(HaveOccurred())
-
-		req, err := http.NewRequest("POST", "/mutate", bytes.NewBuffer(body))
-		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("Content-Type", "application/json")
-
-		GinkgoHelper()
-		start := time.Now()
-		router.ServeHTTP(recorder, req)
-		duration := time.Since(start)
-
-		// Webhook should be fast to not delay deployments
-		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
-		Expect(recorder.Code).To(Equal(http.StatusOK))ewRequest("POST", "/mutate", bytes.NewBuffer(body))
-		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("Content-Type", "application/json")
-
-		GinkgoHelper()
-		start := time.Now()
-		router.ServeHTTP(recorder, req)
-		duration := time.Since(start)
-
-		// Webhook should be fast to not delay deployments
-		Expect(duration).To(BeNumerically("<", 100*time.Millisecond))
-		Expect(recorder.Code).To(Equal(http.StatusOK))CENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -92,26 +21,26 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 
+	"github.com/ahoma/spotalis/internal/server"
+	"github.com/ahoma/spotalis/pkg/webhook"
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
-
-func TestWebhookContract(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Webhook Contract Suite")
-}
 
 var _ = Describe("POST /mutate webhook", func() {
 	var (
-		router   *gin.Engine
-		recorder *httptest.ResponseRecorder
+		router        *gin.Engine
+		recorder      *httptest.ResponseRecorder
+		webhookServer *server.WebhookServer
+		scheme        *runtime.Scheme
 	)
 
 	BeforeEach(func() {
@@ -119,41 +48,69 @@ var _ = Describe("POST /mutate webhook", func() {
 		router = gin.New()
 		recorder = httptest.NewRecorder()
 
-		// This will fail until we implement the webhook handler
-		router.POST("/mutate", func(c *gin.Context) {
-			// TODO: Implement proper webhook handler wrapper for Gin
-			c.JSON(501, gin.H{"error": "webhook handler not implemented for Gin integration"})
-		})
+		// Create scheme with necessary types
+		scheme = runtime.NewScheme()
+		_ = corev1.AddToScheme(scheme)
+		_ = appsv1.AddToScheme(scheme)
+		_ = admissionv1.AddToScheme(scheme)
+
+		// Create a fake client for the mutation handler
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+		// Create mutation handler
+		mutationHandler := webhook.NewMutationHandler(fakeClient, scheme)
+
+		// Create webhook server
+		webhookServer = server.NewWebhookServer(
+			server.WebhookServerConfig{
+				Port:     9443,
+				CertPath: "",
+				KeyPath:  "",
+				ReadOnly: false,
+				Quiet:    true, // Suppress debug logs in tests
+			},
+			mutationHandler,
+			scheme,
+		)
+
+		// Register the webhook endpoint
+		router.POST("/mutate", webhookServer.MutateHandler)
 	})
 
 	Context("when receiving a valid deployment admission request", func() {
 		var admissionRequest *admissionv1.AdmissionRequest
 
 		BeforeEach(func() {
-			deployment := &appsv1.Deployment{
+			// Test with a simple Pod instead of Deployment since webhook only processes Pods
+			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
+					Name:      "test-pod",
 					Namespace: "default",
-					Annotations: map[string]string{
-						"spotalis.io/replica-strategy": "spot-optimized",
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true", // Required for labels-only architecture
 					},
 				},
-				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(3),
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:latest",
+						},
+					},
 				},
 			}
 
-			deploymentJSON, err := json.Marshal(deployment)
+			podJSON, err := json.Marshal(pod)
 			Expect(err).NotTo(HaveOccurred())
 			admissionRequest = &admissionv1.AdmissionRequest{
 				UID: "test-uid",
 				Kind: metav1.GroupVersionKind{
-					Group:   "apps",
+					Group:   "",
 					Version: "v1",
-					Kind:    "Deployment",
+					Kind:    "Pod",
 				},
 				Object: runtime.RawExtension{
-					Raw: deploymentJSON,
+					Raw: podJSON,
 				},
 				Operation: admissionv1.Create,
 			}

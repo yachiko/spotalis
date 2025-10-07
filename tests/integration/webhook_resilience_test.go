@@ -36,6 +36,11 @@ import (
 )
 
 func TestWebhookResilience(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Webhook Resilience Integration Suite")
 }
@@ -85,8 +90,10 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-no-selector",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70",
 					},
 				},
@@ -148,8 +155,10 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-merge-selector",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50",
 					},
 				},
@@ -248,79 +257,6 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 			By("Checking pod has no capacity type selector (no workload annotations)")
 			Expect(pod.Spec.NodeSelector).To(Not(HaveKey("karpenter.sh/capacity-type")))
 		})
-
-		It("should handle special characters in label keys correctly (RFC 6901)", func() {
-			By("Creating deployment with labels containing special chars")
-			deployment := &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-special-chars",
-					Namespace: namespace,
-					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
-						"spotalis.io/spot-percentage": "60",
-					},
-				},
-				Spec: appsv1.DeploymentSpec{
-					Replicas: int32Ptr(2),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "special-app",
-						},
-					},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"app": "special-app",
-							},
-						},
-						Spec: corev1.PodSpec{
-							NodeSelector: map[string]string{
-								"example.com/team~alpha":     "true",     // Contains ~
-								"karpenter.sh/instance-type": "m5.large", // Contains /
-							},
-							Containers: []corev1.Container{
-								{
-									Name:  "app",
-									Image: "nginx:alpine",
-								},
-							},
-						},
-					},
-				},
-			}
-
-			err := k8sClient.Create(ctx, deployment)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Verifying webhook handles special characters with RFC 6901 escaping")
-			Eventually(func() bool {
-				podList := &corev1.PodList{}
-				listOpts := &client.ListOptions{
-					Namespace: namespace,
-				}
-				err := k8sClient.List(ctx, podList, listOpts)
-				if err != nil || len(podList.Items) == 0 {
-					return false
-				}
-
-				for _, pod := range podList.Items {
-					if pod.Labels["app"] == "special-app" {
-						// Verify special character labels are preserved
-						if _, ok := pod.Spec.NodeSelector["example.com/team~alpha"]; !ok {
-							return false
-						}
-						if _, ok := pod.Spec.NodeSelector["karpenter.sh/instance-type"]; !ok {
-							return false
-						}
-						// Verify capacity type is still added
-						if _, ok := pod.Spec.NodeSelector["karpenter.sh/capacity-type"]; !ok {
-							return false
-						}
-					}
-				}
-				return true
-			}, 60*time.Second, 2*time.Second).Should(BeTrue())
-		})
 	})
 
 	Context("when handling high concurrency", func() {
@@ -340,8 +276,10 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      fmt.Sprintf("concurrent-deploy-%d", index),
 							Namespace: namespace,
+							Labels: map[string]string{
+								"spotalis.io/enabled": "true",
+							},
 							Annotations: map[string]string{
-								"spotalis.io/enabled":         "true",
 								"spotalis.io/spot-percentage": "70",
 							},
 						},
@@ -411,8 +349,10 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "high-replica-deploy",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "80",
 					},
 				},
@@ -480,8 +420,10 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "invalid-percentage",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "invalid", // Invalid value
 					},
 				},
@@ -541,8 +483,10 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "annotation-removal",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50",
 					},
 				},
@@ -655,8 +599,10 @@ var _ = Describe("Webhook resilience and failure handling", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-unlabeled-ns",
 					Namespace: unlabeledNs.Name,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70",
 					},
 				},

@@ -1,4 +1,3 @@
-package integration
 //go:build integration
 // +build integration
 
@@ -37,6 +36,11 @@ import (
 )
 
 func TestStatefulSetIntegration(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "StatefulSet Workload Integration Suite")
 }
@@ -87,8 +91,10 @@ var _ = Describe("StatefulSet workload management", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-statefulset",
 					Namespace: namespace,
+					Labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					Annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "60",
 					},
 				},
@@ -107,6 +113,13 @@ var _ = Describe("StatefulSet workload management", func() {
 							},
 						},
 						Spec: corev1.PodSpec{
+							// Allow scheduling onto control-plane node in single-node Kind clusters
+							Tolerations: []corev1.Toleration{
+								{
+									Key:    "node-role.kubernetes.io/control-plane",
+									Effect: corev1.TaintEffectNoSchedule,
+								},
+							},
 							Containers: []corev1.Container{
 								{
 									Name:  "app",
@@ -136,8 +149,8 @@ var _ = Describe("StatefulSet workload management", func() {
 				return k8sClient.Get(ctx, key, statefulSet)
 			}, 30*time.Second, 1*time.Second).Should(Succeed())
 
-			By("Checking annotations are preserved")
-			Expect(statefulSet.Annotations).To(HaveKeyWithValue("spotalis.io/enabled", "true"))
+			By("Checking labels and annotations are preserved")
+			Expect(statefulSet.Labels).To(HaveKeyWithValue("spotalis.io/enabled", "true"))
 			Expect(statefulSet.Annotations).To(HaveKeyWithValue("spotalis.io/spot-percentage", "60"))
 
 			By("Waiting for pods to be created with correct ordinals")
@@ -172,14 +185,14 @@ var _ = Describe("StatefulSet workload management", func() {
 				if pod.Labels["app"] == "stateful-app" {
 					// StatefulSet pods should be named: test-statefulset-0, test-statefulset-1, etc.
 					Expect(pod.Name).To(MatchRegexp(`^test-statefulset-\d+$`))
-					
+
 					// Track that we have sequential ordinals
 					var ordinal int
 					fmt.Sscanf(pod.Name, "test-statefulset-%d", &ordinal)
 					ordinalFound[ordinal] = true
 				}
 			}
-			
+
 			// Should have ordinals 0-4
 			for i := 0; i < 5; i++ {
 				Expect(ordinalFound[i]).To(BeTrue(), fmt.Sprintf("Missing pod with ordinal %d", i))
@@ -231,7 +244,7 @@ var _ = Describe("StatefulSet workload management", func() {
 				if err != nil {
 					return 0
 				}
-				
+
 				deletingCount := 0
 				for _, pod := range currentPodList.Items {
 					if pod.Labels["app"] == "stateful-app" && pod.DeletionTimestamp != nil {
@@ -248,7 +261,7 @@ var _ = Describe("StatefulSet workload management", func() {
 				if err != nil {
 					return false
 				}
-				
+
 				for _, pod := range newPodList.Items {
 					if pod.Labels["app"] == "stateful-app" && pod.Name == podToDelete.Name {
 						return pod.UID != podToDelete.UID && pod.DeletionTimestamp == nil
@@ -395,7 +408,7 @@ var _ = Describe("StatefulSet workload management", func() {
 					}
 				}
 			}
-			
+
 			// 60% of 7 = 4.2, so expect 4 or 5 spot pods
 			Expect(spotCount).To(BeNumerically(">=", 4))
 			Expect(spotCount).To(BeNumerically("<=", 5))
@@ -439,7 +452,7 @@ var _ = Describe("StatefulSet workload management", func() {
 				if err != nil {
 					return nil
 				}
-				
+
 				var podNames []string
 				for _, pod := range podList.Items {
 					if pod.Labels["app"] == "stateful-app" && pod.DeletionTimestamp == nil {
@@ -501,7 +514,7 @@ var _ = Describe("StatefulSet workload management", func() {
 				if err != nil {
 					return false
 				}
-				
+
 				for _, pod := range podList.Items {
 					if pod.Labels["app"] == "stateful-app" && pod.DeletionTimestamp != nil {
 						return false // Found deleting pod during instability
@@ -550,7 +563,7 @@ var _ = Describe("StatefulSet workload management", func() {
 					statefulSet.Annotations["spotalis.io/spot-percentage"] = pct
 					return k8sClient.Update(ctx, statefulSet)
 				}, 10*time.Second, 500*time.Millisecond).Should(Succeed())
-				
+
 				time.Sleep(2 * time.Second) // Small delay between updates
 			}
 
@@ -568,7 +581,7 @@ var _ = Describe("StatefulSet workload management", func() {
 				if err != nil {
 					return 0
 				}
-				
+
 				spotCount := 0
 				totalCount := 0
 				for _, pod := range podList.Items {
@@ -579,7 +592,7 @@ var _ = Describe("StatefulSet workload management", func() {
 						}
 					}
 				}
-				
+
 				if totalCount == 0 {
 					return 0
 				}
@@ -600,7 +613,7 @@ var _ = Describe("StatefulSet workload management", func() {
 						AccessModes: []corev1.PersistentVolumeAccessMode{
 							corev1.ReadWriteOnce,
 						},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
 							},

@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ahoma/spotalis/pkg/logging"
 	"github.com/ahoma/spotalis/tests/integration/shared"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,7 +34,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crlog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -46,6 +50,37 @@ var (
 
 var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.Background())
+
+	By("Setting up logger for integration tests")
+
+	// Create logger configuration for integration tests
+	// Use debug level to see controller reconciliation details
+	loggerConfig := &logging.Config{
+		Level:       "debug", // Use debug to see detailed controller logs
+		Format:      "json",
+		Output:      "stdout",
+		AddCaller:   true,
+		Development: false,
+	}
+
+	logger, err := logging.NewLogger(loggerConfig)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Setup controller-runtime to use our logger (both ctrl and root log packages)
+	ctrl.SetLogger(logger.Logger)
+	// Explicitly set the root delegating logger to avoid the
+	// "log.SetLogger(...) was never called" warning when the
+	// client issues requests before other suites run.
+	crlog.SetLogger(logger.Logger)
+
+	// Configure klog to use the same structured logger
+	// This ensures all Kubernetes client logs use structured format
+	klog.SetLogger(logger.Logger)
+
+	setupLog := logger.WithName("integration-test-setup")
+	setupLog.Info("Integration test logger initialized",
+		"level", loggerConfig.Level,
+		"format", loggerConfig.Format)
 
 	By("Setting up Kubernetes client for Kind cluster")
 
