@@ -1,0 +1,245 @@
+# -- Number of replicas for the controller deployment
+# Set to 2+ for high availability (enables leader election automatically)
+replicaCount: 1
+
+image:
+  # -- Container image registry
+  registry: ghcr.io
+  # -- Container image repository
+  repository: ahoma/spotalis
+  # -- Container image pull policy
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag whose default is the chart appVersion
+  tag: ""
+
+# -- Optional image pull secrets for private registries
+imagePullSecrets: []
+
+# -- Override the full name of the release
+nameOverride: ""
+# -- Override the full name with release name prefix
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+rbac:
+  # -- Specifies whether RBAC resources should be created
+  create: true
+  # -- RBAC scope: "cluster" for cluster-wide, "namespace" for namespace-scoped
+  # When using "namespace", you must specify config.controllers.watchNamespaces
+  scope: "cluster"
+
+webhook:
+  # -- Enable mutating webhook for pod nodeSelector injection
+  enabled: true
+  # -- Webhook server port
+  port: 9443
+  # -- Failure policy for webhook (Ignore allows pods to be created if webhook is unavailable)
+  failurePolicy: Ignore
+  
+  tls:
+    # -- Name of existing secret containing TLS certificate (tls.crt and tls.key)
+    # If set, cert-manager Certificate will not be created
+    existingSecret: ""
+  
+  certManager:
+    # -- Enable cert-manager Certificate resource creation
+    # Requires cert-manager to be installed in the cluster
+    # Automatically disabled if tls.existingSecret is set
+    enabled: true
+    # -- Duration of the certificate
+    duration: 2160h # 90 days
+    # -- Renew certificate before expiration
+    renewBefore: 360h # 15 days
+
+# Spotalis operator configuration
+# This section mirrors pkg/config/consolidated.go structure
+config:
+  operator:
+    # -- Namespace where the operator is deployed
+    namespace: "spotalis-system"
+    
+    leaderElection:
+      # -- Enable leader election for high availability
+      # Automatically enabled when replicaCount > 1
+      enabled: true
+      # -- Leader election lock name
+      id: "spotalis-controller-leader"
+      # -- Namespace for leader election lock
+      # If empty, uses operator.namespace
+      namespace: ""
+    
+    # -- Enable read-only mode (no mutations, only metrics/logging)
+    readOnlyMode: false
+    
+    # -- Global disruption window configuration (optional)
+    # Defines when pod disruptions (rebalancing) are allowed
+    # Can be overridden at namespace or workload level using annotations
+    disruptionWindow:
+      # -- Cron schedule for disruption window (5-field format)
+      # Example: "0 2 * * *" = Daily at 2 AM UTC
+      schedule: ""
+      # -- Duration of disruption window (e.g., "4h", "30m")
+      duration: ""
+  
+  controllers:
+    # -- Reconciliation interval for controllers
+    reconcileInterval: "60s"
+    # -- Maximum concurrent reconciles
+    maxConcurrentReconciles: 2
+    
+    rateLimit:
+      # -- Rate limiter queries per second
+      qps: 50.0
+      # -- Rate limiter burst size
+      burst: 100
+    
+    # -- List of namespaces to watch (empty = all namespaces)
+    # REQUIRED when rbac.scope=namespace
+    watchNamespaces: []
+    
+    # Node classifier configuration
+    # Defines how to identify spot vs on-demand nodes
+    nodeClassifier:
+      # -- Label selectors for spot nodes
+      spotLabels:
+        - matchLabels:
+            karpenter.sh/capacity-type: "spot"
+      
+      # -- Label selectors for on-demand nodes
+      onDemandLabels:
+        - matchLabels:
+            karpenter.sh/capacity-type: "on-demand"
+  
+  webhook:
+    # -- Webhook server port (must match webhook.port)
+    port: 9443
+    # -- Directory for TLS certificates
+    certDir: "/tmp/k8s-webhook-server/serving-certs"
+    # -- TLS certificate filename
+    certName: "tls.crt"
+    # -- TLS private key filename
+    keyName: "tls.key"
+  
+  observability:
+    logging:
+      # -- Log level: debug, info, warn, error
+      level: "info"
+      # -- Log format: json or console
+      format: "json"
+      # -- Log output: stdout or stderr
+      output: "stdout"
+      # -- Add caller information to logs
+      addCaller: true
+      # -- Enable development mode logging
+      development: false
+    
+    metrics:
+      # -- Enable Prometheus metrics
+      enabled: true
+      # -- Metrics server bind address
+      bindAddress: ":8080"
+      # -- Metrics endpoint path
+      path: "/metrics"
+    
+    health:
+      # -- Enable health check endpoint
+      enabled: true
+      # -- Health server bind address
+      bindAddress: ":8081"
+      # -- Health endpoint path
+      path: "/healthz"
+
+# -- Additional environment variables for the controller
+# Example:
+# extraEnv:
+#   - name: SPOTALIS_OPERATOR_LOGLEVEL
+#     value: "debug"
+extraEnv: []
+
+# -- Additional volumes to mount
+extraVolumes: []
+
+# -- Additional volume mounts
+extraVolumeMounts: []
+
+# -- Pod annotations
+podAnnotations: {}
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+service:
+  # -- Service type
+  type: ClusterIP
+  # -- Metrics port
+  metricsPort: 8080
+  # -- Health port
+  healthPort: 8081
+  # -- Webhook port
+  webhookPort: 9443
+  # -- Service annotations
+  annotations: {}
+  # -- Service labels
+  labels: {}
+
+resources:
+  # -- Resource limits
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  # -- Resource requests
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# -- Node selector for pod assignment
+nodeSelector: {}
+
+# -- Tolerations for pod assignment
+tolerations: []
+
+# -- Affinity for pod assignment
+affinity: {}
+
+# -- Priority class name for the pod
+priorityClassName: ""
+
+# -- Termination grace period in seconds
+terminationGracePeriodSeconds: 30
+
+# Pod disruption budget (automatically enabled when replicaCount > 1)
+podDisruptionBudget:
+  # -- Enable pod disruption budget
+  enabled: true
+  # -- Minimum available pods
+  minAvailable: 1
+
+# Deployment strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    # -- Maximum unavailable pods during update (0 for zero-downtime)
+    maxUnavailable: 0
+    # -- Maximum surge pods during update
+    maxSurge: 1

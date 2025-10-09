@@ -1,0 +1,124 @@
+✅ Spotalis has been installed!
+
+Release: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+
+📋 Installation Summary:
+-----------------------
+RBAC Scope: {{ .Values.rbac.scope }}
+{{- if eq .Values.rbac.scope "namespace" }}
+Watched Namespaces: {{ join ", " .Values.config.controllers.watchNamespaces }}
+{{- else }}
+Watching: All namespaces
+{{- end }}
+
+Replicas: {{ .Values.replicaCount }}
+{{- if eq (include "spotalis.leaderElectionEnabled" .) "true" }}
+Leader Election: Enabled
+{{- else }}
+Leader Election: Disabled
+{{- end }}
+
+Webhook: {{ if .Values.webhook.enabled }}Enabled{{ else }}Disabled{{ end }}
+{{- if .Values.webhook.enabled }}
+{{- if .Values.webhook.tls.existingSecret }}
+Certificate Source: Existing secret ({{ .Values.webhook.tls.existingSecret }})
+{{- else if .Values.webhook.certManager.enabled }}
+Certificate Source: cert-manager
+{{- end }}
+{{- end }}
+
+🔍 Verification Steps:
+----------------------
+1. Check controller pod status:
+   kubectl get pods -n {{ .Release.Namespace }} -l {{ include "spotalis.selectorLabels" . | replace "\n" "," }}
+
+2. View controller logs:
+   kubectl logs -n {{ .Release.Namespace }} -l {{ include "spotalis.selectorLabels" . | replace "\n" "," }} --tail=50 -f
+
+3. Check metrics endpoint:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "spotalis.fullname" . }} 8080:8080
+   # Then visit: http://localhost:8080/metrics
+
+4. Verify health status:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "spotalis.fullname" . }} 8081:8081
+   # Then visit: http://localhost:8081/healthz
+
+{{- if .Values.webhook.enabled }}
+
+5. Verify webhook configuration:
+   kubectl get mutatingwebhookconfiguration {{ include "spotalis.fullname" . }}-mutating-webhook
+
+{{- if and .Values.webhook.certManager.enabled (not .Values.webhook.tls.existingSecret) }}
+6. Check certificate status:
+   kubectl get certificate -n {{ .Release.Namespace }} {{ include "spotalis.fullname" . }}-webhook-cert
+   kubectl describe certificate -n {{ .Release.Namespace }} {{ include "spotalis.fullname" . }}-webhook-cert
+{{- end }}
+{{- end }}
+
+{{- if eq (include "spotalis.leaderElectionEnabled" .) "true" }}
+
+7. Check leader election:
+   kubectl get lease -n {{ .Release.Namespace }} {{ .Values.config.operator.leaderElection.id }}
+{{- end }}
+
+📝 Next Steps:
+--------------
+1. Enable Spotalis in target namespaces:
+   kubectl label namespace <your-namespace> spotalis.io/enabled=true
+
+2. Annotate workloads to enable spot/on-demand distribution:
+   kubectl annotate deployment <your-deployment> \
+     spotalis.io/enabled=true \
+     spotalis.io/spot-percentage=70 \
+     spotalis.io/min-on-demand=1
+
+3. For StatefulSets:
+   kubectl annotate statefulset <your-statefulset> \
+     spotalis.io/enabled=true \
+     spotalis.io/spot-percentage=50 \
+     spotalis.io/min-on-demand=2
+
+📚 Documentation:
+-----------------
+For more information, visit:
+- Annotations Reference: https://github.com/ahoma/spotalis/blob/main/docs/api/annotations.md
+- Configuration Guide: https://github.com/ahoma/spotalis/blob/main/docs/configuration/
+
+{{- if eq .Values.rbac.scope "namespace" }}
+
+⚠️  IMPORTANT - Namespace-Scoped Deployment:
+--------------------------------------------
+You have deployed Spotalis in namespace-scoped mode. Ensure:
+- The controller can only watch namespaces listed in config.controllers.watchNamespaces
+- RBAC permissions are created in each watched namespace
+- Add the spotalis.io/enabled=true label to watched namespaces
+{{- end }}
+
+{{- if and .Values.webhook.enabled (not .Values.webhook.certManager.enabled) (not .Values.webhook.tls.existingSecret) }}
+
+⚠️  WARNING - Webhook Certificate Not Configured:
+--------------------------------------------------
+The webhook is enabled but neither cert-manager nor an existing secret is configured.
+The webhook will fail to start. Please either:
+- Enable cert-manager: --set webhook.certManager.enabled=true
+- Provide existing secret: --set webhook.tls.existingSecret=<secret-name>
+{{- end }}
+
+🐛 Troubleshooting:
+-------------------
+If pods are not being mutated:
+1. Verify namespace has label: kubectl get ns <namespace> --show-labels
+2. Check webhook is registered: kubectl get mutatingwebhookconfiguration
+3. View webhook logs for errors in controller pod
+
+If controller is not reconciling:
+1. Check RBAC permissions match the scope
+2. Verify leader election lease if using multiple replicas
+3. Review controller logs for permission errors
+
+For configuration changes:
+- Config changes require pod restart: kubectl rollout restart deployment -n {{ .Release.Namespace }} {{ include "spotalis.fullname" . }}
+
+Happy optimizing! 🚀

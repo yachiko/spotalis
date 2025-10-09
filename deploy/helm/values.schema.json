@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Spotalis Helm Chart Values",
+  "type": "object",
+  "properties": {
+    "rbac": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["cluster", "namespace"],
+          "description": "RBAC scope: cluster for cluster-wide, namespace for namespace-scoped"
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "controllers": {
+          "type": "object",
+          "properties": {
+            "watchNamespaces": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of namespaces to watch. REQUIRED when rbac.scope=namespace"
+            }
+          }
+        }
+      }
+    },
+    "webhook": {
+      "type": "object",
+      "properties": {
+        "tls": {
+          "type": "object",
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "description": "Name of existing secret containing TLS certificate"
+            }
+          }
+        },
+        "certManager": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable cert-manager Certificate resource"
+            }
+          }
+        }
+      }
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of controller replicas"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "rbac": {
+            "properties": {
+              "scope": {
+                "const": "namespace"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "config": {
+            "properties": {
+              "controllers": {
+                "properties": {
+                  "watchNamespaces": {
+                    "minItems": 1
+                  }
+                },
+                "required": ["watchNamespaces"]
+              }
+            }
+          }
+        },
+        "errorMessage": "When rbac.scope=namespace, config.controllers.watchNamespaces must be specified and non-empty"
+      }
+    }
+  ]
+}

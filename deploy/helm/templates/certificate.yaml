@@ -1,0 +1,36 @@
+{{- if and .Values.webhook.enabled .Values.webhook.certManager.enabled (not .Values.webhook.tls.existingSecret) -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "spotalis.fullname" . }}-webhook-cert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spotalis.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "spotalis.webhookCertSecretName" . }}
+  duration: {{ .Values.webhook.certManager.duration }}
+  renewBefore: {{ .Values.webhook.certManager.renewBefore }}
+  issuerRef:
+    name: {{ include "spotalis.fullname" . }}-selfsigned
+    kind: Issuer
+  commonName: {{ include "spotalis.fullname" . }}.{{ .Release.Namespace }}.svc
+  dnsNames:
+  - {{ include "spotalis.fullname" . }}
+  - {{ include "spotalis.fullname" . }}.{{ .Release.Namespace }}
+  - {{ include "spotalis.fullname" . }}.{{ .Release.Namespace }}.svc
+  - {{ include "spotalis.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "spotalis.fullname" . }}-selfsigned
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spotalis.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}

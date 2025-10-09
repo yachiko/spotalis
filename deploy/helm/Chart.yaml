@@ -1,0 +1,18 @@
+apiVersion: v2
+name: spotalis
+description: A Kubernetes controller for optimizing workload replica distribution across spot and on-demand instances
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kubernetes
+  - spot-instances
+  - workload-optimization
+  - controller
+  - cost-optimization
+home: https://github.com/ahoma/spotalis
+sources:
+  - https://github.com/ahoma/spotalis
+maintainers:
+  - name: ahoma
+    email: ahoma@users.noreply.github.com

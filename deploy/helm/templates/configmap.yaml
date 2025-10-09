@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "spotalis.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spotalis.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    operator:
+      namespace: {{ .Values.config.operator.namespace | default .Release.Namespace | quote }}
+      leaderElection:
+        enabled: {{ include "spotalis.leaderElectionEnabled" . }}
+        id: {{ .Values.config.operator.leaderElection.id | quote }}
+        namespace: {{ .Values.config.operator.leaderElection.namespace | default .Release.Namespace | quote }}
+      readOnlyMode: {{ .Values.config.operator.readOnlyMode }}
+      {{- with .Values.config.operator.disruptionWindow }}
+      {{- if or .schedule .duration }}
+      disruptionWindow:
+        {{- if .schedule }}
+        schedule: {{ .schedule | quote }}
+        {{- end }}
+        {{- if .duration }}
+        duration: {{ .duration | quote }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+    
+    controllers:
+      reconcileInterval: {{ .Values.config.controllers.reconcileInterval | quote }}
+      maxConcurrentReconciles: {{ .Values.config.controllers.maxConcurrentReconciles }}
+      rateLimit:
+        qps: {{ .Values.config.controllers.rateLimit.qps }}
+        burst: {{ .Values.config.controllers.rateLimit.burst }}
+      {{- with .Values.config.controllers.watchNamespaces }}
+      watchNamespaces:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeClassifier:
+        spotLabels:
+          {{- toYaml .Values.config.controllers.nodeClassifier.spotLabels | nindent 10 }}
+        onDemandLabels:
+          {{- toYaml .Values.config.controllers.nodeClassifier.onDemandLabels | nindent 10 }}
+    
+    webhook:
+      enabled: {{ .Values.webhook.enabled }}
+      port: {{ .Values.config.webhook.port }}
+      certDir: {{ .Values.config.webhook.certDir | quote }}
+      certName: {{ .Values.config.webhook.certName | quote }}
+      keyName: {{ .Values.config.webhook.keyName | quote }}
+    
+    observability:
+      logging:
+        level: {{ .Values.config.observability.logging.level | quote }}
+        format: {{ .Values.config.observability.logging.format | quote }}
+        output: {{ .Values.config.observability.logging.output | quote }}
+        addCaller: {{ .Values.config.observability.logging.addCaller }}
+        development: {{ .Values.config.observability.logging.development }}
+      metrics:
+        enabled: {{ .Values.config.observability.metrics.enabled }}
+        bindAddress: {{ .Values.config.observability.metrics.bindAddress | quote }}
+        path: {{ .Values.config.observability.metrics.path | quote }}
+      health:
+        enabled: {{ .Values.config.observability.health.enabled }}
+        bindAddress: {{ .Values.config.observability.health.bindAddress | quote }}
+        path: {{ .Values.config.observability.health.path | quote }}
