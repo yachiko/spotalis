@@ -645,16 +645,6 @@ func (nf *NamespaceFilter) checkForbiddenLabels(nsLabels map[string]string) bool
 	return false
 }
 
-// checkRequiredAnnotations checks if namespace has all required annotations
-func (nf *NamespaceFilter) checkRequiredAnnotations(nsAnnotations map[string]string) bool {
-	for key, value := range nf.config.RequiredAnnotations {
-		if nsValue, exists := nsAnnotations[key]; !exists || nsValue != value {
-			return false
-		}
-	}
-	return true
-}
-
 // checkForbiddenAnnotations checks if namespace has any forbidden annotations
 func (nf *NamespaceFilter) checkForbiddenAnnotations(nsAnnotations map[string]string) bool {
 	for key, value := range nf.config.ForbiddenAnnotations {

@@ -282,7 +282,3 @@ var _ = Describe("POST /mutate webhook", func() {
 		})
 	})
 })
-
-func int32Ptr(i int32) *int32 {
-	return &i
-}

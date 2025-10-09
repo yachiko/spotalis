@@ -1132,7 +1132,7 @@ type MockStatefulSetMetricsRecorder struct {
 	}
 }
 
-func (m *MockStatefulSetMetricsRecorder) RecordReconciliation(namespace, workloadName, workloadType, action string, err error) {
+func (m *MockStatefulSetMetricsRecorder) RecordReconciliation(_, _, _, _ string, _ error) {
 	// No-op for mock
 }
 

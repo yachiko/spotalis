@@ -1011,7 +1011,7 @@ type MockMetricsRecorder struct {
 	}
 }
 
-func (m *MockMetricsRecorder) RecordReconciliation(namespace, workloadName, workloadType, action string, err error) {
+func (m *MockMetricsRecorder) RecordReconciliation(_, _, _, _ string, _ error) {
 	// No-op for mock
 }
 

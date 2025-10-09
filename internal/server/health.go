@@ -133,11 +133,12 @@ func (h *HealthChecker) ReadyzHandler(c *gin.Context) {
 		healthy = false
 	}
 
-	// Check if Kubernetes is manually set as down
-	if kubernetesDown {
+	// Check Kubernetes API status
+	switch {
+	case kubernetesDown:
 		checks["kubernetes-api"] = "manually marked as unavailable"
 		healthy = false
-	} else if h.kubeClient != nil {
+	case h.kubeClient != nil:
 		// Check Kubernetes API connectivity (skip in test mode when kubeClient is nil)
 		if err := h.checkKubernetesAPI(ctx); err != nil {
 			checks["kubernetes-api"] = fmt.Sprintf("failed: %v", err)
@@ -145,7 +146,7 @@ func (h *HealthChecker) ReadyzHandler(c *gin.Context) {
 		} else {
 			checks["kubernetes-api"] = "ok"
 		}
-	} else {
+	default:
 		checks["kubernetes-api"] = "skipped (test mode)"
 	}
 
