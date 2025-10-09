@@ -242,6 +242,41 @@ var _ = Describe("NodeClassifierService", func() {
 		})
 	})
 
+	Describe("ClassifyNodesByName", func() {
+		It("should return classifications for known nodes", func() {
+			spotNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "batch-spot-node",
+					Labels: map[string]string{
+						"karpenter.sh/capacity-type": "spot",
+					},
+				},
+			}
+			onDemandNode := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "batch-ondemand-node",
+					Labels: map[string]string{
+						"karpenter.sh/capacity-type": "on-demand",
+					},
+				},
+			}
+
+			Expect(fakeClient.Create(ctx, spotNode.DeepCopy())).To(Succeed())
+			Expect(fakeClient.Create(ctx, onDemandNode.DeepCopy())).To(Succeed())
+
+			results, err := nodeClassifier.ClassifyNodesByName(ctx, []string{spotNode.Name, onDemandNode.Name, spotNode.Name})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(results).To(HaveKeyWithValue(spotNode.Name, apis.NodeTypeSpot))
+			Expect(results).To(HaveKeyWithValue(onDemandNode.Name, apis.NodeTypeOnDemand))
+		})
+
+		It("should return unknown for missing nodes", func() {
+			results, err := nodeClassifier.ClassifyNodesByName(ctx, []string{"missing-node"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(results).To(HaveKeyWithValue("missing-node", apis.NodeTypeUnknown))
+		})
+	})
+
 	Describe("classifyByCloudProvider", func() {
 		Context("when classifying AWS nodes", func() {
 			It("should detect spot instance from EKS capacity type", func() {

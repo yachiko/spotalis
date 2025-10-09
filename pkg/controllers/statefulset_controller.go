@@ -324,6 +324,7 @@ func (r *StatefulSetReconciler) calculateCurrentReplicaState(ctx context.Context
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
+	nodeNameSet := make(map[string]struct{})
 	var spotReplicas, onDemandReplicas int32
 
 	// Classify each pod based on its node
@@ -333,14 +334,30 @@ func (r *StatefulSetReconciler) calculateCurrentReplicaState(ctx context.Context
 			continue // Skip pending pods
 		}
 
-		// Get the node for this pod
-		var node corev1.Node
-		if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-			continue // Skip if we can't get the node
+		nodeNameSet[pod.Spec.NodeName] = struct{}{}
+	}
+
+	nodeNames := make([]string, 0, len(nodeNameSet))
+	for name := range nodeNameSet {
+		nodeNames = append(nodeNames, name)
+	}
+
+	classifications, err := r.NodeClassifier.ClassifyNodesByName(ctx, nodeNames)
+	if err != nil {
+		log.FromContext(ctx).WithValues(
+			"statefulset", statefulSet.Name,
+			"namespace", statefulSet.Namespace,
+		).Error(err, "Failed to classify nodes for StatefulSet pods")
+		classifications = map[string]apis.NodeType{}
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.Spec.NodeName == "" {
+			continue
 		}
 
-		// Classify the node
-		nodeType := r.NodeClassifier.ClassifyNode(&node)
+		nodeType := classifications[pod.Spec.NodeName]
 		switch nodeType {
 		case apis.NodeTypeSpot:
 			spotReplicas++
@@ -481,6 +498,8 @@ func (r *StatefulSetReconciler) categorizePodsByNodeType(ctx context.Context, st
 		return nil, nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
+	filteredPods := make([]*corev1.Pod, 0, len(podList.Items))
+	nodeNameSet := make(map[string]struct{})
 	// Categorize pods by current node type
 	for i := range podList.Items {
 		pod := &podList.Items[i]
@@ -488,12 +507,26 @@ func (r *StatefulSetReconciler) categorizePodsByNodeType(ctx context.Context, st
 			continue // Skip pending or terminating pods
 		}
 
-		nodeType, err := r.getNodeTypeForPod(ctx, pod)
-		if err != nil {
-			log.FromContext(ctx).WithValues("pod", pod.Name, "node", pod.Spec.NodeName).V(1).Info("Could not get node for pod")
-			continue
-		}
+		nodeNameSet[pod.Spec.NodeName] = struct{}{}
+		filteredPods = append(filteredPods, pod)
+	}
 
+	nodeNames := make([]string, 0, len(nodeNameSet))
+	for name := range nodeNameSet {
+		nodeNames = append(nodeNames, name)
+	}
+
+	classifications, err := r.NodeClassifier.ClassifyNodesByName(ctx, nodeNames)
+	if err != nil {
+		log.FromContext(ctx).WithValues(
+			"statefulset", statefulSet.Name,
+			"namespace", statefulSet.Namespace,
+		).Error(err, "Failed to classify nodes while categorizing StatefulSet pods")
+		classifications = map[string]apis.NodeType{}
+	}
+
+	for _, pod := range filteredPods {
+		nodeType := classifications[pod.Spec.NodeName]
 		switch nodeType {
 		case apis.NodeTypeSpot:
 			spotPods = append(spotPods, *pod)
@@ -504,15 +537,6 @@ func (r *StatefulSetReconciler) categorizePodsByNodeType(ctx context.Context, st
 	}
 
 	return spotPods, onDemandPods, nil
-}
-
-// getNodeTypeForPod gets the node type for a specific pod
-func (r *StatefulSetReconciler) getNodeTypeForPod(ctx context.Context, pod *corev1.Pod) (apis.NodeType, error) {
-	var node corev1.Node
-	if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-		return apis.NodeTypeUnknown, err
-	}
-	return r.NodeClassifier.ClassifyNode(&node), nil
 }
 
 // selectPodsForDeletion determines which pods should be deleted based on desired state

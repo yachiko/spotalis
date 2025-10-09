@@ -367,6 +367,7 @@ func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context,
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
+	nodeNameSet := make(map[string]struct{})
 	var spotReplicas, onDemandReplicas int32
 
 	// Classify each pod based on its node
@@ -376,14 +377,30 @@ func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context,
 			continue // Skip pending pods
 		}
 
-		// Get the node for this pod
-		var node corev1.Node
-		if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-			continue // Skip if we can't get the node
+		nodeNameSet[pod.Spec.NodeName] = struct{}{}
+	}
+
+	nodeNames := make([]string, 0, len(nodeNameSet))
+	for name := range nodeNameSet {
+		nodeNames = append(nodeNames, name)
+	}
+
+	classifications, err := r.NodeClassifier.ClassifyNodesByName(ctx, nodeNames)
+	if err != nil {
+		log.FromContext(ctx).WithValues(
+			"deployment", deployment.Name,
+			"namespace", deployment.Namespace,
+		).Error(err, "Failed to classify nodes for deployment pods")
+		classifications = map[string]apis.NodeType{}
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.Spec.NodeName == "" {
+			continue
 		}
 
-		// Classify the node
-		nodeType := r.NodeClassifier.ClassifyNode(&node)
+		nodeType := classifications[pod.Spec.NodeName]
 		switch nodeType {
 		case apis.NodeTypeSpot:
 			spotReplicas++
@@ -523,6 +540,8 @@ func (r *DeploymentReconciler) categorizeDeploymentPods(ctx context.Context, dep
 		return nil, nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
+	filteredPods := make([]*corev1.Pod, 0, len(podList.Items))
+	nodeNameSet := make(map[string]struct{})
 	// Categorize pods by current node type
 	var spotPods, onDemandPods []corev1.Pod
 	for i := range podList.Items {
@@ -531,11 +550,26 @@ func (r *DeploymentReconciler) categorizeDeploymentPods(ctx context.Context, dep
 			continue // Skip pending or terminating pods
 		}
 
-		nodeType, err := r.getNodeTypeForDeploymentPod(ctx, pod)
-		if err != nil {
-			continue // Skip pods with node lookup errors
-		}
+		nodeNameSet[pod.Spec.NodeName] = struct{}{}
+		filteredPods = append(filteredPods, pod)
+	}
 
+	nodeNames := make([]string, 0, len(nodeNameSet))
+	for name := range nodeNameSet {
+		nodeNames = append(nodeNames, name)
+	}
+
+	classifications, err := r.NodeClassifier.ClassifyNodesByName(ctx, nodeNames)
+	if err != nil {
+		log.FromContext(ctx).WithValues(
+			"deployment", deployment.Name,
+			"namespace", deployment.Namespace,
+		).Error(err, "Failed to classify nodes while categorizing pods")
+		classifications = map[string]apis.NodeType{}
+	}
+
+	for _, pod := range filteredPods {
+		nodeType := classifications[pod.Spec.NodeName]
 		switch nodeType {
 		case apis.NodeTypeSpot:
 			spotPods = append(spotPods, *pod)
@@ -546,17 +580,6 @@ func (r *DeploymentReconciler) categorizeDeploymentPods(ctx context.Context, dep
 	}
 
 	return spotPods, onDemandPods, nil
-}
-
-// getNodeTypeForDeploymentPod determines the node type for a given pod
-func (r *DeploymentReconciler) getNodeTypeForDeploymentPod(ctx context.Context, pod *corev1.Pod) (apis.NodeType, error) {
-	var node corev1.Node
-	if err := r.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, &node); err != nil {
-		log.FromContext(ctx).WithValues("pod", pod.Name, "node", pod.Spec.NodeName).V(1).Info("Could not get node for pod")
-		return apis.NodeTypeUnknown, err
-	}
-
-	return r.NodeClassifier.ClassifyNode(&node), nil
 }
 
 // selectPodsForDeletion identifies excess pods that should be deleted for rebalancing

@@ -26,6 +26,7 @@ import (
 	"github.com/ahoma/spotalis/pkg/apis"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -73,10 +74,11 @@ type NodeClassifierConfig struct {
 
 // NodeCache provides cached node classification data
 type NodeCache struct {
-	SpotNodes     map[string]*corev1.Node `json:"spotNodes"`
-	OnDemandNodes map[string]*corev1.Node `json:"onDemandNodes"`
-	LastRefresh   time.Time               `json:"lastRefresh"`
-	mutex         sync.RWMutex            `json:"-"`
+	SpotNodes     map[string]*corev1.Node  `json:"spotNodes"`
+	OnDemandNodes map[string]*corev1.Node  `json:"onDemandNodes"`
+	NodeTypes     map[string]apis.NodeType `json:"nodeTypes"`
+	LastRefresh   time.Time                `json:"lastRefresh"`
+	mutex         sync.RWMutex             `json:"-"`
 }
 
 // NewNodeClassifierService creates a new node classifier service
@@ -91,6 +93,7 @@ func NewNodeClassifierService(client client.Client, config *NodeClassifierConfig
 		cache: &NodeCache{
 			SpotNodes:     make(map[string]*corev1.Node),
 			OnDemandNodes: make(map[string]*corev1.Node),
+			NodeTypes:     make(map[string]apis.NodeType),
 		},
 	}
 }
@@ -260,24 +263,107 @@ func (n *NodeClassifierService) RefreshCache(ctx context.Context) error {
 	// Clear existing cache
 	n.cache.SpotNodes = make(map[string]*corev1.Node)
 	n.cache.OnDemandNodes = make(map[string]*corev1.Node)
+	n.cache.NodeTypes = make(map[string]apis.NodeType)
 
 	// Classify each node
 	for i := range nodeList.Items {
-		node := &nodeList.Items[i]
+		node := nodeList.Items[i].DeepCopy()
 		nodeType := n.ClassifyNode(node)
-
-		switch nodeType {
-		case apis.NodeTypeSpot:
-			n.cache.SpotNodes[node.Name] = node
-		case apis.NodeTypeOnDemand:
-			n.cache.OnDemandNodes[node.Name] = node
-		case apis.NodeTypeUnknown:
-			// Ignore unknown nodes
-		}
+		n.cache.storeNodeClassificationLocked(node, nodeType)
 	}
 
 	n.cache.LastRefresh = time.Now()
 	return nil
+}
+
+// ClassifyNodesByName returns node types for a set of node names using the internal cache when possible.
+func (n *NodeClassifierService) ClassifyNodesByName(ctx context.Context, nodeNames []string) (map[string]apis.NodeType, error) {
+	results := make(map[string]apis.NodeType, len(nodeNames))
+	if len(nodeNames) == 0 {
+		return results, nil
+	}
+
+	uniqueNames := make(map[string]struct{}, len(nodeNames))
+	for _, name := range nodeNames {
+		if name == "" {
+			continue
+		}
+		uniqueNames[name] = struct{}{}
+	}
+
+	if len(uniqueNames) == 0 {
+		return results, nil
+	}
+
+	if err := n.RefreshCache(ctx); err != nil {
+		return nil, fmt.Errorf("failed to refresh node cache: %w", err)
+	}
+
+	missing := make([]string, 0)
+
+	n.cache.mutex.RLock()
+	for name := range uniqueNames {
+		if nodeType, ok := n.cache.NodeTypes[name]; ok {
+			results[name] = nodeType
+		} else {
+			missing = append(missing, name)
+		}
+	}
+	n.cache.mutex.RUnlock()
+
+	for _, name := range missing {
+		var node corev1.Node
+		if err := n.client.Get(ctx, types.NamespacedName{Name: name}, &node); err != nil {
+			results[name] = apis.NodeTypeUnknown
+			continue
+		}
+
+		nodeType := n.ClassifyNode(&node)
+
+		n.cache.mutex.Lock()
+		n.cache.storeNodeClassificationLocked(node.DeepCopy(), nodeType)
+		n.cache.mutex.Unlock()
+
+		results[name] = nodeType
+	}
+
+	for name := range uniqueNames {
+		if _, ok := results[name]; !ok {
+			results[name] = apis.NodeTypeUnknown
+		}
+	}
+
+	return results, nil
+}
+
+func (c *NodeCache) storeNodeClassificationLocked(node *corev1.Node, nodeType apis.NodeType) {
+	if node == nil || node.Name == "" {
+		return
+	}
+
+	if c.SpotNodes == nil {
+		c.SpotNodes = make(map[string]*corev1.Node)
+	}
+	if c.OnDemandNodes == nil {
+		c.OnDemandNodes = make(map[string]*corev1.Node)
+	}
+	if c.NodeTypes == nil {
+		c.NodeTypes = make(map[string]apis.NodeType)
+	}
+
+	switch nodeType {
+	case apis.NodeTypeSpot:
+		c.SpotNodes[node.Name] = node
+		delete(c.OnDemandNodes, node.Name)
+	case apis.NodeTypeOnDemand:
+		c.OnDemandNodes[node.Name] = node
+		delete(c.SpotNodes, node.Name)
+	default:
+		delete(c.SpotNodes, node.Name)
+		delete(c.OnDemandNodes, node.Name)
+	}
+
+	c.NodeTypes[node.Name] = nodeType
 }
 
 // GetNodesBySelector returns nodes matching the given label selector
