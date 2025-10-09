@@ -36,8 +36,10 @@ var _ = Describe("AnnotationParser", func() {
 		Context("with valid annotations", func() {
 			It("should parse all configuration values", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "70%",
 						"spotalis.io/min-on-demand":   "2",
 					},
@@ -52,8 +54,10 @@ var _ = Describe("AnnotationParser", func() {
 
 			It("should parse minimal configuration", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "50%",
 					},
 				}
@@ -67,8 +71,10 @@ var _ = Describe("AnnotationParser", func() {
 
 			It("should handle zero values", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "0%",
 						"spotalis.io/min-on-demand":   "0",
 					},
@@ -82,8 +88,10 @@ var _ = Describe("AnnotationParser", func() {
 
 			It("should return disabled configuration when spotalis.io/enabled is false", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "false",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "false",
 						"spotalis.io/spot-percentage": "70%",
 						"spotalis.io/min-on-demand":   "2",
 					},
@@ -117,8 +125,10 @@ var _ = Describe("AnnotationParser", func() {
 		Context("with invalid annotations", func() {
 			It("should fail with invalid spot percentage", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":         "true",
 						"spotalis.io/spot-percentage": "invalid",
 					},
 				}
@@ -130,8 +140,10 @@ var _ = Describe("AnnotationParser", func() {
 
 			It("should fail with invalid min-on-demand", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: map[string]string{
-						"spotalis.io/enabled":       "true",
 						"spotalis.io/min-on-demand": "not-a-number",
 					},
 				}
@@ -141,14 +153,19 @@ var _ = Describe("AnnotationParser", func() {
 				Expect(err.Error()).To(ContainSubstring("invalid min-on-demand annotation"))
 			})
 
-			It("should fail when no annotations exist", func() {
+			It("should succeed when no annotations exist", func() {
 				obj := &MockObject{
+					labels: map[string]string{
+						"spotalis.io/enabled": "true",
+					},
 					annotations: nil,
 				}
 
-				_, err := parser.ParseWorkloadConfiguration(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("no annotations found"))
+				config, err := parser.ParseWorkloadConfiguration(obj)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(config.Enabled).To(BeTrue())
+				Expect(config.SpotPercentage).To(Equal(int32(0)))
+				Expect(config.MinOnDemand).To(Equal(int32(0)))
 			})
 		})
 	})
@@ -501,6 +518,7 @@ var _ = Describe("AnnotationParser", func() {
 
 // MockObject implements metav1.Object for testing
 type MockObject struct {
+	labels      map[string]string
 	annotations map[string]string
 }
 
@@ -512,28 +530,33 @@ func (m *MockObject) SetAnnotations(annotations map[string]string) {
 	m.annotations = annotations
 }
 
-func (m *MockObject) GetName() string                                { return "test-object" }
-func (m *MockObject) SetName(_ string)                               {}
-func (m *MockObject) GetGenerateName() string                        { return "" }
-func (m *MockObject) SetGenerateName(_ string)                       {}
-func (m *MockObject) GetNamespace() string                           { return "default" }
-func (m *MockObject) SetNamespace(_ string)                          {}
-func (m *MockObject) GetSelfLink() string                            { return "" }
-func (m *MockObject) SetSelfLink(_ string)                           {}
-func (m *MockObject) GetUID() types.UID                              { return types.UID("test-uid") }
-func (m *MockObject) SetUID(_ types.UID)                             {}
-func (m *MockObject) GetResourceVersion() string                     { return "1" }
-func (m *MockObject) SetResourceVersion(_ string)                    {}
-func (m *MockObject) GetGeneration() int64                           { return 1 }
-func (m *MockObject) SetGeneration(_ int64)                          {}
-func (m *MockObject) GetCreationTimestamp() metav1.Time              { return metav1.Time{} }
-func (m *MockObject) SetCreationTimestamp(_ metav1.Time)             {}
-func (m *MockObject) GetDeletionTimestamp() *metav1.Time             { return nil }
-func (m *MockObject) SetDeletionTimestamp(_ *metav1.Time)            {}
-func (m *MockObject) GetDeletionGracePeriodSeconds() *int64          { return nil }
-func (m *MockObject) SetDeletionGracePeriodSeconds(_ *int64)         {}
-func (m *MockObject) GetLabels() map[string]string                   { return nil }
-func (m *MockObject) SetLabels(_ map[string]string)                  {}
+func (m *MockObject) GetName() string                        { return "test-object" }
+func (m *MockObject) SetName(_ string)                       {}
+func (m *MockObject) GetGenerateName() string                { return "" }
+func (m *MockObject) SetGenerateName(_ string)               {}
+func (m *MockObject) GetNamespace() string                   { return "default" }
+func (m *MockObject) SetNamespace(_ string)                  {}
+func (m *MockObject) GetSelfLink() string                    { return "" }
+func (m *MockObject) SetSelfLink(_ string)                   {}
+func (m *MockObject) GetUID() types.UID                      { return types.UID("test-uid") }
+func (m *MockObject) SetUID(_ types.UID)                     {}
+func (m *MockObject) GetResourceVersion() string             { return "1" }
+func (m *MockObject) SetResourceVersion(_ string)            {}
+func (m *MockObject) GetGeneration() int64                   { return 1 }
+func (m *MockObject) SetGeneration(_ int64)                  {}
+func (m *MockObject) GetCreationTimestamp() metav1.Time      { return metav1.Time{} }
+func (m *MockObject) SetCreationTimestamp(_ metav1.Time)     {}
+func (m *MockObject) GetDeletionTimestamp() *metav1.Time     { return nil }
+func (m *MockObject) SetDeletionTimestamp(_ *metav1.Time)    {}
+func (m *MockObject) GetDeletionGracePeriodSeconds() *int64  { return nil }
+func (m *MockObject) SetDeletionGracePeriodSeconds(_ *int64) {}
+func (m *MockObject) GetLabels() map[string]string {
+	return m.labels
+}
+
+func (m *MockObject) SetLabels(labels map[string]string) {
+	m.labels = labels
+}
 func (m *MockObject) GetOwnerReferences() []metav1.OwnerReference    { return nil }
 func (m *MockObject) SetOwnerReferences(_ []metav1.OwnerReference)   {}
 func (m *MockObject) GetFinalizers() []string                        { return nil }
