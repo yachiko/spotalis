@@ -117,6 +117,16 @@ config:
       onDemandLabels:
         - matchLabels:
             karpenter.sh/capacity-type: "on-demand"
+    
+    # Workload timing configuration
+    # Controls timing behavior for all workload controllers (Deployment, StatefulSet)
+    workloadTiming:
+      # -- Minimum duration to wait after deleting a pod before rebalancing again
+      cooldownPeriod: "10s"
+      # -- How long to wait before retrying when disruption window resolution fails
+      disruptionRetryInterval: "1m"
+      # -- How long to wait before checking disruption window again when outside of it
+      disruptionWindowPollInterval: "10m"
   
   webhook:
     # -- Webhook server port (must match webhook.port)

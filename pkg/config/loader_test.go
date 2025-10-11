@@ -57,6 +57,10 @@ operator:
 controllers:
   maxConcurrentReconciles: 5
   reconcileInterval: "10m"
+  workloadTiming:
+    cooldownPeriod: "5s"
+    disruptionRetryInterval: "45s"
+    disruptionWindowPollInterval: "3m"
 webhook:
   enabled: false
   port: 8443
@@ -96,6 +100,9 @@ observability:
 
 	assert.Equal(t, 5, config.Controllers.MaxConcurrentReconciles)
 	assert.Equal(t, 10*time.Minute, config.Controllers.ReconcileInterval)
+	assert.Equal(t, 5*time.Second, config.Controllers.WorkloadTiming.CooldownPeriod)
+	assert.Equal(t, 45*time.Second, config.Controllers.WorkloadTiming.DisruptionRetryInterval)
+	assert.Equal(t, 3*time.Minute, config.Controllers.WorkloadTiming.DisruptionWindowPollInterval)
 
 	assert.False(t, config.Webhook.Enabled)
 	assert.Equal(t, 8443, config.Webhook.Port)
@@ -118,25 +125,28 @@ func TestLoader_LoadFromEnv(t *testing.T) {
 
 	// Set environment variables
 	envVars := map[string]string{
-		"SPOTALIS_OPERATOR_NAMESPACE":                    "env-namespace",
-		"SPOTALIS_OPERATOR_READ_ONLY_MODE":               "true",
-		"SPOTALIS_LEADER_ELECTION_ENABLED":               "false",
-		"SPOTALIS_LEADER_ELECTION_ID":                    "env-leader",
-		"SPOTALIS_LEADER_ELECTION_LEASE_DURATION":        "45s",
-		"SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES": "10",
-		"SPOTALIS_CONTROLLERS_RECONCILE_INTERVAL":        "15m",
-		"SPOTALIS_WEBHOOK_ENABLED":                       "false",
-		"SPOTALIS_WEBHOOK_PORT":                          "7443",
-		"SPOTALIS_WEBHOOK_CERT_DIR":                      "/env/certs",
-		"SPOTALIS_METRICS_ENABLED":                       "false",
-		"SPOTALIS_METRICS_BIND_ADDRESS":                  ":7070",
-		"SPOTALIS_LOGGING_LEVEL":                         "warn",
-		"SPOTALIS_LOGGING_FORMAT":                        "console",
-		"SPOTALIS_LOGGING_OUTPUT":                        "stderr",
-		"SPOTALIS_LOGGING_ADDCALLER":                     "false",
-		"SPOTALIS_LOGGING_DEVELOPMENT":                   "true",
-		"SPOTALIS_HEALTH_ENABLED":                        "false",
-		"SPOTALIS_HEALTH_BIND_ADDRESS":                   ":7071",
+		"SPOTALIS_OPERATOR_NAMESPACE":                                   "env-namespace",
+		"SPOTALIS_OPERATOR_READ_ONLY_MODE":                              "true",
+		"SPOTALIS_LEADER_ELECTION_ENABLED":                              "false",
+		"SPOTALIS_LEADER_ELECTION_ID":                                   "env-leader",
+		"SPOTALIS_LEADER_ELECTION_LEASE_DURATION":                       "45s",
+		"SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES":                "10",
+		"SPOTALIS_CONTROLLERS_RECONCILE_INTERVAL":                       "15m",
+		"SPOTALIS_CONTROLLERS_WORKLOAD_COOLDOWN_PERIOD":                 "7s",
+		"SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_RETRY_INTERVAL":       "35s",
+		"SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_WINDOW_POLL_INTERVAL": "5m",
+		"SPOTALIS_WEBHOOK_ENABLED":                                      "false",
+		"SPOTALIS_WEBHOOK_PORT":                                         "7443",
+		"SPOTALIS_WEBHOOK_CERT_DIR":                                     "/env/certs",
+		"SPOTALIS_METRICS_ENABLED":                                      "false",
+		"SPOTALIS_METRICS_BIND_ADDRESS":                                 ":7070",
+		"SPOTALIS_LOGGING_LEVEL":                                        "warn",
+		"SPOTALIS_LOGGING_FORMAT":                                       "console",
+		"SPOTALIS_LOGGING_OUTPUT":                                       "stderr",
+		"SPOTALIS_LOGGING_ADDCALLER":                                    "false",
+		"SPOTALIS_LOGGING_DEVELOPMENT":                                  "true",
+		"SPOTALIS_HEALTH_ENABLED":                                       "false",
+		"SPOTALIS_HEALTH_BIND_ADDRESS":                                  ":7071",
 	}
 
 	for key, value := range envVars {
@@ -157,6 +167,9 @@ func TestLoader_LoadFromEnv(t *testing.T) {
 
 	assert.Equal(t, 10, config.Controllers.MaxConcurrentReconciles)
 	assert.Equal(t, 15*time.Minute, config.Controllers.ReconcileInterval)
+	assert.Equal(t, 7*time.Second, config.Controllers.WorkloadTiming.CooldownPeriod)
+	assert.Equal(t, 35*time.Second, config.Controllers.WorkloadTiming.DisruptionRetryInterval)
+	assert.Equal(t, 5*time.Minute, config.Controllers.WorkloadTiming.DisruptionWindowPollInterval)
 
 	assert.False(t, config.Webhook.Enabled)
 	assert.Equal(t, 7443, config.Webhook.Port)
@@ -330,6 +343,9 @@ func clearSpotalisEnvVars() {
 		"SPOTALIS_LEADER_ELECTION_LEASE_DURATION",
 		"SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES",
 		"SPOTALIS_CONTROLLERS_RECONCILE_INTERVAL",
+		"SPOTALIS_CONTROLLERS_WORKLOAD_COOLDOWN_PERIOD",
+		"SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_RETRY_INTERVAL",
+		"SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_WINDOW_POLL_INTERVAL",
 		"SPOTALIS_WEBHOOK_ENABLED",
 		"SPOTALIS_WEBHOOK_PORT",
 		"SPOTALIS_WEBHOOK_CERT_DIR",

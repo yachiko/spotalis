@@ -108,6 +108,21 @@ func (l *Loader) loadFromEnv(config *SpotalisConfig) {
 			config.Controllers.ReconcileInterval = duration
 		}
 	}
+	if val := l.getEnv("CONTROLLERS_WORKLOAD_COOLDOWN_PERIOD"); val != "" {
+		if duration, err := time.ParseDuration(val); err == nil {
+			config.Controllers.WorkloadTiming.CooldownPeriod = duration
+		}
+	}
+	if val := l.getEnv("CONTROLLERS_WORKLOAD_DISRUPTION_RETRY_INTERVAL"); val != "" {
+		if duration, err := time.ParseDuration(val); err == nil {
+			config.Controllers.WorkloadTiming.DisruptionRetryInterval = duration
+		}
+	}
+	if val := l.getEnv("CONTROLLERS_WORKLOAD_DISRUPTION_WINDOW_POLL_INTERVAL"); val != "" {
+		if duration, err := time.ParseDuration(val); err == nil {
+			config.Controllers.WorkloadTiming.DisruptionWindowPollInterval = duration
+		}
+	}
 
 	// Webhook configuration
 	if val := l.getEnv("WEBHOOK_ENABLED"); val != "" {

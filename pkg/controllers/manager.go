@@ -36,6 +36,7 @@ type ManagerConfig struct {
 	MaxConcurrentReconciles int
 	ReconcileTimeout        time.Duration
 	ReconcileInterval       time.Duration
+	WorkloadTiming          WorkloadTimingConfig
 
 	// Namespace filtering
 	WatchNamespaces  []string
@@ -56,12 +57,42 @@ type ManagerConfig struct {
 	GracefulShutdownTimeout time.Duration
 }
 
+// WorkloadTimingConfig contains the timing knobs shared by workload controllers
+type WorkloadTimingConfig struct {
+	CooldownPeriod               time.Duration
+	DisruptionRetryInterval      time.Duration
+	DisruptionWindowPollInterval time.Duration
+}
+
+func defaultWorkloadTimingConfig() WorkloadTimingConfig {
+	return WorkloadTimingConfig{
+		CooldownPeriod:               10 * time.Second,
+		DisruptionRetryInterval:      1 * time.Minute,
+		DisruptionWindowPollInterval: 10 * time.Minute,
+	}
+}
+
+func (c WorkloadTimingConfig) withDefaults() WorkloadTimingConfig {
+	defaults := defaultWorkloadTimingConfig()
+	if c.CooldownPeriod <= 0 {
+		c.CooldownPeriod = defaults.CooldownPeriod
+	}
+	if c.DisruptionRetryInterval <= 0 {
+		c.DisruptionRetryInterval = defaults.DisruptionRetryInterval
+	}
+	if c.DisruptionWindowPollInterval <= 0 {
+		c.DisruptionWindowPollInterval = defaults.DisruptionWindowPollInterval
+	}
+	return c
+}
+
 // DefaultManagerConfig returns the default manager configuration
 func DefaultManagerConfig() *ManagerConfig {
 	return &ManagerConfig{
 		MaxConcurrentReconciles: 1, // Low concurrency + single pod deletion = very gradual changes
 		ReconcileTimeout:        5 * time.Minute,
 		ReconcileInterval:       5 * time.Minute, // Increased from 30s for less aggressive rebalancing
+		WorkloadTiming:          defaultWorkloadTimingConfig(),
 		EnableDeployments:       true,
 		EnableStatefulSets:      true,
 		EnableDaemonSets:        false,
@@ -212,13 +243,18 @@ func (cm *ControllerManager) IsStarted() bool {
 
 // setupDeploymentController sets up the deployment controller
 func (cm *ControllerManager) setupDeploymentController() error {
+	timing := cm.config.WorkloadTiming.withDefaults()
+
 	cm.deploymentController = &DeploymentReconciler{
-		Client:            cm.manager.GetClient(),
-		Scheme:            cm.manager.GetScheme(),
-		AnnotationParser:  cm.annotationParser,
-		NodeClassifier:    cm.nodeClassifier,
-		NamespaceFilter:   cm.namespaceFilter,
-		ReconcileInterval: cm.config.ReconcileInterval,
+		Client:                       cm.manager.GetClient(),
+		Scheme:                       cm.manager.GetScheme(),
+		AnnotationParser:             cm.annotationParser,
+		NodeClassifier:               cm.nodeClassifier,
+		NamespaceFilter:              cm.namespaceFilter,
+		ReconcileInterval:            cm.config.ReconcileInterval,
+		CooldownPeriod:               timing.CooldownPeriod,
+		DisruptionRetryInterval:      timing.DisruptionRetryInterval,
+		DisruptionWindowPollInterval: timing.DisruptionWindowPollInterval,
 	}
 
 	// Build controller with configuration
@@ -239,13 +275,18 @@ func (cm *ControllerManager) setupDeploymentController() error {
 
 // setupStatefulSetController sets up the statefulset controller
 func (cm *ControllerManager) setupStatefulSetController() error {
+	timing := cm.config.WorkloadTiming.withDefaults()
+
 	cm.statefulSetController = &StatefulSetReconciler{
-		Client:            cm.manager.GetClient(),
-		Scheme:            cm.manager.GetScheme(),
-		AnnotationParser:  cm.annotationParser,
-		NodeClassifier:    cm.nodeClassifier,
-		NamespaceFilter:   cm.namespaceFilter,
-		ReconcileInterval: cm.config.ReconcileInterval,
+		Client:                       cm.manager.GetClient(),
+		Scheme:                       cm.manager.GetScheme(),
+		AnnotationParser:             cm.annotationParser,
+		NodeClassifier:               cm.nodeClassifier,
+		NamespaceFilter:              cm.namespaceFilter,
+		ReconcileInterval:            cm.config.ReconcileInterval,
+		CooldownPeriod:               timing.CooldownPeriod,
+		DisruptionRetryInterval:      timing.DisruptionRetryInterval,
+		DisruptionWindowPollInterval: timing.DisruptionWindowPollInterval,
 	}
 
 	// Build controller with configuration

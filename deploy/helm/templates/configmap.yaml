@@ -41,6 +41,12 @@ data:
           {{- toYaml .Values.config.controllers.nodeClassifier.spotLabels | nindent 10 }}
         onDemandLabels:
           {{- toYaml .Values.config.controllers.nodeClassifier.onDemandLabels | nindent 10 }}
+      {{- with .Values.config.controllers.workloadTiming }}
+      workloadTiming:
+        cooldownPeriod: {{ .cooldownPeriod | quote }}
+        disruptionRetryInterval: {{ .disruptionRetryInterval | quote }}
+        disruptionWindowPollInterval: {{ .disruptionWindowPollInterval | quote }}
+      {{- end }}
     
     webhook:
       enabled: {{ .Values.webhook.enabled }}

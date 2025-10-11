@@ -88,6 +88,11 @@ var _ = Describe("Observability and Monitoring", func() {
 		// Setup port-forward URLs (assumes port-forward is running)
 		metricsURL = "http://localhost:8090/metrics"
 		healthURL = "http://localhost:8091"
+
+		// Check if port-forward is active, skip tests if not available
+		if !isPortForwardActive(metricsURL, healthURL) {
+			Skip("Port-forward not active. Run: kubectl -n spotalis-system port-forward deployment/spotalis-controller 8090:8080 8091:8081")
+		}
 	})
 
 	AfterEach(func() {
@@ -645,4 +650,29 @@ func getControllerLogs(ctx context.Context, namespace, podName string, tailLines
 func isJSONLog(line string) bool {
 	line = strings.TrimSpace(line)
 	return strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}")
+}
+
+// isPortForwardActive checks if the required port-forwards are active and accessible
+func isPortForwardActive(metricsURL, healthURL string) bool {
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+	}
+
+	// Check metrics endpoint
+	metricsResp, err := client.Get(metricsURL)
+	if err != nil {
+		GinkgoWriter.Printf("Metrics endpoint not accessible: %v\n", err)
+		return false
+	}
+	metricsResp.Body.Close()
+
+	// Check health endpoint
+	healthResp, err := client.Get(healthURL + "/healthz")
+	if err != nil {
+		GinkgoWriter.Printf("Health endpoint not accessible: %v\n", err)
+		return false
+	}
+	healthResp.Body.Close()
+
+	return true
 }

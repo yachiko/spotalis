@@ -1077,6 +1077,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 			statefulSetKey := "default/test-statefulset"
 			now := time.Now()
 
+			reconciler.CooldownPeriod = time.Minute
+
 			// Store a recent deletion time
 			reconciler.lastDeletionTimes.Store(statefulSetKey, now.Add(-30*time.Second))
 
@@ -1117,7 +1119,30 @@ var _ = Describe("StatefulSetReconciler", func() {
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
 			// Should be in cooldown and requeue after remaining cooldown time
-			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+			expectedRemaining := 30 * time.Second
+			Expect(result.RequeueAfter.Seconds()).To(BeNumerically("~", expectedRemaining.Seconds(), 1))
+		})
+	})
+
+	Context("timing helpers", func() {
+		It("returns defaults when unset", func() {
+			reconciler := &StatefulSetReconciler{}
+			defaults := defaultWorkloadTimingConfig()
+			Expect(reconciler.getCooldownPeriod()).To(Equal(defaults.CooldownPeriod))
+			Expect(reconciler.getDisruptionRetryInterval()).To(Equal(defaults.DisruptionRetryInterval))
+			Expect(reconciler.getDisruptionWindowPollInterval()).To(Equal(defaults.DisruptionWindowPollInterval))
+		})
+
+		It("returns configured values when provided", func() {
+			reconciler := &StatefulSetReconciler{
+				CooldownPeriod:               24 * time.Second,
+				DisruptionRetryInterval:      90 * time.Second,
+				DisruptionWindowPollInterval: 7 * time.Minute,
+			}
+
+			Expect(reconciler.getCooldownPeriod()).To(Equal(24 * time.Second))
+			Expect(reconciler.getDisruptionRetryInterval()).To(Equal(90 * time.Second))
+			Expect(reconciler.getDisruptionWindowPollInterval()).To(Equal(7 * time.Minute))
 		})
 	})
 })

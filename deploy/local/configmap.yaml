@@ -24,6 +24,10 @@ data:
       rateLimit:
         qps: 100.0
         burst: 150
+      workloadTiming:
+        cooldownPeriod: "10s"
+        disruptionRetryInterval: "1m"
+        disruptionWindowPollInterval: "10m"
 
     webhook:
       enabled: true

@@ -358,6 +358,9 @@ func (c *NodeCache) storeNodeClassificationLocked(node *corev1.Node, nodeType ap
 	case apis.NodeTypeOnDemand:
 		c.OnDemandNodes[node.Name] = node
 		delete(c.SpotNodes, node.Name)
+	case apis.NodeTypeUnknown:
+		delete(c.SpotNodes, node.Name)
+		delete(c.OnDemandNodes, node.Name)
 	default:
 		delete(c.SpotNodes, node.Name)
 		delete(c.OnDemandNodes, node.Name)

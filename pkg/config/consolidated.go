@@ -96,6 +96,34 @@ type ControllerConfig struct {
 
 	// NodeClassifier contains node classification configuration
 	NodeClassifier NodeClassifierConfig `yaml:"nodeClassifier" json:"nodeClassifier"`
+
+	// WorkloadTiming contains shared timing controls applied to all workload reconcilers
+	WorkloadTiming WorkloadTimingConfig `yaml:"workloadTiming" json:"workloadTiming"`
+}
+
+// WorkloadTimingConfig contains configurable timing knobs for workload controllers
+type WorkloadTimingConfig struct {
+	// CooldownPeriod is the minimum duration to wait after deleting a pod before rebalancing again
+	CooldownPeriod time.Duration `yaml:"cooldownPeriod" json:"cooldownPeriod"`
+
+	// DisruptionRetryInterval is how long to wait before retrying when disruption window resolution fails
+	DisruptionRetryInterval time.Duration `yaml:"disruptionRetryInterval" json:"disruptionRetryInterval"`
+
+	// DisruptionWindowPollInterval is how long to wait before checking the disruption window again when outside of it
+	DisruptionWindowPollInterval time.Duration `yaml:"disruptionWindowPollInterval" json:"disruptionWindowPollInterval"`
+}
+
+func validateWorkloadTimingConfig(name string, cfg *WorkloadTimingConfig) error {
+	if cfg.CooldownPeriod <= 0 {
+		return fmt.Errorf("%s.cooldownPeriod must be positive", name)
+	}
+	if cfg.DisruptionRetryInterval <= 0 {
+		return fmt.Errorf("%s.disruptionRetryInterval must be positive", name)
+	}
+	if cfg.DisruptionWindowPollInterval <= 0 {
+		return fmt.Errorf("%s.disruptionWindowPollInterval must be positive", name)
+	}
+	return nil
 }
 
 // NodeClassifierConfig contains node classification configuration
@@ -200,6 +228,11 @@ func DefaultConfig() *SpotalisConfig {
 					},
 				},
 			},
+			WorkloadTiming: WorkloadTimingConfig{
+				CooldownPeriod:               10 * time.Second,
+				DisruptionRetryInterval:      1 * time.Minute,
+				DisruptionWindowPollInterval: 10 * time.Minute,
+			},
 		},
 		Webhook: WebhookConfig{
 			Enabled: true,
@@ -243,6 +276,10 @@ func (c *SpotalisConfig) Validate() error {
 	// Validate disruption window configuration
 	if err := c.Operator.DisruptionWindow.Validate(); err != nil {
 		return fmt.Errorf("operator.disruptionWindow: %w", err)
+	}
+
+	if err := validateWorkloadTimingConfig("controllers.workloadTiming", &c.Controllers.WorkloadTiming); err != nil {
+		return err
 	}
 
 	return nil

@@ -22,6 +22,12 @@ controllers:
   rateLimit:
     qps: 100.0
     burst: 150
+
+  # Workload timing controls (applies to both Deployments and StatefulSets)
+  workloadTiming:
+    cooldownPeriod: "5s"                   # Wait 5s between successive pod deletions
+    disruptionRetryInterval: "30s"         # Retry disruption window resolution after 30s on error
+    disruptionWindowPollInterval: "2m"     # Re-check disruption window every 2 minutes when closed
   
   # Node classifier configuration
   # Defines how to identify spot vs on-demand nodes

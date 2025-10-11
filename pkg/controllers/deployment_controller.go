@@ -35,14 +35,17 @@ type ControllerError struct {
 // DeploymentReconciler reconciles Deployment objects for spot/on-demand pod distribution management
 type DeploymentReconciler struct {
 	client.Client
-	Scheme              *runtime.Scheme
-	AnnotationParser    *annotations.AnnotationParser
-	NodeClassifier      *config.NodeClassifierService
-	NamespaceFilter     *NamespaceFilter // Filter for namespace-level permissions
-	ReconcileInterval   time.Duration
-	MaxConcurrentRecons int
-	MetricsCollector    MetricsRecorder           // Interface for recording metrics
-	Config              *pkgconfig.SpotalisConfig // Global configuration
+	Scheme                       *runtime.Scheme
+	AnnotationParser             *annotations.AnnotationParser
+	NodeClassifier               *config.NodeClassifierService
+	NamespaceFilter              *NamespaceFilter // Filter for namespace-level permissions
+	ReconcileInterval            time.Duration
+	MaxConcurrentRecons          int
+	MetricsCollector             MetricsRecorder           // Interface for recording metrics
+	Config                       *pkgconfig.SpotalisConfig // Global configuration
+	CooldownPeriod               time.Duration
+	DisruptionRetryInterval      time.Duration
+	DisruptionWindowPollInterval time.Duration
 
 	// Track last pod deletion time per deployment to implement cooldown
 	lastDeletionTimes sync.Map // map[string]time.Time
@@ -64,12 +67,16 @@ type MetricsRecorder interface {
 
 // NewDeploymentReconciler creates a new DeploymentReconciler
 func NewDeploymentReconciler(client client.Client, scheme *runtime.Scheme) *DeploymentReconciler {
+	defaults := defaultWorkloadTimingConfig()
 	return &DeploymentReconciler{
-		Client:              client,
-		Scheme:              scheme,
-		AnnotationParser:    annotations.NewAnnotationParser(),
-		ReconcileInterval:   5 * time.Minute,
-		MaxConcurrentRecons: 10,
+		Client:                       client,
+		Scheme:                       scheme,
+		AnnotationParser:             annotations.NewAnnotationParser(),
+		ReconcileInterval:            5 * time.Minute,
+		MaxConcurrentRecons:          10,
+		CooldownPeriod:               defaults.CooldownPeriod,
+		DisruptionRetryInterval:      defaults.DisruptionRetryInterval,
+		DisruptionWindowPollInterval: defaults.DisruptionWindowPollInterval,
 	}
 }
 
@@ -171,7 +178,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			logger.Error(err, "Invalid deletion timestamp type")
 			return ctrl.Result{}, err
 		}
-		cooldownPeriod := 10 * time.Second // Wait 10 seconds after deleting a pod
+		cooldownPeriod := r.getCooldownPeriod()
 		timeSinceLastDeletion := time.Since(lastDeletion)
 
 		if timeSinceLastDeletion < cooldownPeriod {
@@ -257,7 +264,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Recovered: false,
 			})
 			logger.ReconcileFailed(err, "Failed to resolve disruption window")
-			return ctrl.Result{RequeueAfter: time.Minute}, nil // Retry after 1 minute
+			return ctrl.Result{RequeueAfter: r.getDisruptionRetryInterval()}, nil
 		}
 
 		// Check if we're within the disruption window
@@ -265,7 +272,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			nextWindow := disruptionWindow.Schedule.Next(time.Now().UTC())
 			logger.Info("Outside disruption window, deferring rebalancing",
 				"next_window", nextWindow)
-			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil // Check again in 10 minutes
+			return ctrl.Result{RequeueAfter: r.getDisruptionWindowPollInterval()}, nil
 		}
 
 		logger.Info("Rebalancing deployment pods",
@@ -699,4 +706,25 @@ func (r *DeploymentReconciler) markRecovered() {
 	if r.lastError != nil && !r.lastError.Recovered {
 		r.lastError.Recovered = true
 	}
+}
+
+func (r *DeploymentReconciler) getCooldownPeriod() time.Duration {
+	if r.CooldownPeriod > 0 {
+		return r.CooldownPeriod
+	}
+	return defaultWorkloadTimingConfig().CooldownPeriod
+}
+
+func (r *DeploymentReconciler) getDisruptionRetryInterval() time.Duration {
+	if r.DisruptionRetryInterval > 0 {
+		return r.DisruptionRetryInterval
+	}
+	return defaultWorkloadTimingConfig().DisruptionRetryInterval
+}
+
+func (r *DeploymentReconciler) getDisruptionWindowPollInterval() time.Duration {
+	if r.DisruptionWindowPollInterval > 0 {
+		return r.DisruptionWindowPollInterval
+	}
+	return defaultWorkloadTimingConfig().DisruptionWindowPollInterval
 }

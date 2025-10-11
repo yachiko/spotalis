@@ -138,6 +138,11 @@ func (r *ServiceRegistry) RegisterControllers() error {
 			&controllers.ManagerConfig{
 				MaxConcurrentReconciles: config.Controllers.MaxConcurrentReconciles,
 				ReconcileInterval:       config.Controllers.ReconcileInterval,
+				WorkloadTiming: controllers.WorkloadTimingConfig{
+					CooldownPeriod:               config.Controllers.WorkloadTiming.CooldownPeriod,
+					DisruptionRetryInterval:      config.Controllers.WorkloadTiming.DisruptionRetryInterval,
+					DisruptionWindowPollInterval: config.Controllers.WorkloadTiming.DisruptionWindowPollInterval,
+				},
 			},
 			kubeClient,
 			annotationParser,

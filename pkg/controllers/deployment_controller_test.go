@@ -956,6 +956,8 @@ var _ = Describe("DeploymentReconciler", func() {
 			deploymentKey := "default/test-deployment"
 			now := time.Now()
 
+			reconciler.CooldownPeriod = time.Minute
+
 			// Store a recent deletion time
 			reconciler.lastDeletionTimes.Store(deploymentKey, now.Add(-30*time.Second))
 
@@ -996,7 +998,30 @@ var _ = Describe("DeploymentReconciler", func() {
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
 			// Should be in cooldown and requeue after remaining cooldown time
-			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+			expectedRemaining := 30 * time.Second
+			Expect(result.RequeueAfter.Seconds()).To(BeNumerically("~", expectedRemaining.Seconds(), 1))
+		})
+	})
+
+	Context("timing helpers", func() {
+		It("returns defaults when unset", func() {
+			reconciler := &DeploymentReconciler{}
+			defaults := defaultWorkloadTimingConfig()
+			Expect(reconciler.getCooldownPeriod()).To(Equal(defaults.CooldownPeriod))
+			Expect(reconciler.getDisruptionRetryInterval()).To(Equal(defaults.DisruptionRetryInterval))
+			Expect(reconciler.getDisruptionWindowPollInterval()).To(Equal(defaults.DisruptionWindowPollInterval))
+		})
+
+		It("returns configured values when provided", func() {
+			reconciler := &DeploymentReconciler{
+				CooldownPeriod:               42 * time.Second,
+				DisruptionRetryInterval:      3 * time.Minute,
+				DisruptionWindowPollInterval: 11 * time.Minute,
+			}
+
+			Expect(reconciler.getCooldownPeriod()).To(Equal(42 * time.Second))
+			Expect(reconciler.getDisruptionRetryInterval()).To(Equal(3 * time.Minute))
+			Expect(reconciler.getDisruptionWindowPollInterval()).To(Equal(11 * time.Minute))
 		})
 	})
 })

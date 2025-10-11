@@ -24,6 +24,9 @@ func TestDefaultConfig(t *testing.T) {
 	// Test controller config
 	assert.Equal(t, 1, config.Controllers.MaxConcurrentReconciles)
 	assert.Equal(t, 5*time.Minute, config.Controllers.ReconcileInterval)
+	assert.Equal(t, 10*time.Second, config.Controllers.WorkloadTiming.CooldownPeriod)
+	assert.Equal(t, 1*time.Minute, config.Controllers.WorkloadTiming.DisruptionRetryInterval)
+	assert.Equal(t, 10*time.Minute, config.Controllers.WorkloadTiming.DisruptionWindowPollInterval)
 
 	// Test webhook config
 	assert.True(t, config.Webhook.Enabled)
@@ -60,6 +63,22 @@ func TestConfigValidation(t *testing.T) {
 		err := config.Validate()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "controllers.maxConcurrentReconciles must be positive")
+	})
+
+	t.Run("invalid deployment cooldown", func(t *testing.T) {
+		config := DefaultConfig()
+		config.Controllers.WorkloadTiming.CooldownPeriod = 0
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "controllers.workloadTiming.cooldownPeriod must be positive")
+	})
+
+	t.Run("invalid workload disruption retry interval", func(t *testing.T) {
+		config := DefaultConfig()
+		config.Controllers.WorkloadTiming.DisruptionRetryInterval = -1 * time.Second
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "controllers.workloadTiming.disruptionRetryInterval must be positive")
 	})
 
 	t.Run("invalid webhook port when enabled", func(t *testing.T) {
@@ -106,9 +125,25 @@ func TestConfigStructures(t *testing.T) {
 		config := &ControllerConfig{
 			MaxConcurrentReconciles: 5,
 			ReconcileInterval:       10 * time.Minute,
+			WorkloadTiming: WorkloadTimingConfig{
+				CooldownPeriod:               5 * time.Second,
+				DisruptionRetryInterval:      30 * time.Second,
+				DisruptionWindowPollInterval: 2 * time.Minute,
+			},
 		}
 		assert.Equal(t, 5, config.MaxConcurrentReconciles)
 		assert.Equal(t, 10*time.Minute, config.ReconcileInterval)
+	})
+
+	t.Run("WorkloadTimingConfig", func(t *testing.T) {
+		cfg := &WorkloadTimingConfig{
+			CooldownPeriod:               5 * time.Second,
+			DisruptionRetryInterval:      30 * time.Second,
+			DisruptionWindowPollInterval: 2 * time.Minute,
+		}
+		assert.Equal(t, 5*time.Second, cfg.CooldownPeriod)
+		assert.Equal(t, 30*time.Second, cfg.DisruptionRetryInterval)
+		assert.Equal(t, 2*time.Minute, cfg.DisruptionWindowPollInterval)
 	})
 
 	t.Run("WebhookConfig", func(t *testing.T) {
