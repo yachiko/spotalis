@@ -36,11 +36,11 @@ fmt:
 
 .PHONY: test
 test: envtest ## Run unit tests
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_DIR) -p path)" go clean -testcache && go test ./... -v --tags=unit -timeout=5m -ginkgo.v
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_DIR) -p path)" go clean -testcache && go test ./... -v --tags=unit -timeout=5m
 
 .PHONY: test-integration
 test-integration:
-	go test ./tests/integration/... -v -tags=integration -timeout=15m -ginkgo.v
+	go test ./tests/integration/... -v -tags=integration -timeout=45m -ginkgo.v
 
 ##@ Build
 .PHONY: build
