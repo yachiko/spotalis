@@ -56,27 +56,10 @@ Follow in order; stop when the cause is found.
 | Metrics show requests but zero mutations | Conditions not met / internal skip | Increase log level to debug |
 
 ## Increase Log Verbosity
-```bash
-export SPOTALIS_LOGGING_LEVEL=debug
-kubectl rollout restart deploy/spotalis-controller -n spotalis-system
-```
+
+Set `SPOTALIS_LOGGING_LEVEL` or `observability.logging.level` to `debug`.
+
 Look for detailed webhook decision logs after restart.
-
-## Capturing an Admission Request (Advanced)
-Use apiserver audit logs or a temporary `kubectl proxy` with audit policy enabling `pods/create` requests to see exact admission payload.
-
-## Network Path Verification
-```bash
-kubectl run curl --image=appropriate/curl --restart=Never -- sh -c 'curl -k https://spotalis-controller.spotalis-system.svc:9443/healthz'
-```
-Success indicates service and TLS terminate correctly; failing may show network or cert issue.
-
-## When to File an Issue
-Open an issue with:
-- Controller version & git commit
-- Relevant log excerpts
-- Output of `kubectl describe mutatingwebhookconfiguration spotalis-mutating-webhook`
-- Reproducer steps (namespace & workload manifests sans proprietary data)
 
 ## See Also
 - [Labels & Annotations](../reference/labels-and-annotations.md)

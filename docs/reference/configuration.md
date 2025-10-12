@@ -58,27 +58,27 @@ observability:
 3. Environment variables (prefix `SPOTALIS_`) — highest precedence
 
 ## Environment Variable Mapping
-| Env Var | Field Path | Type | Default | Notes |
-|--------|------------|------|---------|-------|
-| SPOTALIS_OPERATOR_NAMESPACE | operator.namespace | string | spotalis-system | Must be non-empty |
-| SPOTALIS_OPERATOR_READ_ONLY_MODE | operator.readOnlyMode | bool | false | If true, no mutating actions performed |
-| SPOTALIS_LEADER_ELECTION_ENABLED | operator.leaderElection.enabled | bool | true | Disable only for single-replica dev |
-| SPOTALIS_LEADER_ELECTION_ID | operator.leaderElection.id | string | spotalis-controller-leader | Lease name |
-| SPOTALIS_LEADER_ELECTION_LEASE_DURATION | operator.leaderElection.leaseDuration | duration | 15s | Go duration syntax |
-| SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES | controllers.maxConcurrentReconciles | int | 1 | >1 increases parallelism |
-| SPOTALIS_CONTROLLERS_RECONCILE_INTERVAL | controllers.reconcileInterval | duration | 5m | Interval between periodic reconciles |
-| SPOTALIS_CONTROLLERS_WORKLOAD_COOLDOWN_PERIOD | controllers.workloadTiming.cooldownPeriod | duration | 10s | Minimum wait after disruption |
-| SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_RETRY_INTERVAL | controllers.workloadTiming.disruptionRetryInterval | duration | 1m | Retry when window resolution fails |
-| SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_WINDOW_POLL_INTERVAL | controllers.workloadTiming.disruptionWindowPollInterval | duration | 10m | Polling cadence outside window |
-| SPOTALIS_WEBHOOK_ENABLED | webhook.enabled | bool | true | Disable to skip mutation (tests/dev) |
-| SPOTALIS_WEBHOOK_PORT | webhook.port | int | 9443 | >0 required if enabled |
-| SPOTALIS_WEBHOOK_CERT_DIR | webhook.certDir | string | /tmp/k8s-webhook-server/serving-certs | Mounted secret path |
-| SPOTALIS_METRICS_ENABLED | observability.metrics.enabled | bool | true | Metrics off reduces insight |
-| SPOTALIS_METRICS_BIND_ADDRESS | observability.metrics.bindAddress | string | :8080 | host:port or :port |
-| SPOTALIS_LOGGING_LEVEL | observability.logging.level | string | info | debug|info|warn|error |
-| SPOTALIS_LOGGING_FORMAT | observability.logging.format | string | json | json or console |
-| SPOTALIS_HEALTH_ENABLED | observability.health.enabled | bool | true | Health endpoints disabled if false |
-| SPOTALIS_HEALTH_BIND_ADDRESS | observability.health.bindAddress | string | :8081 | host:port or :port |
+| Env Var                                                       | Field Path                                              | Type     | Default                               | Notes                                  |
+| ------------------------------------------------------------- | ------------------------------------------------------- | -------- | ------------------------------------- | -------------------------------------- |
+| SPOTALIS_OPERATOR_NAMESPACE                                   | operator.namespace                                      | string   | spotalis-system                       | Must be non-empty                      |
+| SPOTALIS_OPERATOR_READ_ONLY_MODE                              | operator.readOnlyMode                                   | bool     | false                                 | If true, no mutating actions performed |
+| SPOTALIS_LEADER_ELECTION_ENABLED                              | operator.leaderElection.enabled                         | bool     | true                                  | Disable only for single-replica dev    |
+| SPOTALIS_LEADER_ELECTION_ID                                   | operator.leaderElection.id                              | string   | spotalis-controller-leader            | Lease name                             |
+| SPOTALIS_LEADER_ELECTION_LEASE_DURATION                       | operator.leaderElection.leaseDuration                   | duration | 15s                                   | Go duration syntax                     |
+| SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES                | controllers.maxConcurrentReconciles                     | int      | 1                                     | >1 increases parallelism               |
+| SPOTALIS_CONTROLLERS_RECONCILE_INTERVAL                       | controllers.reconcileInterval                           | duration | 5m                                    | Interval between periodic reconciles   |
+| SPOTALIS_CONTROLLERS_WORKLOAD_COOLDOWN_PERIOD                 | controllers.workloadTiming.cooldownPeriod               | duration | 10s                                   | Minimum wait after disruption          |
+| SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_RETRY_INTERVAL       | controllers.workloadTiming.disruptionRetryInterval      | duration | 1m                                    | Retry when window resolution fails     |
+| SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_WINDOW_POLL_INTERVAL | controllers.workloadTiming.disruptionWindowPollInterval | duration | 10m                                   | Polling cadence outside window         |
+| SPOTALIS_WEBHOOK_ENABLED                                      | webhook.enabled                                         | bool     | true                                  | Disable to skip mutation (tests/dev)   |
+| SPOTALIS_WEBHOOK_PORT                                         | webhook.port                                            | int      | 9443                                  | >0 required if enabled                 |
+| SPOTALIS_WEBHOOK_CERT_DIR                                     | webhook.certDir                                         | string   | /tmp/k8s-webhook-server/serving-certs | Mounted secret path                    |
+| SPOTALIS_METRICS_ENABLED                                      | observability.metrics.enabled                           | bool     | true                                  | Metrics off reduces insight            |
+| SPOTALIS_METRICS_BIND_ADDRESS                                 | observability.metrics.bindAddress                       | string   | :8080                                 | host:port or :port                     |
+| SPOTALIS_LOGGING_LEVEL                                        | observability.logging.level                             | string   | info                                  | debug                                  | info | warn | error |
+| SPOTALIS_LOGGING_FORMAT                                       | observability.logging.format                            | string   | json                                  | json or console                        |
+| SPOTALIS_HEALTH_ENABLED                                       | observability.health.enabled                            | bool     | true                                  | Health endpoints disabled if false     |
+| SPOTALIS_HEALTH_BIND_ADDRESS                                  | observability.health.bindAddress                        | string   | :8081                                 | host:port or :port                     |
 
 ## Field Details & Validation
 ### operator
@@ -137,11 +137,11 @@ export SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES=4
 File defines baseline; env raises concurrency without editing file.
 
 ## Common Misconfigurations
-| Symptom | Likely Cause | Fix |
-|---------|--------------|-----|
-| Startup validation error about cooldownPeriod | Non-positive duration | Provide value >0 e.g. 5s |
-| Webhook fails to start | enabled=true but missing certs | Mount secret or disable webhook |
-| No metrics exposed | metrics.enabled=false or port blocked | Enable and ensure service/port reachable |
+| Symptom                                       | Likely Cause                          | Fix                                      |
+| --------------------------------------------- | ------------------------------------- | ---------------------------------------- |
+| Startup validation error about cooldownPeriod | Non-positive duration                 | Provide value >0 e.g. 5s                 |
+| Webhook fails to start                        | enabled=true but missing certs        | Mount secret or disable webhook          |
+| No metrics exposed                            | metrics.enabled=false or port blocked | Enable and ensure service/port reachable |
 
 ## Stability Markers
 All fields documented are Stable unless noted. Disruption window semantics may evolve; treat schedule/duration as Provisional until first minor release after introduction.
