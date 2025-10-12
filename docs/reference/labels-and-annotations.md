@@ -100,3 +100,4 @@ Disable management | Remove label | `kubectl label deploy/api spotalis.io/enable
 - Replica distribution strategy: `../explanation/replica-distribution-strategy.md`
 - Tuning guide: `../how-to/tune-spot-percentage.md`
 - State management (drift interpretation): `state-management.md`
+- Glossary: `glossary.md`

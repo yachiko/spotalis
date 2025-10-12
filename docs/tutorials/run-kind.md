@@ -1,5 +1,7 @@
 # Tutorial: Run Spotalis on Kind
 
+Stability: Stable
+
 Stated Goal: Deploy Spotalis locally and confirm it mutates a workload (nodeSelector injection) and logs a replica distribution calculation.
 
 Estimated Time: 5–10 minutes.

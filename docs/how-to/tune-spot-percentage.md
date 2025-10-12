@@ -1,5 +1,7 @@
 # How-To: Tune Spot Percentage
 
+Stability: Stable
+
 Goal: Adjust `spotalis.io/spot-percentage` to reach a target spot/on-demand replica mix without inducing unnecessary churn.
 
 ## Before You Start (Safety Checklist)
