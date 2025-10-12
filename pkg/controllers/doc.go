@@ -44,15 +44,16 @@ Setting up controllers with dependency injection:
 		mgr.Start(ctx)
 	})
 
-# Annotation-Driven Configuration
+# Annotation + Label Driven Configuration
 
-Controllers read configuration from workload annotations:
+Controllers read enablement from a label and tuning from workload annotations:
 
 	apiVersion: apps/v1
 	kind: Deployment
 	metadata:
+	  labels:
+	    spotalis.io/enabled: "true"   # enable Spotalis (label only)
 	  annotations:
-	    spotalis.io/enabled: "true"
 	    spotalis.io/spot-percentage: "70"
 	    spotalis.io/min-on-demand: "2"
 	spec:

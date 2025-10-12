@@ -72,21 +72,17 @@ func (w *WorkloadConfiguration) IsOnDemandOnly() bool {
 	return w.SpotPercentage == 0
 }
 
-// ParseFromAnnotations creates a WorkloadConfiguration from Kubernetes annotations
-func ParseFromAnnotations(annotations map[string]string) (*WorkloadConfiguration, error) {
-	config := &WorkloadConfiguration{}
-
-	// Check if spotalis is enabled
-	if enabled, exists := annotations["spotalis.io/enabled"]; exists {
-		parsedEnabled, err := strconv.ParseBool(enabled)
-		if err != nil {
-			return nil, fmt.Errorf("invalid spotalis.io/enabled value: %v", err)
-		}
-		config.Enabled = parsedEnabled
-	}
+// ParseFromAnnotations creates a WorkloadConfiguration from Kubernetes annotations.
+// Enablement is NOT derived from annotations anymore; it must be set via label externally.
+func ParseFromAnnotations(annotations map[string]string, enabled bool) (*WorkloadConfiguration, error) {
+	config := &WorkloadConfiguration{Enabled: enabled}
 
 	if !config.Enabled {
-		return config, nil // Return early if not enabled
+		return config, nil
+	}
+
+	if annotations == nil {
+		return config, nil
 	}
 
 	// Parse minOnDemand
@@ -100,7 +96,6 @@ func ParseFromAnnotations(annotations map[string]string) (*WorkloadConfiguration
 
 	// Parse spotPercentage
 	if spotPercentage, exists := annotations["spotalis.io/spot-percentage"]; exists {
-		// Remove '%' symbol if present
 		percentageStr := strings.TrimSuffix(spotPercentage, "%")
 		parsed, err := strconv.ParseInt(percentageStr, 10, 32)
 		if err != nil {
@@ -115,13 +110,10 @@ func ParseFromAnnotations(annotations map[string]string) (*WorkloadConfiguration
 // ToAnnotations converts the WorkloadConfiguration back to annotations
 func (w *WorkloadConfiguration) ToAnnotations() map[string]string {
 	annotations := make(map[string]string)
-
-	annotations["spotalis.io/enabled"] = strconv.FormatBool(w.Enabled)
-
-	if w.Enabled {
-		annotations["spotalis.io/min-on-demand"] = strconv.FormatInt(int64(w.MinOnDemand), 10)
-		annotations["spotalis.io/spot-percentage"] = strconv.FormatInt(int64(w.SpotPercentage), 10) + "%"
+	if !w.Enabled {
+		return annotations
 	}
-
+	annotations["spotalis.io/min-on-demand"] = strconv.FormatInt(int64(w.MinOnDemand), 10)
+	annotations["spotalis.io/spot-percentage"] = strconv.FormatInt(int64(w.SpotPercentage), 10) + "%"
 	return annotations
 }

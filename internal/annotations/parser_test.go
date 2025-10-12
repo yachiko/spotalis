@@ -68,15 +68,14 @@ var _ = Describe("AnnotationParser", func() {
 				Expect(config.MinOnDemand).To(Equal(int32(0)))
 			})
 
-			It("should handle zero values", func() {
+			It("should handle zero values for tuning annotations", func() {
 				obj := &MockObject{
 					labels: map[string]string{
 						"spotalis.io/enabled": "true",
 					},
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "0",
+						"spotalis.io/spot-percentage": "0%",
 						"spotalis.io/min-on-demand":   "0",
-						"spotalis.io/max-replicas":    "0",
 					},
 				}
 
@@ -175,7 +174,6 @@ var _ = Describe("AnnotationParser", func() {
 	Describe("HasSpotalisAnnotations", func() {
 		It("should return true when spotalis annotations exist", func() {
 			testCases := []map[string]string{
-				{"spotalis.io/enabled": "true"},
 				{"spotalis.io/spot-percentage": "70%"},
 				{"spotalis.io/min-on-demand": "2"},
 			}

@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	// EnabledAnnotation enables/disables Spotalis management for the workload
-	EnabledAnnotation = "spotalis.io/enabled"
+	// EnabledLabel enables/disables Spotalis management for the workload (applied as a LABEL, not annotation)
+	EnabledLabel = "spotalis.io/enabled"
 
 	// SpotPercentageAnnotation configures the percentage of replicas on spot instances
 	SpotPercentageAnnotation = "spotalis.io/spot-percentage"
@@ -67,7 +67,7 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 	// Check if Spotalis is enabled via label (REQUIRED)
 	labels := obj.GetLabels()
 	if labels != nil {
-		if enabled, exists := labels[EnabledAnnotation]; exists {
+		if enabled, exists := labels[EnabledLabel]; exists {
 			config.Enabled = enabled == BooleanTrue
 		}
 	}
@@ -120,7 +120,6 @@ func (p *AnnotationParser) HasSpotalisAnnotations(obj metav1.Object) bool {
 	}
 
 	spotalisAnnotations := []string{
-		EnabledAnnotation,
 		SpotPercentageAnnotation,
 		MinOnDemandAnnotation,
 	}
@@ -144,7 +143,7 @@ func (p *AnnotationParser) IsSpotalisEnabled(obj metav1.Object) bool {
 		return false
 	}
 
-	enabled, exists := labels[EnabledAnnotation]
+	enabled, exists := labels[EnabledLabel]
 	if !exists {
 		return false
 	}
@@ -197,11 +196,7 @@ func (p *AnnotationParser) ValidateAnnotations(obj metav1.Object) []error {
 	}
 
 	// Validate enabled annotation if present
-	if value, exists := annotations[EnabledAnnotation]; exists {
-		if value != BooleanTrue && value != BooleanFalse {
-			errors = append(errors, fmt.Errorf("invalid %s: must be 'true' or 'false', got '%s'", EnabledAnnotation, value))
-		}
-	}
+	// No validation for enablement annotation since enablement is label-only
 
 	// Validate each annotation if present
 	if value, exists := annotations[SpotPercentageAnnotation]; exists {

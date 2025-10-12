@@ -15,7 +15,7 @@ You may obtain a copy of the License at
 					"spotalis.io/scaling-policy":   "gradual",
 				}
 
-				config, err := ParseFromAnnotations(annotations)
+				config, err := ParseFromAnnotations(annotations, true)
 				Expect(err).To(BeNil())
 				Expect(config.Enabled).To(BeTrue())
 				Expect(config.MinOnDemand).To(Equal(int32(2)))
@@ -212,7 +212,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 					"spotalis.io/enabled": "false",
 				}
 
-				config, err := apis.ParseFromAnnotations(annotations)
+				config, err := apis.ParseFromAnnotations(annotations, true)
 				Expect(err).To(BeNil())
 				Expect(config.Enabled).To(BeFalse())
 			})
@@ -220,7 +220,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 			It("should return disabled when annotation is missing", func() {
 				annotations := map[string]string{}
 
-				config, err := apis.ParseFromAnnotations(annotations)
+				config, err := apis.ParseFromAnnotations(annotations, true)
 				Expect(err).To(BeNil())
 				Expect(config.Enabled).To(BeFalse())
 			})
@@ -234,7 +234,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 					"spotalis.io/spot-percentage": "70%",
 				}
 
-				config, err := apis.ParseFromAnnotations(annotations)
+				config, err := apis.ParseFromAnnotations(annotations, true)
 				Expect(err).To(BeNil())
 				Expect(config.Enabled).To(BeTrue())
 				Expect(config.MinOnDemand).To(Equal(int32(2)))
@@ -247,7 +247,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 					"spotalis.io/spot-percentage": "80",
 				}
 
-				config, err := apis.ParseFromAnnotations(annotations)
+				config, err := apis.ParseFromAnnotations(annotations, true)
 				Expect(err).To(BeNil())
 				Expect(config.SpotPercentage).To(Equal(int32(80)))
 			})
@@ -259,7 +259,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 					"spotalis.io/enabled": "invalid",
 				}
 
-				_, err := apis.ParseFromAnnotations(annotations)
+				_, err := apis.ParseFromAnnotations(annotations, true)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid spotalis.io/enabled value"))
 			})
@@ -270,7 +270,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 					"spotalis.io/min-on-demand": "invalid",
 				}
 
-				_, err := apis.ParseFromAnnotations(annotations)
+				_, err := apis.ParseFromAnnotations(annotations, true)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid spotalis.io/min-on-demand value"))
 			})
@@ -281,7 +281,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 					"spotalis.io/spot-percentage": "invalid%",
 				}
 
-				_, err := apis.ParseFromAnnotations(annotations)
+				_, err := apis.ParseFromAnnotations(annotations, true)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid spotalis.io/spot-percentage value"))
 			})

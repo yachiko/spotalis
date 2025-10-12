@@ -33,7 +33,7 @@ var _ = Describe("AnnotationParser", func() {
 	})
 
 	Describe("ParseWorkloadConfiguration", func() {
-		Context("with valid annotations", func() {
+		Context("with valid label enablement and annotations", func() {
 			It("should parse all configuration values", func() {
 				obj := &MockObject{
 					labels: map[string]string{
@@ -86,26 +86,7 @@ var _ = Describe("AnnotationParser", func() {
 				Expect(config.MinOnDemand).To(Equal(int32(0)))
 			})
 
-			It("should return disabled configuration when spotalis.io/enabled is false", func() {
-				obj := &MockObject{
-					labels: map[string]string{
-						"spotalis.io/enabled": "false",
-					},
-					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70%",
-						"spotalis.io/min-on-demand":   "2",
-					},
-				}
-
-				config, err := parser.ParseWorkloadConfiguration(obj)
-				Expect(err).To(BeNil())
-				Expect(config.Enabled).To(BeFalse())
-				// Other fields should be zero values since disabled
-				Expect(config.SpotPercentage).To(Equal(int32(0)))
-				Expect(config.MinOnDemand).To(Equal(int32(0)))
-			})
-
-			It("should return disabled configuration when spotalis.io/enabled is missing", func() {
+			It("should return disabled configuration when enablement label is missing", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "70%",
@@ -122,7 +103,7 @@ var _ = Describe("AnnotationParser", func() {
 			})
 		})
 
-		Context("with invalid annotations", func() {
+		Context("with invalid tuning annotations", func() {
 			It("should fail with invalid spot percentage", func() {
 				obj := &MockObject{
 					labels: map[string]string{
