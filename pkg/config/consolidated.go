@@ -177,15 +177,6 @@ type LoggingConfig struct {
 
 	// Format is the log format (json, console)
 	Format string `yaml:"format" json:"format"`
-
-	// Output is the output destination (stdout, stderr, file path)
-	Output string `yaml:"output" json:"output"`
-
-	// AddCaller adds caller information to logs
-	AddCaller bool `yaml:"addCaller" json:"addCaller"`
-
-	// Development enables development mode (pretty printing, etc.)
-	Development bool `yaml:"development" json:"development"`
 }
 
 // HealthConfig contains health check configuration
@@ -245,11 +236,8 @@ func DefaultConfig() *SpotalisConfig {
 				BindAddress: ":8080",
 			},
 			Logging: LoggingConfig{
-				Level:       "info",
-				Format:      "json",
-				Output:      "stdout",
-				AddCaller:   true,
-				Development: false,
+				Level:  "info",
+				Format: "json",
 			},
 			Health: HealthConfig{
 				Enabled:     true,

@@ -20,15 +20,6 @@ type Config struct {
 
 	// Format is the log format (json, console)
 	Format string `yaml:"format" json:"format"`
-
-	// Output is the output destination (stdout, stderr, file path)
-	Output string `yaml:"output" json:"output"`
-
-	// AddCaller adds caller information to logs
-	AddCaller bool `yaml:"addCaller" json:"addCaller"`
-
-	// Development enables development mode (pretty printing, etc.)
-	Development bool `yaml:"development" json:"development"`
 }
 
 // Logger wraps the controller-runtime logger with additional functionality
@@ -40,22 +31,16 @@ type Logger struct {
 // DefaultConfig returns default logging configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Level:       "info", // Default to info level for general logging
-		Format:      "json",
-		Output:      "stdout",
-		AddCaller:   true,
-		Development: false,
+		Level:  "info", // Default to info level for general logging
+		Format: "json",
 	}
 }
 
 // DefaultDebugConfig returns logging configuration optimized for debug mode
 func DefaultDebugConfig() *Config {
 	return &Config{
-		Level:       "debug",
-		Format:      "json",
-		Output:      "stdout",
-		AddCaller:   true,
-		Development: true, // Enable development mode for better debug experience
+		Level:  "debug",
+		Format: "json",
 	}
 }
 
@@ -67,7 +52,7 @@ func NewLogger(config *Config) (*Logger, error) {
 
 	// Create controller-runtime compatible logger using zap options
 	opts := ctrlzap.Options{
-		Development: config.Development,
+		Development: false,
 	}
 
 	// Configure based on format
@@ -120,20 +105,6 @@ func buildZapConfig(config *Config) zap.Config {
 
 	// Set log level
 	zapConfig.Level = zap.NewAtomicLevelAt(parseZapLevel(config.Level))
-
-	// Configure output
-	if config.Output != "" && config.Output != "stdout" {
-		if config.Output == "stderr" {
-			zapConfig.OutputPaths = []string{"stderr"}
-			zapConfig.ErrorOutputPaths = []string{"stderr"}
-		} else {
-			zapConfig.OutputPaths = []string{config.Output}
-			zapConfig.ErrorOutputPaths = []string{config.Output}
-		}
-	}
-
-	// Configure caller information
-	zapConfig.DisableCaller = !config.AddCaller
 
 	return zapConfig
 }
@@ -256,11 +227,8 @@ func SetGlobalLogger(logger *Logger) error {
 // GetLoggerFromEnv creates a logger from environment variables
 func GetLoggerFromEnv() (*Logger, error) {
 	config := &Config{
-		Level:       getEnvOrDefault("SPOTALIS_LOG_LEVEL", "info"),
-		Format:      getEnvOrDefault("SPOTALIS_LOG_FORMAT", "json"),
-		Output:      getEnvOrDefault("SPOTALIS_LOG_OUTPUT", "stdout"),
-		AddCaller:   getEnvOrDefault("SPOTALIS_LOG_ADD_CALLER", "true") == "true",
-		Development: getEnvOrDefault("SPOTALIS_LOG_DEVELOPMENT", "false") == "true",
+		Level:  getEnvOrDefault("SPOTALIS_LOG_LEVEL", "info"),
+		Format: getEnvOrDefault("SPOTALIS_LOG_FORMAT", "json"),
 	}
 
 	return NewLogger(config)

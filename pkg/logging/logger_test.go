@@ -12,9 +12,7 @@ func TestDefaultConfig(t *testing.T) {
 
 	assert.Equal(t, "info", config.Level)
 	assert.Equal(t, "json", config.Format)
-	assert.Equal(t, "stdout", config.Output)
-	assert.True(t, config.AddCaller)
-	assert.False(t, config.Development)
+	assert.Equal(t, "json", config.Format)
 }
 
 func TestNewLogger(t *testing.T) {
@@ -31,35 +29,23 @@ func TestNewLogger(t *testing.T) {
 		{
 			name: "json format configuration",
 			config: &Config{
-				Level:       "debug",
-				Format:      "json",
-				Output:      "stdout",
-				AddCaller:   true,
-				Development: false,
+				Level:  "debug",
+				Format: "json",
 			},
 			want: &Config{
-				Level:       "debug",
-				Format:      "json",
-				Output:      "stdout",
-				AddCaller:   true,
-				Development: false,
+				Level:  "debug",
+				Format: "json",
 			},
 		},
 		{
 			name: "console format configuration",
 			config: &Config{
-				Level:       "warn",
-				Format:      "console",
-				Output:      "stderr",
-				AddCaller:   false,
-				Development: true,
+				Level:  "warn",
+				Format: "console",
 			},
 			want: &Config{
-				Level:       "warn",
-				Format:      "console",
-				Output:      "stderr",
-				AddCaller:   false,
-				Development: true,
+				Level:  "warn",
+				Format: "console",
 			},
 		},
 	}
@@ -101,11 +87,8 @@ func TestParseLogLevel(t *testing.T) {
 
 func TestLoggerWithMethods(t *testing.T) {
 	config := &Config{
-		Level:       "info",
-		Format:      "json",
-		Output:      "stdout",
-		AddCaller:   true,
-		Development: false,
+		Level:  "info",
+		Format: "json",
 	}
 
 	logger, err := NewLogger(config)
@@ -146,7 +129,6 @@ func TestGetLoggerFromEnv(t *testing.T) {
 	config := logger.GetConfig()
 	assert.Equal(t, "info", config.Level)
 	assert.Equal(t, "json", config.Format)
-	assert.Equal(t, "stdout", config.Output)
 }
 
 func TestBuildZapConfig(t *testing.T) {
@@ -157,21 +139,15 @@ func TestBuildZapConfig(t *testing.T) {
 		{
 			name: "json format",
 			config: &Config{
-				Level:       "debug",
-				Format:      "json",
-				Output:      "stdout",
-				AddCaller:   true,
-				Development: false,
+				Level:  "debug",
+				Format: "json",
 			},
 		},
 		{
 			name: "console format",
 			config: &Config{
-				Level:       "info",
-				Format:      "console",
-				Output:      "stderr",
-				AddCaller:   false,
-				Development: true,
+				Level:  "info",
+				Format: "console",
 			},
 		},
 	}
@@ -183,13 +159,6 @@ func TestBuildZapConfig(t *testing.T) {
 			// Verify configuration is properly set
 			assert.NotNil(t, zapConfig)
 			assert.Equal(t, parseZapLevel(tt.config.Level), zapConfig.Level.Level())
-			assert.Equal(t, !tt.config.AddCaller, zapConfig.DisableCaller)
-
-			if tt.config.Output == "stderr" {
-				assert.Contains(t, zapConfig.OutputPaths, "stderr")
-			} else if tt.config.Output != "stdout" && tt.config.Output != "" {
-				assert.Contains(t, zapConfig.OutputPaths, tt.config.Output)
-			}
 		})
 	}
 }

@@ -45,11 +45,8 @@ import (
 // controller-runtime warning: "log.SetLogger(...) was never called"
 func SetupTestLogger() error {
 	loggerConfig := &logging.Config{
-		Level:       "info",
-		Format:      "json",
-		Output:      "stdout",
-		AddCaller:   false,
-		Development: false,
+		Level:  "info",
+		Format: "json",
 	}
 	logger, err := logging.NewLogger(loggerConfig)
 	if err != nil {

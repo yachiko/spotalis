@@ -35,15 +35,6 @@ type WorkloadConfiguration struct {
 
 	// SpotPercentage is the target percentage of replicas on spot nodes (0-100)
 	SpotPercentage int32 `json:"spotPercentage"`
-
-	// ReplicaStrategy defines the strategy for replica distribution
-	ReplicaStrategy string `json:"replicaStrategy,omitempty"`
-
-	// ScalingPolicy defines how scaling operations should be handled
-	ScalingPolicy string `json:"scalingPolicy,omitempty"`
-
-	// MaxReplicas is the maximum number of replicas for this workload
-	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 }
 
 // Validate checks if the WorkloadConfiguration is valid according to business rules
@@ -118,25 +109,6 @@ func ParseFromAnnotations(annotations map[string]string) (*WorkloadConfiguration
 		config.SpotPercentage = int32(parsed)
 	}
 
-	// Parse replica strategy
-	if strategy, exists := annotations["spotalis.io/replica-strategy"]; exists {
-		config.ReplicaStrategy = strategy
-	}
-
-	// Parse scaling policy
-	if policy, exists := annotations["spotalis.io/scaling-policy"]; exists {
-		config.ScalingPolicy = policy
-	}
-
-	// Parse max replicas
-	if maxReplicas, exists := annotations["spotalis.io/max-replicas"]; exists {
-		parsed, err := strconv.ParseInt(maxReplicas, 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid spotalis.io/max-replicas value: %v", err)
-		}
-		config.MaxReplicas = int32(parsed)
-	}
-
 	return config, nil
 }
 
@@ -149,28 +121,7 @@ func (w *WorkloadConfiguration) ToAnnotations() map[string]string {
 	if w.Enabled {
 		annotations["spotalis.io/min-on-demand"] = strconv.FormatInt(int64(w.MinOnDemand), 10)
 		annotations["spotalis.io/spot-percentage"] = strconv.FormatInt(int64(w.SpotPercentage), 10) + "%"
-
-		if w.ReplicaStrategy != "" {
-			annotations["spotalis.io/replica-strategy"] = w.ReplicaStrategy
-		}
-
-		if w.ScalingPolicy != "" {
-			annotations["spotalis.io/scaling-policy"] = w.ScalingPolicy
-		}
-
-		if w.MaxReplicas > 0 {
-			annotations["spotalis.io/max-replicas"] = strconv.FormatInt(int64(w.MaxReplicas), 10)
-		}
 	}
 
 	return annotations
-}
-
-// GetEffectiveMaxReplicas returns the effective maximum replicas, defaulting to a reasonable value
-func (w *WorkloadConfiguration) GetEffectiveMaxReplicas(currentReplicas int32) int32 {
-	if w.MaxReplicas > 0 {
-		return w.MaxReplicas
-	}
-	// Default to 3x current replicas if not specified
-	return currentReplicas * 3
 }

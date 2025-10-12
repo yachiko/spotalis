@@ -56,11 +56,8 @@ var _ = BeforeSuite(func() {
 	// Create logger configuration for integration tests
 	// Use debug level to see controller reconciliation details
 	loggerConfig := &logging.Config{
-		Level:       "debug", // Use debug to see detailed controller logs
-		Format:      "json",
-		Output:      "stdout",
-		AddCaller:   true,
-		Development: false,
+		Level:  "debug", // Use debug to see detailed controller logs
+		Format: "json",
 	}
 
 	logger, err := logging.NewLogger(loggerConfig)

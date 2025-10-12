@@ -211,12 +211,9 @@ var _ = Describe("WorkloadConfiguration", func() {
 		Context("when spotalis is enabled", func() {
 			It("should parse all valid annotations", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled":          "true",
-					"spotalis.io/min-on-demand":    "2",
-					"spotalis.io/spot-percentage":  "70%",
-					"spotalis.io/replica-strategy": "spread",
-					"spotalis.io/scaling-policy":   "gradual",
-					"spotalis.io/max-replicas":     "20",
+					"spotalis.io/enabled":         "true",
+					"spotalis.io/min-on-demand":   "2",
+					"spotalis.io/spot-percentage": "70%",
 				}
 
 				config, err := ParseFromAnnotations(annotations)
@@ -224,9 +221,6 @@ var _ = Describe("WorkloadConfiguration", func() {
 				Expect(config.Enabled).To(BeTrue())
 				Expect(config.MinOnDemand).To(Equal(int32(2)))
 				Expect(config.SpotPercentage).To(Equal(int32(70)))
-				Expect(config.ReplicaStrategy).To(Equal("spread"))
-				Expect(config.ScalingPolicy).To(Equal("gradual"))
-				Expect(config.MaxReplicas).To(Equal(int32(20)))
 			})
 
 			It("should handle spot percentage without % symbol", func() {
@@ -273,38 +267,21 @@ var _ = Describe("WorkloadConfiguration", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid spotalis.io/spot-percentage value"))
 			})
-
-			It("should fail with invalid max-replicas value", func() {
-				annotations := map[string]string{
-					"spotalis.io/enabled":      "true",
-					"spotalis.io/max-replicas": "invalid",
-				}
-
-				_, err := ParseFromAnnotations(annotations)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("invalid spotalis.io/max-replicas value"))
-			})
 		})
 	})
 
 	Describe("ToAnnotations", func() {
 		It("should convert enabled configuration to annotations", func() {
 			config := &WorkloadConfiguration{
-				Enabled:         true,
-				MinOnDemand:     2,
-				SpotPercentage:  70,
-				ReplicaStrategy: "spread",
-				ScalingPolicy:   "gradual",
-				MaxReplicas:     20,
+				Enabled:        true,
+				MinOnDemand:    2,
+				SpotPercentage: 70,
 			}
 
 			annotations := config.ToAnnotations()
 			Expect(annotations["spotalis.io/enabled"]).To(Equal("true"))
 			Expect(annotations["spotalis.io/min-on-demand"]).To(Equal("2"))
 			Expect(annotations["spotalis.io/spot-percentage"]).To(Equal("70%"))
-			Expect(annotations["spotalis.io/replica-strategy"]).To(Equal("spread"))
-			Expect(annotations["spotalis.io/scaling-policy"]).To(Equal("gradual"))
-			Expect(annotations["spotalis.io/max-replicas"]).To(Equal("20"))
 		})
 
 		It("should convert disabled configuration to minimal annotations", func() {
@@ -325,38 +302,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 			}
 
 			annotations := config.ToAnnotations()
-			Expect(annotations).ToNot(HaveKey("spotalis.io/replica-strategy"))
-			Expect(annotations).ToNot(HaveKey("spotalis.io/scaling-policy"))
-			Expect(annotations).ToNot(HaveKey("spotalis.io/max-replicas"))
-		})
-	})
-
-	Describe("GetEffectiveMaxReplicas", func() {
-		It("should return configured max replicas when set", func() {
-			config := &WorkloadConfiguration{
-				MaxReplicas: 15,
-			}
-
-			effective := config.GetEffectiveMaxReplicas(5)
-			Expect(effective).To(Equal(int32(15)))
-		})
-
-		It("should return 3x current replicas when max replicas is not set", func() {
-			config := &WorkloadConfiguration{
-				MaxReplicas: 0,
-			}
-
-			effective := config.GetEffectiveMaxReplicas(5)
-			Expect(effective).To(Equal(int32(15)))
-		})
-
-		It("should handle zero current replicas", func() {
-			config := &WorkloadConfiguration{
-				MaxReplicas: 0,
-			}
-
-			effective := config.GetEffectiveMaxReplicas(0)
-			Expect(effective).To(Equal(int32(0)))
+			Expect(annotations).To(HaveLen(3)) // enabled, min-on-demand, spot-percentage
 		})
 	})
 })

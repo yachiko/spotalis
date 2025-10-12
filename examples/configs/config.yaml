@@ -19,9 +19,6 @@ operator:
 controllers:
   reconcileInterval: "30s"  # Faster reconciliation for development
   maxConcurrentReconciles: 1
-  rateLimit:
-    qps: 100.0
-    burst: 150
 
   # Workload timing controls (applies to both Deployments and StatefulSets)
   workloadTiming:
@@ -53,9 +50,6 @@ observability:
   logging:
     level: "info"
     format: "json"  # Use JSON format for structured logging
-    output: "stdout"  # Log to standard output
-    addCaller: true   # Include caller information
-    development: false  # Production mode
   metrics:
     enabled: true
     bindAddress: ":8080"

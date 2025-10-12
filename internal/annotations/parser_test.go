@@ -66,7 +66,6 @@ var _ = Describe("AnnotationParser", func() {
 				Expect(config.Enabled).To(BeTrue())
 				Expect(config.SpotPercentage).To(Equal(int32(50)))
 				Expect(config.MinOnDemand).To(Equal(int32(0)))
-				Expect(config.MaxReplicas).To(Equal(int32(0)))
 			})
 
 			It("should handle zero values", func() {
@@ -85,7 +84,6 @@ var _ = Describe("AnnotationParser", func() {
 				Expect(err).To(BeNil())
 				Expect(config.SpotPercentage).To(Equal(int32(0)))
 				Expect(config.MinOnDemand).To(Equal(int32(0)))
-				Expect(config.MaxReplicas).To(Equal(int32(0)))
 			})
 		})
 
