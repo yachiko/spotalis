@@ -50,6 +50,3 @@ See `CONTRIBUTING.md` for development and documentation placement guidelines.
 
 ## License
 Apache 2.0 (TBD if different)
-
----
-Legacy expanded conceptual and example content will be migrated into the structured docs under `docs/`. If something you expect is missing, open an issue referencing this README.

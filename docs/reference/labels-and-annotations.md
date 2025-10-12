@@ -88,6 +88,16 @@ spec:
 - Historical enabling via an annotation was never officially supported and is now explicitly documented as label-only.
 - Old references to `annotations.md` should be updated to `labels-and-annotations.md` (or generic wording: "Workload labels & annotations").
 
+## Deferred / Future Keys
+The following potential annotation keys are intentionally NOT implemented yet to keep surface minimal:
+
+Key (Proposed) | Reason Deferred | Possible Future Semantics
+---------------|-----------------|--------------------------
+`spotalis.io/replica-strategy` | Strategy variants not finalized | Alternative distribution modes (e.g., burst, gradual)
+`spotalis.io/scaling-policy` | Requires autoscaler integration design | Rate limits & ramp schedules
+
+They will only be added once semantics are stable; do not rely on them or create ad-hoc variants.
+
 ## Quick Reference Cheat Sheet
 Action | What to Change | Example
 ------ | --------------- | -------
