@@ -82,7 +82,7 @@ func (m *MutationHandler) SetMetricsCollector(collector *metrics.Collector) {
 func (m *MutationHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	// Create structured logger for this webhook request
 	logger := controllers.NewWebhookLogger(ctx, req)
-	logger.V(2).Info("Processing admission request")
+	logger.V(1).Info("Processing admission request")
 
 	var response admission.Response
 	switch req.Kind.Kind {
@@ -121,7 +121,7 @@ func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request, 
 	}
 
 	if workloadConfig == nil {
-		logger.V(2).Info("Pod not managed by Spotalis")
+		logger.V(1).Info("Pod not managed by Spotalis")
 		return admission.Allowed("not managed by Spotalis")
 	}
 
@@ -243,13 +243,12 @@ func (m *MutationHandler) generatePodPatches(pod *corev1.Pod, config *apis.Workl
 	var patches []map[string]interface{}
 	var mutationTypes []string
 
-	// Add nodeSelector for spot instances if spot percentage > 0
-	if config.SpotPercentage > 0 {
-		nodeSelectorPatches := m.generateNodeSelectorPatches(pod, config)
-		patches = append(patches, nodeSelectorPatches...)
-		if len(nodeSelectorPatches) > 0 {
-			mutationTypes = append(mutationTypes, "nodeSelector")
-		}
+	// Always add/override nodeSelector to ensure correct capacity type
+	// This handles both spot and on-demand scenarios
+	nodeSelectorPatches := m.generateNodeSelectorPatches(pod, config)
+	patches = append(patches, nodeSelectorPatches...)
+	if len(nodeSelectorPatches) > 0 {
+		mutationTypes = append(mutationTypes, "nodeSelector")
 	}
 
 	return patches, mutationTypes
@@ -321,8 +320,8 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 		return capacityTypeOnDemand, err
 	}
 
-	// Count current pods for this workload
-	spotCount, onDemandCount, err := m.countCurrentPods(ctx, pod.Namespace, workloadName, workloadKind)
+	// Count current pods for this workload (excluding the current pod being mutated)
+	spotCount, onDemandCount, err := m.countCurrentPods(ctx, pod.Namespace, workloadName, workloadKind, pod.Name)
 	if err != nil {
 		return capacityTypeOnDemand, err
 	}
@@ -384,7 +383,7 @@ func (m *MutationHandler) getWorkloadInfo(pod *corev1.Pod) (workloadType, worklo
 }
 
 // countCurrentPods counts existing spot and on-demand pods for a workload
-func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workloadName, workloadKind string) (spotCount, onDemandCount int, err error) {
+func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workloadName, workloadKind, excludePodName string) (spotCount, onDemandCount int, err error) {
 	// List all pods in the namespace
 	var podList corev1.PodList
 	if err := m.Client.List(ctx, &podList, client.InNamespace(namespace)); err != nil {
@@ -393,6 +392,12 @@ func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workl
 
 	for i := range podList.Items {
 		pod := &podList.Items[i]
+
+		// Skip the pod being mutated (it should not influence its own placement decision)
+		if pod.Name == excludePodName {
+			continue
+		}
+
 		// Skip pods that are not running or pending
 		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
 			continue

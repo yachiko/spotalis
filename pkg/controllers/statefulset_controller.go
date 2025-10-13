@@ -97,7 +97,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Create structured logger for this reconciliation
 	logger := NewControllerLogger(ctx, "statefulset-controller", req, "StatefulSet")
-	logger.V(2).Info("Starting reconciliation")
+	logger.V(1).Info("Starting reconciliation")
 
 	// Fetch the StatefulSet
 	var statefulSet appsv1.StatefulSet
@@ -128,7 +128,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Check if Spotalis is explicitly enabled for this StatefulSet
 	if !r.AnnotationParser.IsSpotalisEnabled(&statefulSet) {
-		logger.V(2).Info("Spotalis not enabled, skipping")
+		logger.V(1).Info("Spotalis not enabled, skipping")
 		return ctrl.Result{}, nil
 	}
 
@@ -305,12 +305,12 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 		return ctrl.Result{RequeueAfter: r.ReconcileInterval / 2}, nil
 	}
-	logger.V(2).Info("No rebalancing needed")
+	logger.V(1).Info("No rebalancing needed")
 
 	// Mark as recovered since reconcile completed successfully
 	r.markRecovered()
 
-	logger.V(2).Info("Reconciliation completed successfully")
+	logger.V(1).Info("Reconciliation completed successfully")
 
 	// Use longer interval when no action is needed to reduce load
 	return ctrl.Result{RequeueAfter: r.ReconcileInterval * 2}, nil
@@ -471,7 +471,7 @@ func (r *StatefulSetReconciler) resolveDisruptionWindow(
 	}
 
 	// No window configured = always allowed
-	logger.V(2).Info("No disruption window configured, disruptions always allowed")
+	logger.V(1).Info("No disruption window configured, disruptions always allowed")
 	return nil, nil
 }
 
