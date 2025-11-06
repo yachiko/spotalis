@@ -59,16 +59,16 @@ spec:
 More label/annotation options: see [labels & annotations reference](docs/reference/labels-and-annotations.md).
 
 ## 🧠 Core Concepts
-| Concept | Where to Read |
-|--------|----------------|
-| Enablement model | [labels & annotations](docs/reference/labels-and-annotations.md) |
-| Distribution algorithm | [replica strategy](docs/explanation/replica-distribution-strategy.md) |
-| Runtime & internal state | [state management](docs/reference/state-management.md) |
-| Configuration structure + env overrides | [configuration reference](docs/reference/configuration.md) |
-| Metrics & scrape ports | [metrics](docs/reference/metrics.md), [runtime ports](docs/reference/runtime-ports.md) |
-| Design & trade‑offs | [design choices](docs/explanation/design-choices.md) |
-| Debugging pod mutation | [debug mutation how-to](docs/how-to/debug-mutation.md) |
-| Tuning spot % safely | [tune spot percentage](docs/how-to/tune-spot-percentage.md) |
+| Concept                                 | Where to Read                                                                          |
+| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| Enablement model                        | [labels & annotations](docs/reference/labels-and-annotations.md)                       |
+| Distribution algorithm                  | [replica strategy](docs/explanation/replica-distribution-strategy.md)                  |
+| Runtime & internal state                | [state management](docs/reference/state-management.md)                                 |
+| Configuration structure + env overrides | [configuration reference](docs/reference/configuration.md)                             |
+| Metrics & scrape ports                  | [metrics](docs/reference/metrics.md), [runtime ports](docs/reference/runtime-ports.md) |
+| Design & trade‑offs                     | [design choices](docs/explanation/design-choices.md)                                   |
+| Debugging pod mutation                  | [debug mutation how-to](docs/how-to/debug-mutation.md)                                 |
+| Tuning spot % safely                    | [tune spot percentage](docs/how-to/tune-spot-percentage.md)                            |
 
 ## 📊 Observability
 Spotalis exposes Prometheus metrics and health endpoints (see [runtime ports](docs/reference/runtime-ports.md)). Key gauges/counters quantify desired vs realized spot/on‑demand replicas so you can alert on drift. See also [metrics reference](docs/reference/metrics.md).
@@ -95,22 +95,19 @@ Independent controls:
 * When both are set, the floor always overrides percentage math that would go below it.
 
 ## 🗺 Documentation Map (Diátaxis)
-| Need | Go To |
-|------|-------|
-| First successful run | [Kind tutorial](docs/tutorials/run-kind.md) |
-| Adjust spot/on-demand ratio | [tune spot percentage](docs/how-to/tune-spot-percentage.md) |
-| List labels & annotations | [labels & annotations](docs/reference/labels-and-annotations.md) |
-| System configuration | [configuration reference](docs/reference/configuration.md) |
-| Metrics & ports | [metrics](docs/reference/metrics.md), [runtime ports](docs/reference/runtime-ports.md) |
-| Internal state & reconciliation | [state management](docs/reference/state-management.md) |
-| General usage / flow | [how it works](docs/explanation/how-it-works.md) |
-| Architecture rationale | [architecture](docs/explanation/architecture.md) |
-| Strategy math | [replica strategy](docs/explanation/replica-distribution-strategy.md) |
-| Design trade-offs | [design choices](docs/explanation/design-choices.md) |
-| Debug mutation issues | [debug mutation how-to](docs/how-to/debug-mutation.md) |
+| Need                            | Go To                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------- |
+| First successful run            | [Kind tutorial](docs/tutorials/run-kind.md)                                            |
+| Adjust spot/on-demand ratio     | [tune spot percentage](docs/how-to/tune-spot-percentage.md)                            |
+| List labels & annotations       | [labels & annotations](docs/reference/labels-and-annotations.md)                       |
+| System configuration            | [configuration reference](docs/reference/configuration.md)                             |
+| Metrics & ports                 | [metrics](docs/reference/metrics.md), [runtime ports](docs/reference/runtime-ports.md) |
+| Internal state & reconciliation | [state management](docs/reference/state-management.md)                                 |
+| General usage / flow            | [how it works](docs/explanation/how-it-works.md)                                       |
+| Architecture rationale          | [architecture](docs/explanation/architecture.md)                                       |
+| Strategy math                   | [replica strategy](docs/explanation/replica-distribution-strategy.md)                  |
+| Design trade-offs               | [design choices](docs/explanation/design-choices.md)                                   |
+| Debug mutation issues           | [debug mutation how-to](docs/how-to/debug-mutation.md)                                 |
 
 ## 📄 License
 Apache2 ©
-
----
-<sub>Spotalis is early-stage; interfaces and annotation keys may evolve. Track changes via commit history and release notes (future).</sub>

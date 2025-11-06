@@ -15,8 +15,7 @@ Related docs: [Architecture](./architecture.md), [Replica Distribution Strategy]
 
 ## Label-Only Enablement
 **Choice**: `spotalis.io/enabled=true` required on namespace AND workload.
-- Rationale: Explicit opt-in prevents accidental cluster-wide mutation; dual gate reduces blast radius.
-- Migration: Removed legacy enablement annotation (BREAKING CHANGE) to eliminate ambiguous sources of truth.
+- Rationale: The webhook supports namespace scoping exclusively via labels, so using the same enablement label on both the namespace and each workload preserves one consistent mechanism (no split between labels vs annotations), enforces explicit opt-in, and keeps accidental cluster‑wide mutation blast radius low.
 
 ## Single Binary Pattern
 **Choice**: One controller binary combining operator core, webhook server, and metrics/health endpoints.

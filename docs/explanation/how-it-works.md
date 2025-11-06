@@ -36,7 +36,6 @@ flowchart LR
 3. Distribution engine computes a safe split.
 4. Reconciler patches workloads incrementally.
 5. Webhook (if enabled) injects node affinity / selectors to steer placement.
-6. Metrics exported for feedback loops.
 
 ## 2. Opt-In & Annotation Model
 
