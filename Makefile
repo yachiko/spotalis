@@ -63,7 +63,7 @@ docker-build-local: ## Build Docker image for local development (ARM64 by defaul
 
 .PHONY: docker-build
 docker-build: ## Build Docker images for all platforms
-	docker buildx bake controller --push
+	docker buildx bake controller
 
 ##@ Kind
 .PHONY: kind
@@ -80,6 +80,25 @@ kind-load: docker-build-local ## Load Docker image into Kind cluster
 	kind load docker-image spotalis:local --name spotalis || true; \
 	kubectl set image deployment/spotalis-controller controller=spotalis:local -n spotalis-system || true
 	kubectl rollout restart deployment spotalis-controller -n spotalis-system
+
+##@ Release
+.PHONY: tag
+tag: ## Create and push next patch version tag (vX.Y.(Z+1))
+	@set -e; \
+	last=$$(git tag --list 'v*' --sort=-v:refname | head -1); \
+	if [ -z "$$last" ]; then \
+	  new="v0.0.1"; \
+	else \
+	  ver=$${last#v}; \
+	  major=$${ver%%.*}; rest=$${ver#*.}; minor=$${rest%%.*}; patch=$${rest#*.}; \
+	  patch=$$((patch+1)); \
+	  new="v$$major.$$minor.$$patch"; \
+	fi; \
+	echo "Last tag: $$last"; \
+	echo "New tag: $$new"; \
+	git tag $$new; \
+	git push origin $$new; \
+	echo "✅ Created and pushed $$new"
 	
 ENVTEST = $(TOOLS_DIR)/setup-envtest
 .PHONY: envtest
