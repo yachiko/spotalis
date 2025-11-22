@@ -6,7 +6,7 @@ image:
   # -- Container image registry
   registry: ghcr.io
   # -- Container image repository
-  repository: ahoma/spotalis
+  repository: yachiko/spotalis
   # -- Container image pull policy
   pullPolicy: IfNotPresent
   # -- Overrides the image tag whose default is the chart appVersion

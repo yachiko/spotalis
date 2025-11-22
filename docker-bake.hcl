@@ -2,7 +2,7 @@
 # Usage: docker buildx bake
 
 variable "REGISTRY" {
-  default = "ghcr.io/spotalis"
+  default = "ghcr.io/yachiko"
 }
 
 variable "TAG" {
@@ -27,8 +27,8 @@ target "controller" {
   dockerfile = "Dockerfile"
   platforms  = split(",", PLATFORM)
   tags = [
-    "${REGISTRY}/controller:${TAG}",
-    "${REGISTRY}/controller:latest"
+    "${REGISTRY}/spotalis:${TAG}",
+    "${REGISTRY}/spotalis:latest"
   ]
   
   # Build arguments
