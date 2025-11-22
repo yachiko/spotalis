@@ -192,12 +192,12 @@ affinity:
 helm package deploy/helm
 
 # Generate index
-helm repo index . --url https://github.com/ahoma/spotalis/releases/download/
+helm repo index . --url https://github.com/yachiko/spotalis/releases/download/
 
 # Commit to gh-pages branch or chart repository
 git checkout gh-pages
 mv spotalis-*.tgz charts/
-helm repo index charts --url https://ahoma.github.io/spotalis/charts
+helm repo index charts --url https://yachiko.github.io/spotalis/charts
 git commit -am "Release chart v0.1.0"
 git push
 ```
@@ -205,8 +205,8 @@ git push
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/ahoma/spotalis/issues
-- Documentation: https://github.com/ahoma/spotalis/blob/main/deploy/helm/README.md
+- GitHub Issues: https://github.com/yachiko/spotalis/issues
+- Documentation: https://github.com/yachiko/spotalis/blob/main/deploy/helm/README.md
 
 ---
 

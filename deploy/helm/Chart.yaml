@@ -10,9 +10,9 @@ keywords:
   - workload-optimization
   - controller
   - cost-optimization
-home: https://github.com/ahoma/spotalis
+home: https://github.com/yachiko/spotalis
 sources:
-  - https://github.com/ahoma/spotalis
+  - https://github.com/yachiko/spotalis
 maintainers:
-  - name: ahoma
-    email: ahoma@users.noreply.github.com
+  - name: yachiko
+    email: yachiko@users.noreply.github.com

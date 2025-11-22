@@ -83,8 +83,8 @@ Certificate Source: cert-manager
 📚 Documentation:
 -----------------
 For more information, visit:
-- Annotations Reference: https://github.com/ahoma/spotalis/blob/main/docs/api/annotations.md
-- Configuration Guide: https://github.com/ahoma/spotalis/blob/main/docs/configuration/
+- Annotations Reference: https://github.com/yachiko/spotalis/blob/main/docs/api/annotations.md
+- Configuration Guide: https://github.com/yachiko/spotalis/blob/main/docs/configuration/
 
 {{- if eq .Values.rbac.scope "namespace" }}
 

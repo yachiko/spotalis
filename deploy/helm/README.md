@@ -88,7 +88,7 @@ kubectl delete mutatingwebhookconfiguration spotalis-mutating-webhook
 |-----------|-------------|---------|
 | `replicaCount` | Number of controller replicas | `1` |
 | `image.registry` | Container image registry | `ghcr.io` |
-| `image.repository` | Container image repository | `ahoma/spotalis` |
+| `image.repository` | Container image repository | `yachiko/spotalis` |
 | `image.tag` | Container image tag (overrides appVersion) | `""` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `rbac.scope` | RBAC scope: `cluster` or `namespace` | `cluster` |
@@ -366,7 +366,7 @@ See the `examples/` directory for complete configuration examples:
 ## Contributing
 
 For more information about Spotalis development and contribution guidelines, visit:
-https://github.com/ahoma/spotalis
+https://github.com/yachiko/spotalis
 
 ## License
 

@@ -1,4 +1,4 @@
-module github.com/ahoma/spotalis
+module github.com/yachiko/spotalis
 
 go 1.24.0
 
