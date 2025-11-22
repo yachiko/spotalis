@@ -59,8 +59,8 @@ Starting the operator with dependency injection:
 
 	import (
 		"context"
-		"github.com/ahoma/spotalis/pkg/operator"
-		"github.com/ahoma/spotalis/pkg/di"
+		"github.com/yachiko/spotalis/pkg/operator"
+		"github.com/yachiko/spotalis/pkg/di"
 	)
 
 	func main() {

@@ -19,11 +19,11 @@ package controllers
 import (
 	"time"
 
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/metrics"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/yachiko/spotalis/internal/annotations"
+	"github.com/yachiko/spotalis/internal/config"
+	"github.com/yachiko/spotalis/pkg/metrics"
 	"k8s.io/client-go/kubernetes/fake"
 )
 

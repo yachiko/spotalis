@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/apis"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/yachiko/spotalis/internal/config"
+	"github.com/yachiko/spotalis/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 

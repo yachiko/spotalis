@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ahoma/spotalis/pkg/config"
-	"github.com/ahoma/spotalis/pkg/operator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yachiko/spotalis/pkg/config"
+	"github.com/yachiko/spotalis/pkg/operator"
 )
 
 func TestApplicationBuilder_NewApplicationBuilder(t *testing.T) {

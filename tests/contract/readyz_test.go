@@ -20,10 +20,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/ahoma/spotalis/internal/server"
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/yachiko/spotalis/internal/server"
 )
 
 var _ = Describe("GET /readyz endpoint", func() {

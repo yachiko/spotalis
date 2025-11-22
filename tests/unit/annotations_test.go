@@ -17,9 +17,9 @@ limitations under the License.
 package unit
 
 import (
-	"github.com/ahoma/spotalis/internal/annotations"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/yachiko/spotalis/internal/annotations"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )

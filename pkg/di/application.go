@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ahoma/spotalis/pkg/config"
-	"github.com/ahoma/spotalis/pkg/logging"
-	"github.com/ahoma/spotalis/pkg/operator"
+	"github.com/yachiko/spotalis/pkg/config"
+	"github.com/yachiko/spotalis/pkg/logging"
+	"github.com/yachiko/spotalis/pkg/operator"
 )
 
 // ApplicationBuilder helps build and configure the Spotalis application using DI

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/metrics"
+	"github.com/yachiko/spotalis/internal/annotations"
+	"github.com/yachiko/spotalis/internal/config"
+	"github.com/yachiko/spotalis/pkg/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"

@@ -21,9 +21,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ahoma/spotalis/pkg/apis"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/yachiko/spotalis/pkg/apis"
 )
 
 var _ = Describe("Collector", func() {

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ahoma/spotalis/pkg/apis"
+	"github.com/yachiko/spotalis/pkg/apis"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"

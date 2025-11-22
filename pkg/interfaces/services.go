@@ -22,8 +22,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/apis"
+	"github.com/yachiko/spotalis/internal/config"
+	"github.com/yachiko/spotalis/pkg/apis"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"

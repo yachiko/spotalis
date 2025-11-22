@@ -19,11 +19,11 @@ package operator
 import (
 	"time"
 
-	"github.com/ahoma/spotalis/internal/server"
-	"github.com/ahoma/spotalis/pkg/metrics"
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/yachiko/spotalis/internal/server"
+	"github.com/yachiko/spotalis/pkg/metrics"
 	"k8s.io/client-go/kubernetes/fake"
 )
 

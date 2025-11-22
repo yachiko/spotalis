@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	metricsCollector "github.com/ahoma/spotalis/pkg/metrics"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	metricsCollector "github.com/yachiko/spotalis/pkg/metrics"
 )
 
 // MetricsServer provides metrics collection and serving functionality

@@ -51,7 +51,7 @@ Basic application setup:
 
 	import (
 		"context"
-		"github.com/ahoma/spotalis/pkg/di"
+		"github.com/yachiko/spotalis/pkg/di"
 	)
 
 	func main() {
@@ -157,7 +157,7 @@ DI system supports testing with mock services:
 
 	import (
 		"testing"
-		"github.com/ahoma/spotalis/pkg/di"
+		"github.com/yachiko/spotalis/pkg/di"
 	)
 
 	func TestApplication(t *testing.T) {

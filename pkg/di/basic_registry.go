@@ -20,10 +20,10 @@ package di
 import (
 	"time"
 
-	"github.com/ahoma/spotalis/internal/annotations"
-	"github.com/ahoma/spotalis/internal/config"
-	"github.com/ahoma/spotalis/pkg/metrics"
-	"github.com/ahoma/spotalis/pkg/operator"
+	"github.com/yachiko/spotalis/internal/annotations"
+	"github.com/yachiko/spotalis/internal/config"
+	"github.com/yachiko/spotalis/pkg/metrics"
+	"github.com/yachiko/spotalis/pkg/operator"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"

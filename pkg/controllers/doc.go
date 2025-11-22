@@ -28,8 +28,8 @@ ControllerManager orchestrates all controllers:
 Setting up controllers with dependency injection:
 
 	import (
-		"github.com/ahoma/spotalis/pkg/controllers"
-		"github.com/ahoma/spotalis/pkg/di"
+		"github.com/yachiko/spotalis/pkg/controllers"
+		"github.com/yachiko/spotalis/pkg/di"
 	)
 
 	// DI container automatically provides dependencies

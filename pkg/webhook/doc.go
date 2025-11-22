@@ -24,8 +24,8 @@ AdmissionHandler manages HTTP endpoint:
 Setting up webhook with dependency injection:
 
 	import (
-		"github.com/ahoma/spotalis/pkg/webhook"
-		"github.com/ahoma/spotalis/pkg/di"
+		"github.com/yachiko/spotalis/pkg/webhook"
+		"github.com/yachiko/spotalis/pkg/di"
 	)
 
 	// DI container provides dependencies

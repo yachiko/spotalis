@@ -25,10 +25,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ahoma/spotalis/pkg/logging"
-	"github.com/ahoma/spotalis/tests/integration/shared"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/yachiko/spotalis/pkg/logging"
+	"github.com/yachiko/spotalis/tests/integration/shared"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
