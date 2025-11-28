@@ -63,6 +63,7 @@ type DeploymentReconciler struct {
 type MetricsRecorder interface {
 	RecordWorkloadMetrics(namespace, workloadName, workloadType string, replicaState *apis.ReplicaState)
 	RecordReconciliation(namespace, workloadName, workloadType, action string, err error)
+	RecordPDBBlock(namespace, workload, workloadType, pdbName string)
 }
 
 // NewDeploymentReconciler creates a new DeploymentReconciler
@@ -630,6 +631,41 @@ func (r *DeploymentReconciler) executeDeploymentRebalancing(ctx context.Context,
 
 	// Only delete the first pod to avoid overwhelming the system
 	pod := podsToDelete[0]
+
+	// Pre-check PDB status before attempting eviction
+	pdbStatus, err := CheckPDBStatus(ctx, r.Client, &pod)
+	if err != nil {
+		logger.Error(err, "Failed to check PDB status", "pod", pod.Name)
+		// Continue anyway - eviction API will enforce PDB
+	} else if !pdbStatus.CanDisrupt {
+		// PDB blocks eviction - log and skip
+		logger.Info("Rebalancing blocked by PDB",
+			"pod", pod.Name,
+			"pdb", pdbStatus.PDBName,
+			"disruptions_allowed", pdbStatus.DisruptionsAllowed,
+			"current_healthy", pdbStatus.CurrentHealthy,
+			"desired_healthy", pdbStatus.DesiredHealthy,
+			"reason", pdbStatus.BlockReason)
+
+		// Record metric if collector is available
+		if r.MetricsCollector != nil {
+			// Extract deployment name from deploymentKey (format: namespace/name)
+			r.MetricsCollector.RecordPDBBlock(pod.Namespace, pod.Name, "deployment", pdbStatus.PDBName)
+		}
+
+		// Return nil - not an error, just can't proceed now
+		// Controller will requeue and try again later
+		return nil
+	}
+
+	// Log PDB info if present
+	if pdbStatus != nil && pdbStatus.HasPDB {
+		logger.V(1).Info("PDB allows eviction",
+			"pod", pod.Name,
+			"pdb", pdbStatus.PDBName,
+			"disruptions_allowed", pdbStatus.DisruptionsAllowed)
+	}
+
 	logger.Info("Evicting pod for rebalancing",
 		"pod", pod.Name,
 		"node", pod.Spec.NodeName,

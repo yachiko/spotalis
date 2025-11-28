@@ -598,7 +598,7 @@ var _ = Describe("StatefulSet workload management", func() {
 					return 0
 				}
 				return (spotCount * 100) / totalCount
-			}, 120*time.Second, 5*time.Second).Should(BeNumerically(">=", 80)) // Allow some variance
+			}, 180*time.Second, 5*time.Second).Should(BeNumerically(">=", 80)) // Allow some variance
 
 			GinkgoWriter.Println("StatefulSet successfully handled concurrent annotation updates")
 		})

@@ -55,6 +55,15 @@ var (
 		[]string{"namespace", "workload", "workload_type", "error_type"},
 	)
 
+	// PDB blocking metrics
+	pdbBlocksTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "spotalis_rebalancing_blocked_by_pdb_total",
+			Help: "Total number of rebalancing operations blocked by PodDisruptionBudget",
+		},
+		[]string{"namespace", "workload", "workload_type", "pdb_name"},
+	)
+
 	// Webhook metrics
 	webhookRequests = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -156,6 +165,7 @@ func (c *Collector) RegisterMetrics(registry prometheus.Registerer) {
 		workloadReplicas,
 		reconciliationTotal,
 		reconciliationErrors,
+		pdbBlocksTotal,
 		webhookRequests,
 		webhookMutations,
 		controllerLastSeen,
@@ -206,6 +216,11 @@ func (c *Collector) RecordWebhookRequest(operation, resourceKind, result string)
 // RecordWebhookMutation records metrics for webhook mutations
 func (c *Collector) RecordWebhookMutation(resourceKind, mutationType string) {
 	webhookMutations.WithLabelValues(resourceKind, mutationType).Inc()
+}
+
+// RecordPDBBlock records metrics for PDB-blocked rebalancing operations
+func (c *Collector) RecordPDBBlock(namespace, workload, workloadType, pdbName string) {
+	pdbBlocksTotal.WithLabelValues(namespace, workload, workloadType, pdbName).Inc()
 }
 
 // UpdateControllerHealth updates controller health metrics

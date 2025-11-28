@@ -1054,6 +1054,10 @@ func (m *MockMetricsRecorder) RecordWorkloadMetrics(namespace, workloadName, wor
 	})
 }
 
+func (m *MockMetricsRecorder) RecordPDBBlock(_, _, _, _ string) {
+	// No-op for mock
+}
+
 // Helper function to create int32 pointers
 func int32Ptr(i int32) *int32 {
 	return &i

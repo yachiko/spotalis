@@ -9,6 +9,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -28,6 +29,33 @@ const (
 	// EvictionResultError indicates an unexpected error occurred.
 	EvictionResultError EvictionResult = "Error"
 )
+
+// PDBStatus represents the PodDisruptionBudget status for a pod.
+type PDBStatus struct {
+	// HasPDB indicates if any PDB matches this pod
+	HasPDB bool
+
+	// PDBName is the name of the matching PDB (first match if multiple)
+	PDBName string
+
+	// DisruptionsAllowed is how many more pods can be disrupted
+	DisruptionsAllowed int32
+
+	// CurrentHealthy is the current number of healthy pods
+	CurrentHealthy int32
+
+	// DesiredHealthy is the minimum required healthy pods
+	DesiredHealthy int32
+
+	// ExpectedPods is the total number of pods expected by the PDB
+	ExpectedPods int32
+
+	// CanDisrupt indicates if eviction is currently allowed
+	CanDisrupt bool
+
+	// BlockReason provides human-readable reason if blocked
+	BlockReason string
+}
 
 // EvictPod attempts to evict a pod using the Eviction API, which respects PodDisruptionBudgets.
 // Returns an EvictionResult and any error encountered.
@@ -106,6 +134,66 @@ func CanEvict(ctx context.Context, c client.Client, pod *corev1.Pod) (bool, erro
 
 	// Unexpected error
 	return false, fmt.Errorf("dry-run eviction failed: %w", err)
+}
+
+// CheckPDBStatus checks if a pod can be evicted based on PDB constraints.
+// Returns PDBStatus with details about matching PDBs and disruption allowance.
+func CheckPDBStatus(ctx context.Context, c client.Client, pod *corev1.Pod) (*PDBStatus, error) {
+	status := &PDBStatus{
+		CanDisrupt: true, // Default: allow if no PDB
+	}
+
+	// List all PDBs in the pod's namespace
+	var pdbList policyv1.PodDisruptionBudgetList
+	if err := c.List(ctx, &pdbList, client.InNamespace(pod.Namespace)); err != nil {
+		return nil, fmt.Errorf("listing PDBs: %w", err)
+	}
+
+	// Check each PDB for a match
+	for i := range pdbList.Items {
+		pdb := &pdbList.Items[i]
+
+		// Skip if selector is nil
+		if pdb.Spec.Selector == nil {
+			continue
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+		if err != nil {
+			continue // Skip malformed selectors
+		}
+
+		// Check if this PDB matches the pod
+		if !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+
+		// Found a matching PDB
+		status.HasPDB = true
+		status.PDBName = pdb.Name
+		status.DisruptionsAllowed = pdb.Status.DisruptionsAllowed
+		status.CurrentHealthy = pdb.Status.CurrentHealthy
+		status.DesiredHealthy = pdb.Status.DesiredHealthy
+		status.ExpectedPods = pdb.Status.ExpectedPods
+
+		// Check if disruption is allowed
+		if pdb.Status.DisruptionsAllowed < 1 {
+			status.CanDisrupt = false
+			status.BlockReason = fmt.Sprintf(
+				"PDB %s blocks eviction: %d/%d healthy, need %d, disruptions allowed: %d",
+				pdb.Name,
+				pdb.Status.CurrentHealthy,
+				pdb.Status.ExpectedPods,
+				pdb.Status.DesiredHealthy,
+				pdb.Status.DisruptionsAllowed,
+			)
+		}
+
+		// Use first matching PDB (Kubernetes behavior)
+		break
+	}
+
+	return status, nil
 }
 
 // evictionError is returned when eviction fails due to PDB constraints.

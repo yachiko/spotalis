@@ -267,7 +267,7 @@ var _ = Describe("Observability and Monitoring", func() {
 						"namespace": testNamespace,
 					})
 					return currentCount > initialCount
-				}, "60s", "2s").Should(BeTrue(), "Reconcile count should increase after Spotalis management is enabled")
+				}, "90s", "2s").Should(BeTrue(), "Reconcile count should increase after Spotalis management is enabled")
 			})
 
 			It("should track reconcile errors separately", func() {

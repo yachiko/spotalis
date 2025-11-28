@@ -1175,6 +1175,10 @@ func (m *MockStatefulSetMetricsRecorder) RecordWorkloadMetrics(namespace, worklo
 	})
 }
 
+func (m *MockStatefulSetMetricsRecorder) RecordPDBBlock(_, _, _, _ string) {
+	// No-op for mock
+}
+
 // Helper function to create resource quantities
 func mustParseQuantity(value string) resource.Quantity {
 	q, err := resource.ParseQuantity(value)

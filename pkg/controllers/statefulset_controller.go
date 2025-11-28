@@ -593,6 +593,40 @@ func (r *StatefulSetReconciler) executeGradualRebalancing(ctx context.Context, s
 
 	// Only delete the first pod to avoid overwhelming the system
 	pod := podsToDelete[0]
+
+	// Pre-check PDB status before attempting eviction
+	pdbStatus, err := CheckPDBStatus(ctx, r.Client, &pod)
+	if err != nil {
+		logger.Error(err, "Failed to check PDB status", "pod", pod.Name)
+		// Continue anyway - eviction API will enforce PDB
+	} else if !pdbStatus.CanDisrupt {
+		// PDB blocks eviction - log and skip
+		logger.Info("Rebalancing blocked by PDB",
+			"pod", pod.Name,
+			"pdb", pdbStatus.PDBName,
+			"disruptions_allowed", pdbStatus.DisruptionsAllowed,
+			"current_healthy", pdbStatus.CurrentHealthy,
+			"desired_healthy", pdbStatus.DesiredHealthy,
+			"reason", pdbStatus.BlockReason)
+
+		// Record metric if collector is available
+		if r.MetricsCollector != nil {
+			r.MetricsCollector.RecordPDBBlock(pod.Namespace, statefulSet.Name, "statefulset", pdbStatus.PDBName)
+		}
+
+		// Return nil - not an error, just can't proceed now
+		// Controller will requeue and try again later
+		return nil
+	}
+
+	// Log PDB info if present
+	if pdbStatus != nil && pdbStatus.HasPDB {
+		logger.V(1).Info("PDB allows eviction",
+			"pod", pod.Name,
+			"pdb", pdbStatus.PDBName,
+			"disruptions_allowed", pdbStatus.DisruptionsAllowed)
+	}
+
 	logger.Info("Evicting pod for rebalancing",
 		"pod", pod.Name,
 		"node", pod.Spec.NodeName,
