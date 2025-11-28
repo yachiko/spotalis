@@ -56,6 +56,7 @@ type MutationHandler struct {
 	AnnotationParser *annotations.AnnotationParser
 	NodeClassifier   *config.NodeClassifierService
 	MetricsCollector *metrics.Collector
+	AdmissionTracker *AdmissionStateTracker
 	decoder          admission.Decoder
 }
 
@@ -320,20 +321,40 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 		return capacityTypeOnDemand, err
 	}
 
+	// Get workload generation for staleness detection
+	generation, err := m.getWorkloadGeneration(ctx, pod.Namespace, workloadName, workloadKind)
+	if err != nil {
+		return capacityTypeOnDemand, err
+	}
+
 	// Count current pods for this workload (excluding the current pod being mutated)
 	spotCount, onDemandCount, err := m.countCurrentPods(ctx, pod.Namespace, workloadName, workloadKind, pod.Name)
 	if err != nil {
 		return capacityTypeOnDemand, err
 	}
 
-	// Calculate totals
-	totalPods := spotCount + onDemandCount + 1 // +1 for the new pod being scheduled
+	// Add pending admissions to effective count if tracker is available
+	effectiveSpot := spotCount
+	effectiveOnDemand := onDemandCount
+	if m.AdmissionTracker != nil {
+		key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
+		pendingSpot, pendingOnDemand := m.AdmissionTracker.GetPendingCounts(key, generation)
+		effectiveSpot = spotCount + int(pendingSpot)
+		effectiveOnDemand = onDemandCount + int(pendingOnDemand)
+	}
+
+	// Calculate totals with effective counts
+	totalPods := effectiveSpot + effectiveOnDemand + 1 // +1 for the new pod being scheduled
 
 	// Calculate required on-demand pods
 	requiredOnDemand := int(config.MinOnDemand)
 
 	// If we haven't met the minimum on-demand requirement, schedule on on-demand
-	if onDemandCount < requiredOnDemand {
+	if effectiveOnDemand < requiredOnDemand {
+		if m.AdmissionTracker != nil {
+			key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
+			m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
+		}
 		return capacityTypeOnDemand, nil
 	}
 
@@ -342,17 +363,48 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 	targetOnDemandCount := totalPods - targetSpotCount
 
 	// Prioritize on-demand: if we need more on-demand pods, schedule there
-	if onDemandCount < targetOnDemandCount {
+	if effectiveOnDemand < targetOnDemandCount {
+		if m.AdmissionTracker != nil {
+			key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
+			m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
+		}
 		return capacityTypeOnDemand, nil
 	}
 
 	// If we have enough on-demand pods and need more spot pods, schedule on spot
-	if spotCount < targetSpotCount {
+	if effectiveSpot < targetSpotCount {
+		if m.AdmissionTracker != nil {
+			key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
+			m.AdmissionTracker.IncrementPending(key, capacityTypeSpot, generation)
+		}
 		return capacityTypeSpot, nil
 	}
 
 	// Default to on-demand for safety
+	if m.AdmissionTracker != nil {
+		key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
+		m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
+	}
 	return capacityTypeOnDemand, nil
+}
+
+// getWorkloadGeneration retrieves the generation of the workload for staleness detection
+func (m *MutationHandler) getWorkloadGeneration(ctx context.Context, namespace, name, kind string) (int64, error) {
+	switch kind {
+	case workloadTypeDeployment:
+		var deploy appsv1.Deployment
+		if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &deploy); err != nil {
+			return 0, err
+		}
+		return deploy.Generation, nil
+	case workloadTypeStatefulSet:
+		var sts appsv1.StatefulSet
+		if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &sts); err != nil {
+			return 0, err
+		}
+		return sts.Generation, nil
+	}
+	return 0, nil
 }
 
 // getWorkloadInfo extracts workload information from pod owner references

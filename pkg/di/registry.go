@@ -13,7 +13,9 @@ import (
 	"github.com/yachiko/spotalis/pkg/metrics"
 	"github.com/yachiko/spotalis/pkg/operator"
 	"github.com/yachiko/spotalis/pkg/webhook"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -104,6 +106,11 @@ func (r *ServiceRegistry) RegisterCoreServices() error {
 	// Register metrics collector
 	r.container.MustProvide(metrics.NewCollector)
 
+	// Register admission state tracker for webhook race condition prevention
+	r.container.MustProvide(func() *webhook.AdmissionStateTracker {
+		return webhook.NewAdmissionStateTracker(webhook.DefaultAdmissionTTL)
+	})
+
 	// Register node classifier configuration from consolidated config
 	r.container.MustProvide(func(_ *config.SpotalisConfig) *internalConfig.NodeClassifierConfig {
 		// Convert consolidated config to node classifier config
@@ -153,16 +160,15 @@ func (r *ServiceRegistry) RegisterControllers() error {
 
 // RegisterServers registers server-related services (webhook, metrics, health)
 func (r *ServiceRegistry) RegisterServers() error {
-	// Register webhook mutation handler
-	r.container.MustProvide(webhook.NewMutationHandler)
-
-	// Register webhook server - simplified for now
+	// Register webhook mutation handler with admission tracker
 	r.container.MustProvide(func(
-		mutationHandler *webhook.MutationHandler,
+		client client.Client,
+		scheme *runtime.Scheme,
+		admissionTracker *webhook.AdmissionStateTracker,
 	) *webhook.MutationHandler {
-		// For now, just return the mutation handler
-		// The actual webhook server setup is complex and tied to the operator
-		return mutationHandler
+		handler := webhook.NewMutationHandler(client, scheme)
+		handler.AdmissionTracker = admissionTracker
+		return handler
 	})
 
 	// Register health checker
