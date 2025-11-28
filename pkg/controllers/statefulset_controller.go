@@ -593,14 +593,30 @@ func (r *StatefulSetReconciler) executeGradualRebalancing(ctx context.Context, s
 
 	// Only delete the first pod to avoid overwhelming the system
 	pod := podsToDelete[0]
-	logger.Info("Deleting pod for rebalancing",
+	logger.Info("Evicting pod for rebalancing",
 		"pod", pod.Name,
 		"node", pod.Spec.NodeName,
 		"remaining", len(podsToDelete)-1)
 
-	if err := r.Delete(ctx, &pod); err != nil {
-		logger.Error(err, "Failed to delete pod", "pod", pod.Name)
+	// Use Eviction API to respect PodDisruptionBudgets
+	result, err := EvictPod(ctx, r.Client, &pod)
+	if err != nil {
+		if result == EvictionResultPDBBlocked {
+			// Log PDB blocking but don't treat as error - will retry next reconcile
+			logger.Info("Pod eviction blocked by PodDisruptionBudget, will retry later",
+				"pod", pod.Name,
+				"node", pod.Spec.NodeName)
+			// Return nil to avoid exponential backoff - PDB blocking is expected
+			return nil
+		}
+		logger.Error(err, "Failed to evict pod", "pod", pod.Name)
 		return err
+	}
+
+	if result == EvictionResultAlreadyGone {
+		logger.V(1).Info("Pod already deleted, continuing", "pod", pod.Name)
+	} else {
+		logger.V(1).Info("Pod evicted successfully", "pod", pod.Name, "result", result)
 	}
 
 	// Record the deletion time for cooldown tracking
