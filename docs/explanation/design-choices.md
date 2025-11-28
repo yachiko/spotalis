@@ -91,6 +91,27 @@ Related docs: [Architecture](./architecture.md), [Replica Distribution Strategy]
 - Additional mutation types (tolerations, affinities) gated by configuration.
 - Latency histograms & percentile SLIs for reconciliations.
 
+## Recent Decisions
+
+### Admission Race Prevention via Pending Counters
+Burst admissions (e.g., HPA scaling +10) can lead to multiple concurrent webhook requests making identical decisions from a stale view. Spotalis uses an in-memory AdmissionStateTracker to record pending spot/on-demand decisions per workload with a short TTL and workload generation awareness. Decisions are based on effective counts = current pods + pending decisions, eliminating race-induced over-allocation while remaining lightweight and stateless across restarts.
+
+Trade-offs:
+- Pros: Simple and fast; no CRDs; robust during bursts; low operational overhead.
+- Cons: Transient in-memory state; controller convergence still required after restarts.
+
+### Eviction API vs Direct Delete
+Controllers rebalance using the Kubernetes Eviction API (pods/eviction) rather than directly deleting pods.
+
+Reasons:
+- Respects PodDisruptionBudgets (PDBs); blocked evictions return HTTP 429.
+- Honors graceful termination and lifecycle hooks.
+- Provides better auditability via API server events.
+
+Operational behavior:
+- Evict at most one pod per reconcile cycle to limit disruption.
+- If eviction is blocked by a PDB, log and retry on subsequent reconciles without treating it as an error (avoids exponential backoff).
+
 ## See Also
 - [Architecture](./architecture.md)
 - [Replica Distribution Strategy](./replica-distribution-strategy.md)

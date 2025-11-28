@@ -18,6 +18,7 @@ Related docs: [Labels & Annotations](../reference/labels-and-annotations.md), [S
 | Workload spec | replicas | Total desired replica count (T) |
 | Annotation | spotalis.io/spot-percentage | Target percentage (P) of replicas on spot |
 | Annotation | spotalis.io/min-on-demand | Minimum on-demand count (M) |
+| Admission (webhook) | effective counts | Current observed pods plus pending admissions tracked during bursts |
 
 ## Core Formula
 Let T=total replicas, P=spot percentage (0-100), M=min on-demand.
@@ -72,6 +73,7 @@ Migration chosen when totals match but distribution differs; direction determine
 ## Staleness & Cooldowns
 - Cooldown period prevents rapid oscillations; controllers wait `controllers.workloadTiming.cooldownPeriod` after disruptive action.
 - Disruption window (if configured) restricts when rebalancing actions may execute; outside window only observe state.
+ - Admission burst safety: webhook bases decisions on effective counts (current + pending) to prevent race-driven over-allocation.
 
 ## Failure Modes & Mitigations
 | Failure | Mitigation |
@@ -79,11 +81,13 @@ Migration chosen when totals match but distribution differs; direction determine
 | Spot capacity unavailable | M ensures baseline on-demand; migration halts until rebalance possible |
 | Rapid workload scale changes | Periodic reconcile re-evaluates; cooldown enforces pacing |
 | Extreme P after scale (e.g., T shrinks) | Formula recomputes; may shift replicas back to on-demand safely |
+| PDB blocking eviction | Eviction API respects PDBs; controller logs and retries later |
 
 ## Future Extensions (Provisional)
 - Weighted historical stability factor for spot adoption ramp-up
 - Burst scaling guard (limit migrations per window)
 - Multi-pool strategy annotations (deferred)
+ - Proactive PDB pre-checks to optimize eviction attempts
 
 ## See Also
 - [Labels & Annotations](../reference/labels-and-annotations.md)

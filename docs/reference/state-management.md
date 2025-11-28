@@ -12,7 +12,30 @@ Related docs: [Replica Distribution Strategy](../explanation/replica-distributio
 | ReplicaState | Tracks current vs desired replica distribution for a workload | current/desired counts, drift, actions | Stable |
 | LeadershipState | Tracks leader election timings & transitions | IsLeader, RenewedAt, Transitions | Stable |
 | NamespaceFilter | Maintains set of monitored namespaces via selector | MonitoredNamespaces, Selector, LastUpdated | Stable |
+| AdmissionState | Tracks pending spot/on-demand admissions per workload to prevent burst races | PendingSpot/PendingOnDemand, LastUpdated, Generation | Stable |
 | APIRateLimiter | Regulates API server request velocity with backoff | RequestsPerSecond, BackoffUntil, RateLimitHits | Provisional |
+## AdmissionState (Stable)
+Lightweight, thread‑safe in‑memory tracker used by the webhook to avoid race conditions during burst admissions.
+
+Key fields:
+- PendingSpot / PendingOnDemand: per‑workload counters for decisions made but not yet reflected in live pods
+- LastUpdated: timestamp used by TTL cleanup to evict stale entries
+- Generation: workload generation; when it changes, pending counters are reset to avoid staleness
+
+Behavior:
+- Admission decisions use effective counts = observed pods + pending counters.
+- On decision, increment the relevant counter immediately.
+- Background cleanup loop removes entries older than the TTL.
+- On process restart, state is empty; controllers converge distribution over time.
+
+## Eviction vs Deletion (Stable)
+Controllers rebalance using the Kubernetes Eviction API (pods/eviction) rather than direct deletion. This respects PodDisruptionBudgets and graceful termination.
+
+Outcomes:
+- Evicted: eviction accepted; pod terminates per grace period.
+- AlreadyGone: pod not found; continue without error.
+- PDBBlocked: HTTP 429; controller logs and retries later without exponential backoff.
+
 
 ## ReplicaState (Stable)
 Represents distribution state for a single workload.

@@ -99,14 +99,14 @@ Leader election ensures only one active reconciler mutates workloads. Follower i
 2. Parse / validate annotations.
 3. Compute desired split.
 4. Compare to current realized split (observed through labeled pods or internal state tracking).
-5. If drift > threshold, issue patch/update (controller runtime client).
+5. If drift > threshold, issue eviction(s) via the Kubernetes Eviction API (pods/eviction) to safely disrupt pods and allow rescheduling onto the correct capacity type. Evictions respect PodDisruptionBudgets and graceful termination.
 6. Record metrics + emit structured log.
 
 Patches are minimal to reduce conflict with GitOps tools (no speculative metadata churn).
 
 ## 6. Webhook Participation
 
-When enabled, the mutating admission webhook injects node selectors / labels that align with the node classification (e.g. `capacity.spotalis.io=spot|on-demand`). This steers spot‑designated pods without modifying the original deployment template more than necessary.
+When enabled, the mutating admission webhook injects node selectors / labels that align with the node classification (e.g. `capacity.spotalis.io=spot|on-demand`). To prevent race conditions during burst scaling, the webhook uses effective counts = current pods + pending admissions tracked in a thread‑safe in‑memory AdmissionStateTracker (with TTL and workload generation awareness). The chosen capacity type is recorded immediately in the pending counters before returning the admission response.
 
 If the webhook is unavailable, controller falls back to reconciliation only; distribution decisions remain, but scheduling steering is weaker.
 
@@ -144,6 +144,7 @@ Port & endpoint mapping: [runtime ports](../reference/runtime-ports.md) and [met
 | Webhook down | No new pod steering; existing pods unaffected | Restore certs / restart; see debug guide |
 | Invalid annotations | Workload treated as all on‑demand | Fix annotation; metric highlights occurrence |
 | API rate limiting | Slower convergence | Backoff + eventual consistency; tune controller rate limits |
+| PDB blocks eviction | Temporary rebalancing pause | Eviction returns 429; controller logs and retries without backoff |
 
 ## 10. Compatibility & GitOps
 

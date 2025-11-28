@@ -11,12 +11,12 @@ This how-to walks you through installing Spotalis in a production-like namespace
 
 ## 1. Prerequisites
 
-| Dependency | Requirement / Note |
-|------------|--------------------|
-| Kubernetes | (List tested versions here, e.g. >= 1.27) |
-| Helm       | v3.x |
-| Permissions | Cluster role to create namespace + RBAC resources |
-| (Optional) Prometheus | To scrape metrics & build alerts |
+| Dependency            | Requirement / Note                                |
+| --------------------- | ------------------------------------------------- |
+| Kubernetes            | (List tested versions here, e.g. >= 1.27)         |
+| Helm                  | v3.x                                              |
+| Permissions           | Cluster role to create namespace + RBAC resources |
+| (Optional) Prometheus | To scrape metrics & build alerts                  |
 
 ## 2. Add the Helm Repository
 
@@ -130,11 +130,11 @@ Suggested alert ideas:
 
 ## 7. Troubleshooting
 
-| Symptom | Likely Cause | Next Step |
-|---------|--------------|-----------|
-| Webhook timeouts | TLS cert not mounted / DNS issues | See `../../how-to/debug-mutation.md` |
-| No leader lease | RBAC or coordination API blocked | Check RBAC, reapply chart |
-| Replica mix not changing | Missing opt-in label/annotation | Confirm `spotalis.io/enabled=true` |
+| Symptom                  | Likely Cause                                     | Next Step                              |
+| ------------------------ | ------------------------------------------------ | -------------------------------------- |
+| Webhook timeouts         | TLS cert not mounted / DNS issues                | See `../../how-to/debug-mutation.md`   |
+| No leader lease          | RBAC or coordination API blocked                 | Check RBAC, reapply chart              |
+| Replica mix not changing | Missing opt-in label/annotation                  | Confirm `spotalis.io/enabled=true`     |
 | Excessive reconcile logs | Too aggressive settings or rapid cluster scaling | Tune annotations / review strategy doc |
 
 Gather logs:
