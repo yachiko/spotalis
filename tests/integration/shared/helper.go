@@ -592,6 +592,27 @@ func (h *KindClusterHelper) WaitForDeploymentCleanup(labels map[string]string) e
 	return nil
 }
 
+// CreateStatefulSet creates a StatefulSet in the given namespace
+func (h *KindClusterHelper) CreateStatefulSet(ctx context.Context, namespace string, sts *appsv1.StatefulSet) error {
+	sts.Namespace = namespace
+	return h.Client.Create(ctx, sts)
+}
+
+// ScaleStatefulSet scales a StatefulSet to the specified replicas
+func (h *KindClusterHelper) ScaleStatefulSet(ctx context.Context, namespace, name string, replicas int32) error {
+	sts := &appsv1.StatefulSet{}
+	err := h.Client.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, sts)
+	if err != nil {
+		return fmt.Errorf("failed to get StatefulSet: %w", err)
+	}
+
+	sts.Spec.Replicas = &replicas
+	return h.Client.Update(ctx, sts)
+}
+
 // randString generates a random string of specified length
 func randString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
