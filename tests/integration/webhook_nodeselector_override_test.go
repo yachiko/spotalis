@@ -421,6 +421,7 @@ var _ = Describe("Webhook NodeSelector Override Behavior", func() {
 							},
 						},
 						Spec: corev1.PodSpec{
+							TerminationGracePeriodSeconds: int64Ptr(0), // Fast eviction for testing
 							Tolerations: []corev1.Toleration{
 								{
 									Key:    "node-role.kubernetes.io/control-plane",

@@ -29,6 +29,11 @@ func int32Ptr(i int32) *int32 {
 	return &i
 }
 
+// int64Ptr returns a pointer to the given int64 value
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
 // randString generates a random string of the specified length
 func randString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"

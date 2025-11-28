@@ -113,6 +113,7 @@ var _ = Describe("StatefulSet workload management", func() {
 							},
 						},
 						Spec: corev1.PodSpec{
+							TerminationGracePeriodSeconds: int64Ptr(0), // Fast eviction for testing
 							// Allow scheduling onto control-plane node in single-node Kind clusters
 							Tolerations: []corev1.Toleration{
 								{
