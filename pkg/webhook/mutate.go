@@ -34,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -379,17 +380,33 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 		return capacityTypeOnDemand, err
 	}
 
-	// Count current pods for this workload (excluding the current pod being mutated)
-	spotCount, onDemandCount, err := m.countCurrentPods(ctx, pod.Namespace, workloadName, workloadKind, pod.Name)
+	// Check staleness before using cached state
+	var key string
+	if m.AdmissionTracker != nil {
+		key = m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
+		staleness := m.AdmissionTracker.CheckStaleness(key, generation)
+		if staleness.IsStale {
+			m.logStaleness(staleness, workloadName, workloadKind, pod.Namespace)
+			// Reset state on staleness
+			m.AdmissionTracker.ResetPending(key, generation)
+		}
+	}
+
+	// List pods and capture metadata
+	spotCount, onDemandCount, listRV, err := m.countCurrentPodsWithRV(ctx, pod.Namespace, workloadName, workloadKind, pod.Name)
 	if err != nil {
 		return capacityTypeOnDemand, err
+	}
+
+	// Update pod list metadata for future staleness checks
+	if m.AdmissionTracker != nil {
+		m.AdmissionTracker.UpdatePodListMetadata(key, listRV, generation)
 	}
 
 	// Add pending admissions to effective count if tracker is available
 	effectiveSpot := spotCount
 	effectiveOnDemand := onDemandCount
 	if m.AdmissionTracker != nil {
-		key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
 		pendingSpot, pendingOnDemand := m.AdmissionTracker.GetPendingCounts(key, generation)
 		effectiveSpot = spotCount + int(pendingSpot)
 		effectiveOnDemand = onDemandCount + int(pendingOnDemand)
@@ -404,7 +421,6 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 	// If we haven't met the minimum on-demand requirement, schedule on on-demand
 	if effectiveOnDemand < requiredOnDemand {
 		if m.AdmissionTracker != nil {
-			key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
 			m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
 		}
 		return capacityTypeOnDemand, nil
@@ -417,7 +433,6 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 	// Prioritize on-demand: if we need more on-demand pods, schedule there
 	if effectiveOnDemand < targetOnDemandCount {
 		if m.AdmissionTracker != nil {
-			key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
 			m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
 		}
 		return capacityTypeOnDemand, nil
@@ -426,7 +441,6 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 	// If we have enough on-demand pods and need more spot pods, schedule on spot
 	if effectiveSpot < targetSpotCount {
 		if m.AdmissionTracker != nil {
-			key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
 			m.AdmissionTracker.IncrementPending(key, capacityTypeSpot, generation)
 		}
 		return capacityTypeSpot, nil
@@ -434,7 +448,6 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 
 	// Default to on-demand for safety
 	if m.AdmissionTracker != nil {
-		key := m.AdmissionTracker.WorkloadKey(pod.Namespace, workloadKind, workloadName)
 		m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
 	}
 	return capacityTypeOnDemand, nil
@@ -524,6 +537,53 @@ func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workl
 	}
 
 	return spotCount, onDemandCount, nil
+}
+
+// countCurrentPodsWithRV lists pods and returns the list's resourceVersion
+func (m *MutationHandler) countCurrentPodsWithRV(
+	ctx context.Context,
+	namespace, workloadName, workloadKind, excludePodName string,
+) (spotCount, onDemandCount int, resourceVersion string, err error) {
+	var podList corev1.PodList
+	if err := m.Client.List(ctx, &podList, client.InNamespace(namespace)); err != nil {
+		return 0, 0, "", err
+	}
+
+	resourceVersion = podList.ResourceVersion
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.Name == excludePodName {
+			continue
+		}
+		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+			continue
+		}
+		if !m.podBelongsToWorkload(pod, workloadName, workloadKind) {
+			continue
+		}
+
+		capacityType := m.getPodCapacityType(pod)
+		if capacityType == capacityTypeSpot {
+			spotCount++
+		} else {
+			onDemandCount++
+		}
+	}
+
+	return spotCount, onDemandCount, resourceVersion, nil
+}
+
+// logStaleness logs when stale state is detected
+func (m *MutationHandler) logStaleness(s StalenessCheck, name, kind, ns string) {
+	log.FromContext(context.Background()).V(1).Info(
+		"Detected stale admission state, resetting",
+		"workload", name,
+		"kind", kind,
+		"namespace", ns,
+		"reason", s.Reason,
+		"details", s.Details,
+	)
 }
 
 // podBelongsToWorkload checks if a pod belongs to the specified workload

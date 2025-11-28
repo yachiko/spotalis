@@ -1,14 +1,32 @@
 package webhook
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
 
 const (
-	DefaultAdmissionTTL = 30 * time.Second
-	CleanupInterval     = 10 * time.Second
+	DefaultAdmissionTTL  = 30 * time.Second
+	CleanupInterval      = 10 * time.Second
+	DefaultPodListMaxAge = 5 * time.Second
 )
+
+// StaleReason describes why state is considered stale
+type StaleReason string
+
+const (
+	StaleReasonNone       StaleReason = ""
+	StaleReasonGeneration StaleReason = "workload_generation_changed"
+	StaleReasonPodListAge StaleReason = "pod_list_too_old"
+)
+
+// StalenessCheck contains the result of staleness validation
+type StalenessCheck struct {
+	IsStale bool
+	Reason  StaleReason
+	Details string
+}
 
 // PendingAdmission tracks pending pod admissions for a workload
 type PendingAdmission struct {
@@ -16,6 +34,10 @@ type PendingAdmission struct {
 	PendingOnDemand int32
 	LastUpdated     time.Time
 	Generation      int64
+
+	// Task 005: Optimistic Concurrency fields
+	PodListResourceVersion string    // RV when pods were listed
+	PodListTime            time.Time // When pod list was fetched
 }
 
 // AdmissionStateTracker tracks pending admissions across workloads
@@ -24,6 +46,9 @@ type AdmissionStateTracker struct {
 	pending map[string]*PendingAdmission
 	ttl     time.Duration
 	stopCh  chan struct{}
+
+	// Task 005: Optimistic Concurrency
+	podListMaxAge time.Duration // Max age of pod list before considered stale
 }
 
 // NewAdmissionStateTracker creates a new admission state tracker
@@ -32,9 +57,10 @@ func NewAdmissionStateTracker(ttl time.Duration) *AdmissionStateTracker {
 		ttl = DefaultAdmissionTTL
 	}
 	t := &AdmissionStateTracker{
-		pending: make(map[string]*PendingAdmission),
-		ttl:     ttl,
-		stopCh:  make(chan struct{}),
+		pending:       make(map[string]*PendingAdmission),
+		ttl:           ttl,
+		stopCh:        make(chan struct{}),
+		podListMaxAge: DefaultPodListMaxAge,
 	}
 	go t.cleanupLoop()
 	return t
@@ -112,5 +138,65 @@ func (t *AdmissionStateTracker) cleanup() {
 		if now.Sub(p.LastUpdated) > t.ttl {
 			delete(t.pending, key)
 		}
+	}
+}
+
+// CheckStaleness validates if the cached state is still valid
+func (t *AdmissionStateTracker) CheckStaleness(key string, currentGeneration int64) StalenessCheck {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	p, exists := t.pending[key]
+	if !exists {
+		// No prior state - not stale, just new
+		return StalenessCheck{IsStale: false}
+	}
+
+	// Check generation mismatch
+	if p.Generation != currentGeneration {
+		return StalenessCheck{
+			IsStale: true,
+			Reason:  StaleReasonGeneration,
+			Details: fmt.Sprintf("cached generation %d != current %d", p.Generation, currentGeneration),
+		}
+	}
+
+	// Check pod list age
+	if !p.PodListTime.IsZero() && time.Since(p.PodListTime) > t.podListMaxAge {
+		return StalenessCheck{
+			IsStale: true,
+			Reason:  StaleReasonPodListAge,
+			Details: fmt.Sprintf("pod list is %v old, max %v", time.Since(p.PodListTime), t.podListMaxAge),
+		}
+	}
+
+	return StalenessCheck{IsStale: false}
+}
+
+// UpdatePodListMetadata records when pods were listed
+func (t *AdmissionStateTracker) UpdatePodListMetadata(key string, resourceVersion string, generation int64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	p, exists := t.pending[key]
+	if !exists {
+		p = &PendingAdmission{Generation: generation}
+		t.pending[key] = p
+	}
+
+	p.PodListResourceVersion = resourceVersion
+	p.PodListTime = time.Now()
+	p.LastUpdated = time.Now()
+}
+
+// ResetPending clears pending counts for a workload, typically due to staleness
+func (t *AdmissionStateTracker) ResetPending(key string, newGeneration int64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.pending[key] = &PendingAdmission{
+		Generation:  newGeneration,
+		LastUpdated: time.Now(),
+		PodListTime: time.Now(),
 	}
 }

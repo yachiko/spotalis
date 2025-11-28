@@ -18,7 +18,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -591,8 +593,20 @@ func (r *StatefulSetReconciler) executeGradualRebalancing(ctx context.Context, s
 
 	logger := log.FromContext(ctx)
 
-	// Only delete the first pod to avoid overwhelming the system
+	// Determine pod management policy
+	isOrdered := isOrderedReadyPolicy(statefulSet)
+
+	// Sort pods by ordinal before deletion
+	// For OrderedReady: delete highest ordinals first (descending)
+	// For Parallel: still sort for consistency (descending)
+	podsToDelete = sortPodsByOrdinal(podsToDelete, statefulSet.Name, true)
+	logger.V(1).Info("Sorted pods for deletion by ordinal",
+		"count", len(podsToDelete),
+		"isOrderedReady", isOrdered)
+
+	// Only delete the first pod (highest ordinal) to avoid overwhelming the system
 	pod := podsToDelete[0]
+	ordinal, _ := extractPodOrdinal(pod.Name, statefulSet.Name)
 
 	// Pre-check PDB status before attempting eviction
 	pdbStatus, err := CheckPDBStatus(ctx, r.Client, &pod)
@@ -629,6 +643,7 @@ func (r *StatefulSetReconciler) executeGradualRebalancing(ctx context.Context, s
 
 	logger.Info("Evicting pod for rebalancing",
 		"pod", pod.Name,
+		"ordinal", ordinal,
 		"node", pod.Spec.NodeName,
 		"remaining", len(podsToDelete)-1)
 
@@ -784,6 +799,86 @@ func statefulSetLabelSelector(statefulSet *appsv1.StatefulSet) (client.MatchingL
 	}
 
 	return client.MatchingLabels(statefulSet.Spec.Selector.MatchLabels), nil
+}
+
+// extractPodOrdinal extracts the ordinal from a StatefulSet pod name
+// Pod names are formatted as: <statefulset-name>-<ordinal>
+func extractPodOrdinal(podName string, statefulSetName string) (int, error) {
+	// Validate prefix
+	prefix := statefulSetName + "-"
+	if !strings.HasPrefix(podName, prefix) {
+		return -1, fmt.Errorf("pod name %q does not match StatefulSet %q pattern", podName, statefulSetName)
+	}
+
+	ordinalStr := podName[len(prefix):]
+	ordinal, err := strconv.Atoi(ordinalStr)
+	if err != nil {
+		return -1, fmt.Errorf("failed to parse ordinal from pod %q: %w", podName, err)
+	}
+
+	return ordinal, nil
+}
+
+// podWithOrdinal pairs a pod with its parsed ordinal for sorting
+type podWithOrdinal struct {
+	pod     corev1.Pod
+	ordinal int
+}
+
+// sortPodsByOrdinal sorts pods by their ordinal
+// For OrderedReady: highest ordinal first (descending)
+// For Parallel: original order (but we still sort for consistency)
+func sortPodsByOrdinal(pods []corev1.Pod, statefulSetName string, descending bool) []corev1.Pod {
+	if len(pods) == 0 {
+		return pods
+	}
+
+	podsWithOrdinals := make([]podWithOrdinal, 0, len(pods))
+
+	for i := range pods {
+		pod := pods[i]
+		ordinal, err := extractPodOrdinal(pod.Name, statefulSetName)
+		if err != nil {
+			// If we can't parse ordinal, put at end with ordinal -1
+			ordinal = -1
+		}
+		podsWithOrdinals = append(podsWithOrdinals, podWithOrdinal{
+			pod:     pod,
+			ordinal: ordinal,
+		})
+	}
+
+	if descending {
+		// Highest ordinal first
+		sort.Slice(podsWithOrdinals, func(i, j int) bool {
+			return podsWithOrdinals[i].ordinal > podsWithOrdinals[j].ordinal
+		})
+	} else {
+		// Lowest ordinal first
+		sort.Slice(podsWithOrdinals, func(i, j int) bool {
+			return podsWithOrdinals[i].ordinal < podsWithOrdinals[j].ordinal
+		})
+	}
+
+	result := make([]corev1.Pod, len(podsWithOrdinals))
+	for i, pwo := range podsWithOrdinals {
+		result[i] = pwo.pod
+	}
+	return result
+}
+
+// getPodManagementPolicy returns the pod management policy, defaulting to OrderedReady
+func getPodManagementPolicy(sts *appsv1.StatefulSet) appsv1.PodManagementPolicyType {
+	if sts.Spec.PodManagementPolicy == "" {
+		return appsv1.OrderedReadyPodManagement
+	}
+	return sts.Spec.PodManagementPolicy
+}
+
+// isOrderedReadyPolicy returns true if StatefulSet uses OrderedReady policy
+func isOrderedReadyPolicy(sts *appsv1.StatefulSet) bool {
+	policy := getPodManagementPolicy(sts)
+	return policy == appsv1.OrderedReadyPodManagement
 }
 
 // GetReconcileCount returns the total number of reconciliations performed
