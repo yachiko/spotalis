@@ -160,14 +160,20 @@ func (r *ServiceRegistry) RegisterControllers() error {
 
 // RegisterServers registers server-related services (webhook, metrics, health)
 func (r *ServiceRegistry) RegisterServers() error {
-	// Register webhook mutation handler with admission tracker
+	// Register webhook mutation handler with admission tracker and node classifier config
 	r.container.MustProvide(func(
 		client client.Client,
 		scheme *runtime.Scheme,
 		admissionTracker *webhook.AdmissionStateTracker,
+		nodeClassifier *internalConfig.NodeClassifierService,
+		config *config.SpotalisConfig,
+		metricsCollector *metrics.Collector,
 	) *webhook.MutationHandler {
 		handler := webhook.NewMutationHandler(client, scheme)
 		handler.AdmissionTracker = admissionTracker
+		handler.SetNodeClassifier(nodeClassifier)
+		handler.SetNodeClassifierConfig(&config.Controllers.NodeClassifier)
+		handler.SetMetricsCollector(metricsCollector)
 		return handler
 	})
 

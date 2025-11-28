@@ -26,6 +26,7 @@ import (
 	"github.com/yachiko/spotalis/internal/annotations"
 	"github.com/yachiko/spotalis/internal/config"
 	"github.com/yachiko/spotalis/pkg/apis"
+	pkgconfig "github.com/yachiko/spotalis/pkg/config"
 	"github.com/yachiko/spotalis/pkg/controllers"
 	"github.com/yachiko/spotalis/pkg/metrics"
 	"gomodules.xyz/jsonpatch/v2"
@@ -52,12 +53,13 @@ const (
 
 // MutationHandler handles admission webhook requests for pod and workload mutation
 type MutationHandler struct {
-	Client           client.Client
-	AnnotationParser *annotations.AnnotationParser
-	NodeClassifier   *config.NodeClassifierService
-	MetricsCollector *metrics.Collector
-	AdmissionTracker *AdmissionStateTracker
-	decoder          admission.Decoder
+	Client               client.Client
+	AnnotationParser     *annotations.AnnotationParser
+	NodeClassifier       *config.NodeClassifierService
+	NodeClassifierConfig *pkgconfig.NodeClassifierConfig
+	MetricsCollector     *metrics.Collector
+	AdmissionTracker     *AdmissionStateTracker
+	decoder              admission.Decoder
 }
 
 // NewMutationHandler creates a new mutation handler
@@ -77,6 +79,11 @@ func (m *MutationHandler) SetNodeClassifier(classifier *config.NodeClassifierSer
 // SetMetricsCollector sets the metrics collector for recording webhook metrics
 func (m *MutationHandler) SetMetricsCollector(collector *metrics.Collector) {
 	m.MetricsCollector = collector
+}
+
+// SetNodeClassifierConfig sets the node classifier configuration for label extraction
+func (m *MutationHandler) SetNodeClassifierConfig(cfg *pkgconfig.NodeClassifierConfig) {
+	m.NodeClassifierConfig = cfg
 }
 
 // Handle processes admission webhook requests
@@ -275,6 +282,42 @@ func jsonPointerUnescape(s string) string {
 	return s
 }
 
+// getCapacityTypeLabelConfig extracts the label key and values for spot/on-demand
+// from the NodeClassifierConfig. Falls back to Karpenter defaults if not configured.
+func (m *MutationHandler) getCapacityTypeLabelConfig() (labelKey string, spotValue string, onDemandValue string) {
+	// Defaults (Karpenter)
+	labelKey = "karpenter.sh/capacity-type"
+	spotValue = "spot"
+	onDemandValue = "on-demand"
+
+	if m.NodeClassifierConfig == nil {
+		return
+	}
+
+	// Extract spot label config
+	if len(m.NodeClassifierConfig.SpotLabels) > 0 {
+		selector := m.NodeClassifierConfig.SpotLabels[0]
+		if len(selector.MatchLabels) > 0 {
+			// Use first key-value pair found
+			for k, v := range selector.MatchLabels {
+				labelKey = k
+				spotValue = v
+				break
+			}
+		}
+	}
+
+	// Extract on-demand value (same key expected)
+	if len(m.NodeClassifierConfig.OnDemandLabels) > 0 {
+		selector := m.NodeClassifierConfig.OnDemandLabels[0]
+		if v, exists := selector.MatchLabels[labelKey]; exists {
+			onDemandValue = v
+		}
+	}
+
+	return
+}
+
 // generateNodeSelectorPatches generates patches for node selector based on current pod distribution
 func (m *MutationHandler) generateNodeSelectorPatches(pod *corev1.Pod, config *apis.WorkloadConfiguration) []map[string]interface{} {
 	var patches []map[string]interface{}
@@ -286,8 +329,17 @@ func (m *MutationHandler) generateNodeSelectorPatches(pod *corev1.Pod, config *a
 		capacityType = capacityTypeOnDemand
 	}
 
+	// Get label configuration
+	labelKey, spotValue, onDemandValue := m.getCapacityTypeLabelConfig()
+
+	// Map capacity type to actual label value
+	labelValue := onDemandValue
+	if capacityType == capacityTypeSpot {
+		labelValue = spotValue
+	}
+
 	nodeSelector := map[string]string{
-		"karpenter.sh/capacity-type": capacityType,
+		labelKey: labelValue,
 	}
 
 	// Add nodeSelector if it doesn't exist
@@ -521,10 +573,17 @@ func (m *MutationHandler) getPodCapacityType(pod *corev1.Pod) string {
 
 // getCapacityTypeFromNodeSelector extracts capacity type from pod's nodeSelector
 func (m *MutationHandler) getCapacityTypeFromNodeSelector(pod *corev1.Pod) string {
-	if pod.Spec.NodeSelector != nil {
-		if capacityType, exists := pod.Spec.NodeSelector["karpenter.sh/capacity-type"]; exists {
-			return capacityType
+	if pod.Spec.NodeSelector == nil {
+		return ""
+	}
+
+	labelKey, spotValue, _ := m.getCapacityTypeLabelConfig()
+
+	if capacityType, exists := pod.Spec.NodeSelector[labelKey]; exists {
+		if capacityType == spotValue {
+			return capacityTypeSpot
 		}
+		return capacityTypeOnDemand
 	}
 	return ""
 }
@@ -552,10 +611,15 @@ func (m *MutationHandler) getCapacityTypeFromRequiredAffinity(nodeAffinity *core
 		return ""
 	}
 
+	labelKey, spotValue, _ := m.getCapacityTypeLabelConfig()
+
 	for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
 		for _, expr := range term.MatchExpressions {
-			if expr.Key == "karpenter.sh/capacity-type" && len(expr.Values) > 0 {
-				return expr.Values[0]
+			if expr.Key == labelKey && len(expr.Values) > 0 {
+				if expr.Values[0] == spotValue {
+					return capacityTypeSpot
+				}
+				return capacityTypeOnDemand
 			}
 		}
 	}
@@ -568,15 +632,21 @@ func (m *MutationHandler) getCapacityTypeFromPreferredAffinity(nodeAffinity *cor
 		return ""
 	}
 
+	labelKey, spotValue, _ := m.getCapacityTypeLabelConfig()
+
 	highestWeight := int32(0)
 	preferredType := ""
 
 	for _, term := range nodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
 		if term.Weight > highestWeight {
 			for _, expr := range term.Preference.MatchExpressions {
-				if expr.Key == "karpenter.sh/capacity-type" && len(expr.Values) > 0 {
+				if expr.Key == labelKey && len(expr.Values) > 0 {
 					highestWeight = term.Weight
-					preferredType = expr.Values[0]
+					if expr.Values[0] == spotValue {
+						preferredType = capacityTypeSpot
+					} else {
+						preferredType = capacityTypeOnDemand
+					}
 				}
 			}
 		}

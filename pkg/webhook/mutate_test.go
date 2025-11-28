@@ -22,6 +22,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/yachiko/spotalis/pkg/apis"
+	pkgconfig "github.com/yachiko/spotalis/pkg/config"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -320,6 +322,284 @@ var _ = Describe("MutationHandler", func() {
 				Expect(foundPatch["op"]).To(Equal("add"))
 				Expect(foundPatch["path"]).To(Equal("/spec/nodeSelector/karpenter.sh~1capacity-type"))
 			})
+		})
+	})
+})
+
+var _ = Describe("Configurable Labels", func() {
+	var (
+		handler *MutationHandler
+	)
+
+	BeforeEach(func() {
+		testScheme := runtime.NewScheme()
+		err := scheme.AddToScheme(testScheme)
+		Expect(err).NotTo(HaveOccurred())
+		handler = NewMutationHandler(nil, testScheme)
+	})
+
+	Describe("getCapacityTypeLabelConfig", func() {
+		Context("with nil config", func() {
+			It("should return Karpenter defaults", func() {
+				handler.NodeClassifierConfig = nil
+				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
+				Expect(labelKey).To(Equal("karpenter.sh/capacity-type"))
+				Expect(spotValue).To(Equal("spot"))
+				Expect(onDemandValue).To(Equal("on-demand"))
+			})
+		})
+
+		Context("with empty config", func() {
+			It("should return Karpenter defaults", func() {
+				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{}
+				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
+				Expect(labelKey).To(Equal("karpenter.sh/capacity-type"))
+				Expect(spotValue).To(Equal("spot"))
+				Expect(onDemandValue).To(Equal("on-demand"))
+			})
+		})
+
+		Context("with custom EKS labels", func() {
+			It("should extract EKS capacity type labels", func() {
+				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+					SpotLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": "SPOT"}},
+					},
+					OnDemandLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": "ON_DEMAND"}},
+					},
+				}
+				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
+				Expect(labelKey).To(Equal("eks.amazonaws.com/capacityType"))
+				Expect(spotValue).To(Equal("SPOT"))
+				Expect(onDemandValue).To(Equal("ON_DEMAND"))
+			})
+		})
+
+		Context("with custom GKE labels", func() {
+			It("should extract GKE preemptible labels", func() {
+				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+					SpotLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"cloud.google.com/gke-preemptible": "true"}},
+					},
+					OnDemandLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"cloud.google.com/gke-preemptible": "false"}},
+					},
+				}
+				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
+				Expect(labelKey).To(Equal("cloud.google.com/gke-preemptible"))
+				Expect(spotValue).To(Equal("true"))
+				Expect(onDemandValue).To(Equal("false"))
+			})
+		})
+
+		Context("with custom AKS labels", func() {
+			It("should extract AKS scale set priority labels", func() {
+				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+					SpotLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"kubernetes.azure.com/scalesetpriority": "spot"}},
+					},
+					OnDemandLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"kubernetes.azure.com/scalesetpriority": "regular"}},
+					},
+				}
+				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
+				Expect(labelKey).To(Equal("kubernetes.azure.com/scalesetpriority"))
+				Expect(spotValue).To(Equal("spot"))
+				Expect(onDemandValue).To(Equal("regular"))
+			})
+		})
+
+		Context("with multiple selectors", func() {
+			It("should use first selector from spot labels", func() {
+				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+					SpotLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"custom.io/type": "preemptible"}},
+						{MatchLabels: map[string]string{"other.io/type": "spot"}},
+					},
+					OnDemandLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"custom.io/type": "standard"}},
+					},
+				}
+				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
+				Expect(labelKey).To(Equal("custom.io/type"))
+				Expect(spotValue).To(Equal("preemptible"))
+				Expect(onDemandValue).To(Equal("standard"))
+			})
+		})
+
+		Context("with mismatched keys", func() {
+			It("should use spot label key and not find matching on-demand value", func() {
+				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+					SpotLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"spot.io/type": "preemptible"}},
+					},
+					OnDemandLabels: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"ondemand.io/type": "standard"}},
+					},
+				}
+				labelKey, spotValue, _ := handler.getCapacityTypeLabelConfig()
+				Expect(labelKey).To(Equal("spot.io/type"))
+				Expect(spotValue).To(Equal("preemptible"))
+				// On-demand value should still be default since key doesn't match
+			})
+		})
+	})
+
+	Describe("generateNodeSelectorPatches with custom labels", func() {
+		It("should use custom label key in patches", func() {
+			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+				SpotLabels: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"custom.io/type": "spot-instance"}},
+				},
+				OnDemandLabels: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"custom.io/type": "on-demand-instance"}},
+				},
+			}
+
+			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{},
+				},
+			}
+
+			// Note: determineTargetCapacityType will default to on-demand when no workload context
+			// This test just verifies the label key is correctly used
+			config := &apis.WorkloadConfiguration{
+				SpotPercentage: 0, // 0% spot means all on-demand
+			}
+
+			patches := handler.generateNodeSelectorPatches(pod, config)
+
+			// Find the patch for custom.io/type
+			var foundPatch map[string]interface{}
+			for _, patch := range patches {
+				// custom.io/type should be escaped to custom.io~1type
+				if patch["path"] == "/spec/nodeSelector/custom.io~1type" {
+					foundPatch = patch
+					break
+				}
+			}
+
+			Expect(foundPatch).NotTo(BeNil(), "Should find patch with escaped custom label path")
+			Expect(foundPatch["op"]).To(Equal("add"))
+			// Should use on-demand-instance since spot percentage is 0
+			Expect(foundPatch["value"]).To(Equal("on-demand-instance"))
+		})
+	})
+
+	Describe("getCapacityTypeFromNodeSelector with custom labels", func() {
+		It("should detect spot from custom EKS labels", func() {
+			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+				SpotLabels: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": "SPOT"}},
+				},
+			}
+
+			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"eks.amazonaws.com/capacityType": "SPOT",
+					},
+				},
+			}
+
+			capacityType := handler.getCapacityTypeFromNodeSelector(pod)
+			Expect(capacityType).To(Equal("spot"))
+		})
+
+		It("should detect on-demand from custom GKE labels", func() {
+			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+				SpotLabels: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"cloud.google.com/gke-preemptible": "true"}},
+				},
+			}
+
+			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"cloud.google.com/gke-preemptible": "false",
+					},
+				},
+			}
+
+			capacityType := handler.getCapacityTypeFromNodeSelector(pod)
+			Expect(capacityType).To(Equal("on-demand"))
+		})
+
+		It("should return empty for unknown label value", func() {
+			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+				SpotLabels: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"custom.io/type": "spot"}},
+				},
+			}
+
+			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"other.io/type": "unknown",
+					},
+				},
+			}
+
+			capacityType := handler.getCapacityTypeFromNodeSelector(pod)
+			Expect(capacityType).To(Equal(""))
+		})
+	})
+
+	Describe("getCapacityTypeFromRequiredAffinity with custom labels", func() {
+		It("should detect spot from custom label in required affinity", func() {
+			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+				SpotLabels: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"custom.io/capacity": "spot"}},
+				},
+			}
+
+			affinity := &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "custom.io/capacity",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"spot"},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			capacityType := handler.getCapacityTypeFromRequiredAffinity(affinity)
+			Expect(capacityType).To(Equal("spot"))
+		})
+
+		It("should detect on-demand from custom label in required affinity", func() {
+			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
+				SpotLabels: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"custom.io/capacity": "spot"}},
+				},
+			}
+
+			affinity := &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "custom.io/capacity",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"on-demand"},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			capacityType := handler.getCapacityTypeFromRequiredAffinity(affinity)
+			Expect(capacityType).To(Equal("on-demand"))
 		})
 	})
 })
