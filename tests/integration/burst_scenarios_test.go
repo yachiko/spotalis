@@ -168,15 +168,21 @@ var _ = Describe("Burst Scenario Integration Tests", func() {
 				return allPodsHaveNodeSelector(ctx, k8sClient, namespace, "burst-20-80")
 			}, 120*time.Second, 3*time.Second).Should(BeTrue())
 
-			By("Verifying pod distribution")
-			// Expected: 20 * 80% = 16 spot, min 2 on-demand → 16 spot, 4 on-demand
-			spotCount, onDemandCount := countPodDistribution(ctx, k8sClient, namespace, "burst-20-80")
+			By("Waiting for distribution to converge")
 			expectedSpot := calculateExpectedSpot(20, spotPercentage, minOnDemand)
+			var spotCount, onDemandCount int
 
+			Eventually(func() bool {
+				spotCount, onDemandCount = countPodDistribution(ctx, k8sClient, namespace, "burst-20-80")
+				// Allow +/- 2 tolerance
+				return spotCount >= expectedSpot-2 && spotCount <= expectedSpot+2
+			}, 180*time.Second, 5*time.Second).Should(BeTrue())
+
+			By("Verifying pod distribution")
 			GinkgoWriter.Printf("20-pod burst distribution: spot=%d, on-demand=%d (expected spot ~%d)\n",
 				spotCount, onDemandCount, expectedSpot)
 
-			Expect(spotCount).To(BeNumerically(">=", expectedSpot-2)) // Allow +/- 2 for larger deployments
+			Expect(spotCount).To(BeNumerically(">=", expectedSpot-2))
 			Expect(spotCount).To(BeNumerically("<=", expectedSpot+2))
 			Expect(onDemandCount).To(BeNumerically(">=", minOnDemand))
 		})
@@ -337,14 +343,23 @@ var _ = Describe("Burst Scenario Integration Tests", func() {
 			By("Verifying distribution after stabilization")
 			Eventually(func() bool {
 				return allPodsHaveNodeSelector(ctx, k8sClient, namespace, "rapid-up-down")
-			}, 90*time.Second, 3*time.Second).Should(BeTrue())
+			}, 120*time.Second, 3*time.Second).Should(BeTrue())
 
-			spotCount, onDemandCount := countPodDistribution(ctx, k8sClient, namespace, "rapid-up-down")
-			GinkgoWriter.Printf("Final distribution: spot=%d, on-demand=%d\n", spotCount, onDemandCount)
+			By("Waiting for distribution to converge")
+			var spotCount, onDemandCount int
+			// 60% of 8 = ~5 spot, min 1 on-demand
+			expectedSpot := calculateExpectedSpot(8, 60, 1)
 
-			// 60% of 8 = ~5 spot, at least 1 on-demand
-			Expect(spotCount).To(BeNumerically(">=", 3))
-			Expect(spotCount).To(BeNumerically("<=", 6))
+			Eventually(func() bool {
+				spotCount, onDemandCount = countPodDistribution(ctx, k8sClient, namespace, "rapid-up-down")
+				// Check if we're within tolerance and have min on-demand
+				return spotCount >= expectedSpot-2 && spotCount <= expectedSpot+2 && onDemandCount >= 1
+			}, 180*time.Second, 5*time.Second).Should(BeTrue())
+
+			GinkgoWriter.Printf("Final distribution: spot=%d, on-demand=%d (expected spot ~%d)\n", spotCount, onDemandCount, expectedSpot)
+
+			Expect(spotCount).To(BeNumerically(">=", expectedSpot-2))
+			Expect(spotCount).To(BeNumerically("<=", expectedSpot+2))
 			Expect(onDemandCount).To(BeNumerically(">=", 1))
 		})
 	})

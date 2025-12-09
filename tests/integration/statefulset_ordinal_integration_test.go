@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -16,52 +17,71 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/yachiko/spotalis/tests/integration/shared"
 )
 
+func TestStatefulSetOrdinalIntegration(t *testing.T) {
+	// Set up logger to avoid controller-runtime warning
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "StatefulSet Ordinal-Aware Deletion Integration Suite", Label("integration", "ordinal"))
+}
+
 var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() {
 	var (
-		ctx           context.Context
-		testNamespace string
-		helper        *shared.KindClusterHelper
+		ctx        context.Context
+		cancel     context.CancelFunc
+		kindHelper *shared.KindClusterHelper
+		k8sClient  client.Client
+		namespace  string
 	)
 
 	BeforeEach(func() {
-		ctx = context.Background()
+		ctx, cancel = context.WithCancel(context.Background())
 		var err error
-		helper, err = shared.NewKindClusterHelper()
+		kindHelper, err = shared.NewKindClusterHelper(ctx)
 		Expect(err).NotTo(HaveOccurred(), "Failed to create Kind cluster helper")
 
-		testNamespace = fmt.Sprintf("ordinal-test-%d", time.Now().Unix())
-		err = helper.CreateTestNamespace(ctx, testNamespace)
+		k8sClient = kindHelper.Client
+		kindHelper.WaitForSpotalisController()
+
+		namespace, err = kindHelper.CreateTestNamespace()
 		Expect(err).NotTo(HaveOccurred(), "Failed to create test namespace")
 
-		By(fmt.Sprintf("Created test namespace: %s", testNamespace))
+		By(fmt.Sprintf("Created test namespace: %s", namespace))
 	})
 
 	AfterEach(func() {
-		if testNamespace != "" {
-			By(fmt.Sprintf("Cleaning up test namespace: %s", testNamespace))
-			_ = helper.CleanupNamespace(ctx, testNamespace)
+		if namespace != "" && kindHelper != nil {
+			By(fmt.Sprintf("Cleaning up test namespace: %s", namespace))
+			err := kindHelper.CleanupNamespace(namespace)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		if cancel != nil {
+			cancel()
 		}
 	})
 
 	Context("Ordinal-Aware Deletion Validation", func() {
 		It("should create StatefulSet pods with sequential ordinals", func() {
 			By("Creating StatefulSet with 5 replicas")
-			sts := createOrdinalTestStatefulSet("ordinal-seq", 5, 60, 1, appsv1.OrderedReadyPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "ordinal-seq", 5, 60, 1, appsv1.OrderedReadyPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all pods to be created")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "ordinal-seq")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "ordinal-seq")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(5))
 
 			By("Verifying sequential ordinals 0-4")
-			pods, err := getStatefulSetPods(ctx, helper, testNamespace, "ordinal-seq")
+			pods, err := getStatefulSetPods(ctx, k8sClient, namespace, "ordinal-seq")
 			Expect(err).NotTo(HaveOccurred())
 
 			ordinals := extractOrdinals(pods)
@@ -71,24 +91,24 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 
 		It("should respect OrderedReady pod management policy during rebalancing", func() {
 			By("Creating StatefulSet with OrderedReady policy")
-			sts := createOrdinalTestStatefulSet("ordinal-ordered", 6, 50, 2, appsv1.OrderedReadyPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "ordinal-ordered", 6, 50, 2, appsv1.OrderedReadyPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all pods to be ready")
 			Eventually(func() bool {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "ordinal-ordered")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "ordinal-ordered")
 				return count == 6
 			}, 180*time.Second, 5*time.Second).Should(BeTrue())
 
 			By("Waiting for node selectors to be applied")
 			Eventually(func() bool {
-				pods, _ := getStatefulSetPods(ctx, helper, testNamespace, "ordinal-ordered")
+				pods, _ := getStatefulSetPods(ctx, k8sClient, namespace, "ordinal-ordered")
 				return allStatefulSetPodsHaveNodeSelector(pods)
 			}, 120*time.Second, 5*time.Second).Should(BeTrue())
 
 			By("Verifying ordinal integrity after rebalancing")
-			pods, err := getStatefulSetPods(ctx, helper, testNamespace, "ordinal-ordered")
+			pods, err := getStatefulSetPods(ctx, k8sClient, namespace, "ordinal-ordered")
 			Expect(err).NotTo(HaveOccurred())
 
 			ordinals := extractOrdinals(pods)
@@ -98,18 +118,18 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 
 		It("should handle Parallel pod management policy correctly", func() {
 			By("Creating StatefulSet with Parallel policy")
-			sts := createOrdinalTestStatefulSet("ordinal-parallel", 4, 75, 1, appsv1.ParallelPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "ordinal-parallel", 4, 75, 1, appsv1.ParallelPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all pods to be created (parallel)")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "ordinal-parallel")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "ordinal-parallel")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(4))
 
 			By("Verifying ordinals are correct despite parallel creation")
-			pods, err := getStatefulSetPods(ctx, helper, testNamespace, "ordinal-parallel")
+			pods, err := getStatefulSetPods(ctx, k8sClient, namespace, "ordinal-parallel")
 			Expect(err).NotTo(HaveOccurred())
 
 			ordinals := extractOrdinals(pods)
@@ -119,24 +139,24 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 
 		It("should maintain ordinal integrity during spot/on-demand rebalancing", func() {
 			By("Creating StatefulSet with 8 replicas and 75% spot")
-			sts := createOrdinalTestStatefulSet("ordinal-rebalance", 8, 75, 2, appsv1.OrderedReadyPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "ordinal-rebalance", 8, 75, 2, appsv1.OrderedReadyPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all pods to be created")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "ordinal-rebalance")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "ordinal-rebalance")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(8))
 
 			By("Waiting for node selectors to be applied")
 			Eventually(func() bool {
-				pods, _ := getStatefulSetPods(ctx, helper, testNamespace, "ordinal-rebalance")
+				pods, _ := getStatefulSetPods(ctx, k8sClient, namespace, "ordinal-rebalance")
 				return allStatefulSetPodsHaveNodeSelector(pods)
 			}, 120*time.Second, 5*time.Second).Should(BeTrue())
 
 			By("Verifying no gaps in ordinal sequence")
-			pods, err := getStatefulSetPods(ctx, helper, testNamespace, "ordinal-rebalance")
+			pods, err := getStatefulSetPods(ctx, k8sClient, namespace, "ordinal-rebalance")
 			Expect(err).NotTo(HaveOccurred())
 
 			ordinals := extractOrdinals(pods)
@@ -148,24 +168,24 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 	Context("StatefulSet Distribution Tests", func() {
 		It("should achieve 75% spot distribution on 8-replica StatefulSet", func() {
 			By("Creating StatefulSet with 8 replicas and 75% spot target")
-			sts := createOrdinalTestStatefulSet("dist-75pct", 8, 75, 1, appsv1.OrderedReadyPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "dist-75pct", 8, 75, 1, appsv1.OrderedReadyPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all pods to be created")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "dist-75pct")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "dist-75pct")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(8))
 
 			By("Waiting for distribution to stabilize")
 			Eventually(func() bool {
-				pods, _ := getStatefulSetPods(ctx, helper, testNamespace, "dist-75pct")
+				pods, _ := getStatefulSetPods(ctx, k8sClient, namespace, "dist-75pct")
 				return allStatefulSetPodsHaveNodeSelector(pods)
 			}, 120*time.Second, 5*time.Second).Should(BeTrue())
 
 			By("Verifying spot/on-demand distribution")
-			spotCount, onDemandCount := countStatefulSetDistribution(ctx, helper, testNamespace, "dist-75pct")
+			spotCount, onDemandCount := countStatefulSetDistribution(ctx, k8sClient, namespace, "dist-75pct")
 
 			// Expected: 75% of 8 = 6 spot, 2 on-demand (ceiling(8 * 0.75) = 6)
 			// Allow +/- 1 pod tolerance for rounding
@@ -176,24 +196,24 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 
 		It("should enforce min-on-demand constraint", func() {
 			By("Creating StatefulSet with min-on-demand=2")
-			sts := createOrdinalTestStatefulSet("dist-min-od", 5, 80, 2, appsv1.OrderedReadyPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "dist-min-od", 5, 80, 2, appsv1.OrderedReadyPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all pods to be created")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "dist-min-od")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "dist-min-od")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(5))
 
 			By("Waiting for distribution to stabilize")
 			Eventually(func() bool {
-				pods, _ := getStatefulSetPods(ctx, helper, testNamespace, "dist-min-od")
+				pods, _ := getStatefulSetPods(ctx, k8sClient, namespace, "dist-min-od")
 				return allStatefulSetPodsHaveNodeSelector(pods)
 			}, 120*time.Second, 5*time.Second).Should(BeTrue())
 
 			By("Verifying min-on-demand constraint is enforced")
-			spotCount, onDemandCount := countStatefulSetDistribution(ctx, helper, testNamespace, "dist-min-od")
+			spotCount, onDemandCount := countStatefulSetDistribution(ctx, k8sClient, namespace, "dist-min-od")
 
 			// With 5 replicas, 80% spot, min-on-demand=2:
 			// Target spot = ceil(5 * 0.8) = 4
@@ -208,28 +228,28 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 	Context("StatefulSet Scaling Tests", func() {
 		It("should maintain ordinal assignment when scaling up", func() {
 			By("Creating StatefulSet with 3 replicas")
-			sts := createOrdinalTestStatefulSet("scale-up", 3, 60, 1, appsv1.OrderedReadyPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "scale-up", 3, 60, 1, appsv1.OrderedReadyPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for initial 3 pods")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "scale-up")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "scale-up")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(3))
 
 			By("Scaling up to 6 replicas")
-			err = helper.ScaleStatefulSet(ctx, testNamespace, "scale-up", 6)
+			err = scaleStatefulSet(ctx, k8sClient, namespace, "scale-up", 6)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all 6 pods")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "scale-up")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "scale-up")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(6))
 
 			By("Verifying ordinals 0-5 exist")
-			pods, err := getStatefulSetPods(ctx, helper, testNamespace, "scale-up")
+			pods, err := getStatefulSetPods(ctx, k8sClient, namespace, "scale-up")
 			Expect(err).NotTo(HaveOccurred())
 
 			ordinals := extractOrdinals(pods)
@@ -239,28 +259,28 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 
 		It("should remove highest ordinals when scaling down", func() {
 			By("Creating StatefulSet with 5 replicas")
-			sts := createOrdinalTestStatefulSet("scale-down", 5, 60, 1, appsv1.OrderedReadyPodManagement)
-			err := helper.CreateStatefulSet(ctx, testNamespace, sts)
+			sts := createOrdinalTestStatefulSet(namespace, "scale-down", 5, 60, 1, appsv1.OrderedReadyPodManagement)
+			err := k8sClient.Create(ctx, sts)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for all 5 pods")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "scale-down")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "scale-down")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(5))
 
 			By("Scaling down to 3 replicas")
-			err = helper.ScaleStatefulSet(ctx, testNamespace, "scale-down", 3)
+			err = scaleStatefulSet(ctx, k8sClient, namespace, "scale-down", 3)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for scale-down to complete")
 			Eventually(func() int {
-				count, _ := countStatefulSetPods(ctx, helper, testNamespace, "scale-down")
+				count, _ := countStatefulSetPods(ctx, k8sClient, namespace, "scale-down")
 				return count
 			}, 180*time.Second, 5*time.Second).Should(Equal(3))
 
 			By("Verifying only ordinals 0-2 remain")
-			pods, err := getStatefulSetPods(ctx, helper, testNamespace, "scale-down")
+			pods, err := getStatefulSetPods(ctx, k8sClient, namespace, "scale-down")
 			Expect(err).NotTo(HaveOccurred())
 
 			ordinals := extractOrdinals(pods)
@@ -272,12 +292,15 @@ var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() 
 
 // Helper functions
 
-func createOrdinalTestStatefulSet(name string, replicas int32, spotPercentage, minOnDemand int, podManagementPolicy appsv1.PodManagementPolicyType) *appsv1.StatefulSet {
+func createOrdinalTestStatefulSet(namespace, name string, replicas int32, spotPercentage, minOnDemand int, podManagementPolicy appsv1.PodManagementPolicyType) *appsv1.StatefulSet {
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"spotalis.io/enabled": "true",
+			},
 			Annotations: map[string]string{
-				"spotalis.io/enabled":         "true",
 				"spotalis.io/spot-percentage": fmt.Sprintf("%d", spotPercentage),
 				"spotalis.io/min-on-demand":   fmt.Sprintf("%d", minOnDemand),
 			},
@@ -294,10 +317,17 @@ func createOrdinalTestStatefulSet(name string, replicas int32, spotPercentage, m
 					Labels: map[string]string{"app": name},
 				},
 				Spec: corev1.PodSpec{
+					TerminationGracePeriodSeconds: int64Ptr(0),
+					Tolerations: []corev1.Toleration{
+						{
+							Key:    "node-role.kubernetes.io/control-plane",
+							Effect: corev1.TaintEffectNoSchedule,
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx:1.25",
+							Image: "nginx:1.25-alpine",
 							Ports: []corev1.ContainerPort{
 								{ContainerPort: 80, Name: "web"},
 							},
@@ -309,20 +339,18 @@ func createOrdinalTestStatefulSet(name string, replicas int32, spotPercentage, m
 	}
 }
 
-func countStatefulSetPods(ctx context.Context, helper *shared.KindClusterHelper, namespace, stsName string) (int, error) {
-	pods, err := helper.Client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app=%s", stsName),
-	})
+func countStatefulSetPods(ctx context.Context, k8sClient client.Client, namespace, stsName string) (int, error) {
+	podList := &corev1.PodList{}
+	err := k8sClient.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{"app": stsName})
 	if err != nil {
 		return 0, err
 	}
-	return len(pods.Items), nil
+	return len(podList.Items), nil
 }
 
-func getStatefulSetPods(ctx context.Context, helper *shared.KindClusterHelper, namespace, stsName string) ([]corev1.Pod, error) {
-	podList, err := helper.Client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app=%s", stsName),
-	})
+func getStatefulSetPods(ctx context.Context, k8sClient client.Client, namespace, stsName string) ([]corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	err := k8sClient.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{"app": stsName})
 	if err != nil {
 		return nil, err
 	}
@@ -369,8 +397,8 @@ func allStatefulSetPodsHaveNodeSelector(pods []corev1.Pod) bool {
 	return true
 }
 
-func countStatefulSetDistribution(ctx context.Context, helper *shared.KindClusterHelper, namespace, stsName string) (spot, onDemand int) {
-	pods, err := getStatefulSetPods(ctx, helper, namespace, stsName)
+func countStatefulSetDistribution(ctx context.Context, k8sClient client.Client, namespace, stsName string) (spot, onDemand int) {
+	pods, err := getStatefulSetPods(ctx, k8sClient, namespace, stsName)
 	if err != nil {
 		return 0, 0
 	}
@@ -388,4 +416,18 @@ func countStatefulSetDistribution(ctx context.Context, helper *shared.KindCluste
 		}
 	}
 	return spot, onDemand
+}
+
+func scaleStatefulSet(ctx context.Context, k8sClient client.Client, namespace, name string, replicas int32) error {
+	sts := &appsv1.StatefulSet{}
+	err := k8sClient.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, sts)
+	if err != nil {
+		return fmt.Errorf("failed to get StatefulSet: %w", err)
+	}
+
+	sts.Spec.Replicas = &replicas
+	return k8sClient.Update(ctx, sts)
 }
