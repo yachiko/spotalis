@@ -103,5 +103,8 @@ tag: ## Create and push next patch version tag (vX.Y.(Z+1))
 ENVTEST = $(TOOLS_DIR)/setup-envtest
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(TOOLS_DIR)
+$(ENVTEST): | $(TOOLS_DIR)
 	GOBIN=$(TOOLS_DIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+$(TOOLS_DIR):
+	mkdir -p $(TOOLS_DIR)
