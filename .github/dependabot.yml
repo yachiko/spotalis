@@ -1,0 +1,51 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      timezone: "Europe/Warsaw"
+    labels:
+      - "dependencies"
+    reviewers:
+      - "yachiko"
+    assignees:
+      - "yachiko"
+    open-pull-requests-limit: 10
+    groups:
+      kubernetes:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+      ginkgo:
+        patterns:
+          - "github.com/onsi/ginkgo/*"
+          - "github.com/onsi/gomega"
+      golang-x:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      timezone: "Europe/Warsaw"
+    labels:
+      - "dependencies"
+      - "ci"
+    reviewers:
+      - "yachiko"
+    assignees:
+      - "yachiko"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      timezone: "Europe/Warsaw"
+    labels:
+      - "dependencies"
+    reviewers:
+      - "yachiko"
+    assignees:
+      - "yachiko"
