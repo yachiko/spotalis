@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-25
+
+Maintenance release: fix-up pass after several months of idle time. No new product features; every change is hygiene, dependency freshness, or developer docs. `Chart.yaml` and `appVersion` were already at `0.1.0`.
+
 ### Fixed
 - PR validation workflow `lint` job no longer fails on a `mmake deps` typo.
 
@@ -73,7 +77,8 @@ Initial public release.
 - Diátaxis-structured documentation (`docs/tutorials`, `docs/how-to`, `docs/reference`, `docs/explanation`).
 - Apache License 2.0.
 
-[Unreleased]: https://github.com/yachiko/spotalis/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/yachiko/spotalis/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/yachiko/spotalis/compare/v0.0.5...v0.1.0
 [0.0.5]: https://github.com/yachiko/spotalis/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/yachiko/spotalis/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/yachiko/spotalis/compare/v0.0.2...v0.0.3
