@@ -11,19 +11,15 @@ updates:
       - "yachiko"
     assignees:
       - "yachiko"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
-      kubernetes:
+      go-modules:
         patterns:
-          - "k8s.io/*"
-          - "sigs.k8s.io/*"
-      ginkgo:
-        patterns:
-          - "github.com/onsi/ginkgo/*"
-          - "github.com/onsi/gomega"
-      golang-x:
-        patterns:
-          - "golang.org/x/*"
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -37,6 +33,15 @@ updates:
       - "yachiko"
     assignees:
       - "yachiko"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -49,3 +54,12 @@ updates:
       - "yachiko"
     assignees:
       - "yachiko"
+    open-pull-requests-limit: 5
+    groups:
+      docker:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
