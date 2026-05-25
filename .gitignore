@@ -47,6 +47,9 @@ controller
 *.tmp
 *.temp
 
+# Local developer git config snapshots
+git_config
+
 # Generated certificates (contains sensitive data)
 build/k8s/secret.yaml
 output
