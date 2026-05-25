@@ -18,35 +18,31 @@ This how-to walks you through installing Spotalis in a production-like namespace
 | Permissions           | Cluster role to create namespace + RBAC resources |
 | (Optional) Prometheus | To scrape metrics & build alerts                  |
 
-## 2. Add the Helm Repository
+## 2. Get the Chart
 
-Replace the repo URL once the chart is published.
-
-```bash
-helm repo add spotalis https://example.invalid/spotalis
-helm repo update
-```
-
-List available versions:
+The chart is not yet published to a Helm repository. Install from source:
 
 ```bash
-helm search repo spotalis --versions
+git clone https://github.com/yachiko/spotalis.git
+cd spotalis
 ```
+
+Available chart versions correspond to git tags (`git tag -l`).
 
 ## 3. Install / Upgrade
 
 ```bash
-helm upgrade --install spotalis spotalis/spotalis \
+helm upgrade --install spotalis ./deploy/helm \
 	--namespace spotalis-system \
 	--create-namespace
 ```
 
-Helm will perform an install the first time and upgrades on subsequent invocations. Add `--version <semver>` to pin a specific release.
+Helm will perform an install the first time and upgrades on subsequent invocations. Check out a specific tag (`git checkout v0.1.0`) before installing to pin a release.
 
 ### Common Overrides (Inline)
 
 ```bash
-helm upgrade --install spotalis spotalis/spotalis \
+helm upgrade --install spotalis ./deploy/helm \
 	-n spotalis-system --create-namespace \
 	--set controller.logLevel=info \
 	--set controller.replicas=1 \
@@ -56,7 +52,7 @@ helm upgrade --install spotalis spotalis/spotalis \
 Or supply a `values.yaml` file:
 
 ```bash
-helm upgrade --install spotalis spotalis/spotalis -n spotalis-system -f my-values.yaml
+helm upgrade --install spotalis ./deploy/helm -n spotalis-system -f my-values.yaml
 ```
 
 > Full schema: see `../../reference/configuration.md` and the chart `values.yaml`.

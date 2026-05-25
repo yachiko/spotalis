@@ -22,11 +22,10 @@ Local success path (Kind): follow the [Kind tutorial](docs/tutorials/run-kind.md
 
 Production / cluster installation: see the [Helm install how-to](docs/how-to/install-helm.md).
 
-Helm install (placeholder repo URL until published):
+Helm install from source (no chart repo is published yet):
 ```bash
-helm repo add spotalis https://example.invalid/spotalis
-helm repo update
-helm upgrade --install spotalis spotalis/spotalis \
+git clone https://github.com/yachiko/spotalis.git
+helm upgrade --install spotalis ./spotalis/deploy/helm \
   --namespace spotalis-system --create-namespace
 ```
 
