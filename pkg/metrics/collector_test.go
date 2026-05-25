@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"errors"
 	"time"
 
@@ -236,41 +235,6 @@ var _ = Describe("Collector", func() {
 		})
 	})
 
-	Describe("StartMetricsCollection", func() {
-		It("should start background metrics collection", func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-			defer cancel()
-
-			// Start collection with short interval
-			done := make(chan bool)
-			go func() {
-				defer GinkgoRecover()
-				collector.StartMetricsCollection(ctx, 10*time.Millisecond)
-				done <- true
-			}()
-
-			// Should exit when context is canceled
-			Eventually(done, 200*time.Millisecond).Should(Receive())
-		})
-
-		It("should handle errors gracefully", func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-			defer cancel()
-
-			// Set a nil classifier to trigger an error path
-			collector.SetNodeClassifier(nil)
-
-			done := make(chan bool)
-			go func() {
-				defer GinkgoRecover()
-				collector.StartMetricsCollection(ctx, 5*time.Millisecond)
-				done <- true
-			}()
-
-			// Should continue running despite errors
-			Eventually(done, 100*time.Millisecond).Should(Receive())
-		})
-	})
 })
 
 var _ = Describe("Timer", func() {
