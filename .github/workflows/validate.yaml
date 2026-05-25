@@ -64,20 +64,19 @@ jobs:
     name: Docker Build Test
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
       - name: Build docker image
         uses: docker/bake-action@v6
-        with: 
-          set:  |
+        with:
+          set: |
             *.tags=spotalis:local
-            *.output=type=,dest=${{ runner.temp }}/spotalis.tar
+            *.platform=linux/amd64
+            *.output=type=docker,dest=${{ runner.temp }}/spotalis.tar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
