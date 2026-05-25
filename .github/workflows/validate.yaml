@@ -129,6 +129,7 @@ jobs:
       - name: Load image
         run: |
           docker load --input ${{ runner.temp }}/spotalis.tar
+          docker tag spotalis:local ghcr.io/yachiko/spotalis:latest
           docker image ls -a
 
       - name: Set up Kind
@@ -142,7 +143,11 @@ jobs:
 
       - name: Load Docker image to Kind
         run: |
-          kind load docker-image spotalis:local --name spotalis
+          kind load docker-image ghcr.io/yachiko/spotalis:latest --name spotalis
+
+      - name: Deploy Spotalis
+        run: |
+          make deploy
 
       - name: Run integration tests
         run: |
