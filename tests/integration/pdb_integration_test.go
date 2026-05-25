@@ -22,7 +22,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,13 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestPDBIntegration(t *testing.T) {
-	if err := shared.SetupTestLogger(); err != nil {
-		t.Fatalf("Failed to set up logger: %v", err)
-	}
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "PDB Integration Suite", Label("integration", "pdb"))
-}
 
 var _ = Describe("PDB Integration Tests", func() {
 	var (

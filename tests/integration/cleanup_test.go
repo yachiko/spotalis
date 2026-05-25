@@ -21,7 +21,6 @@ package integration
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,15 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestCleanupIntegration(t *testing.T) {
-	// Set up logger to avoid controller-runtime warning
-	if err := shared.SetupTestLogger(); err != nil {
-		t.Fatalf("Failed to set up logger: %v", err)
-	}
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Cleanup Integration Suite", Label("integration"))
-}
 
 var _ = Describe("Resource cleanup mechanisms", func() {
 	var (

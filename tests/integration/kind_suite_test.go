@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -39,6 +40,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crlog "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+func TestIntegration(t *testing.T) {
+	if err := shared.SetupTestLogger(); err != nil {
+		t.Fatalf("Failed to set up logger: %v", err)
+	}
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Spotalis Integration Suite", Label("integration"))
+}
 
 var (
 	k8sClient client.Client

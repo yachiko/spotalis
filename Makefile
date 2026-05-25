@@ -1,5 +1,5 @@
 # Build variables
-GO_VERSION ?= 1.24
+GO_VERSION ?= 1.26
 IMG_NAME ?= spotalis
 IMG_TAG ?= latest
 IMG ?= $(IMG_NAME):$(IMG_TAG)
@@ -14,7 +14,7 @@ DOCKER_PLATFORM ?= linux/arm64
 
 # Tools
 CONTROLLER_GEN_VERSION ?= v0.19.0
-ENVTEST_K8S_VERSION = 1.34.0
+ENVTEST_K8S_VERSION = 1.36.0
 
 # Directories
 BIN_DIR := bin

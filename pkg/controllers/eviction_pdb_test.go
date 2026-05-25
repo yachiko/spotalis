@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -244,7 +243,3 @@ var _ = Describe("CheckPDBStatus", func() {
 	})
 })
 
-func TestCheckPDBStatus(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Eviction PDB Suite")
-}

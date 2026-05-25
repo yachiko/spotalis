@@ -10,11 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - PR validation workflow `lint` job no longer fails on a `mmake deps` typo.
 
 ### Changed
-- `Makefile` Go pin aligned with `go.mod` (1.24); `ENVTEST_K8S_VERSION` bumped to 1.34.0 to match `k8s.io/api v0.34.2`.
+- Go toolchain bumped to 1.26. `Dockerfile`, `Makefile`, GitHub Actions, and `CONTRIBUTING.md` updated in lockstep.
+- Dependency refresh: `k8s.io/{api,client-go,apimachinery}` 0.34.2 → 0.36.1, `sigs.k8s.io/controller-runtime` 0.22.4 → 0.24.1, `ginkgo` 2.25 → 2.27, plus minor refreshes across the tree.
+- `ENVTEST_K8S_VERSION` bumped to 1.36.0 to match the new `k8s.io/api`.
+- Integration test entry points consolidated: a single `TestIntegration` in `tests/integration/kind_suite_test.go` replaces 13 per-file `Test*Integration` functions that called `RunSpecs` independently (now rejected by Ginkgo 2.27).
 - Helm install instructions now use a from-source flow until a chart repository is published.
 
 ### Removed
 - Dead `Collector.StartMetricsCollection` placeholder and its two unit tests.
+- Redundant `TestCheckPDBStatus` runner in `pkg/controllers/eviction_pdb_test.go` (the package already has `TestControllers`).
 - Local-developer artifacts that should not have been tracked (`git_config` is now gitignored).
 
 ### Added
