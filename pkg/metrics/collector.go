@@ -19,7 +19,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -266,22 +265,6 @@ func (c *Collector) ResetMetrics() {
 	webhookMutations.Reset()
 	controllerLastSeen.Reset()
 	leaderElectionStatus.Reset()
-}
-
-// StartMetricsCollection starts background metrics collection
-func (c *Collector) StartMetricsCollection(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			// Metrics collection logic can be added here if needed
-			// Currently a placeholder for future enhancements
-		}
-	}
 }
 
 // Timer provides timing functionality for metrics
