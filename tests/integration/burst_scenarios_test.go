@@ -22,7 +22,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,14 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestBurstScenariosIntegration(t *testing.T) {
-	// Set up logger to avoid controller-runtime warning
-	if err := shared.SetupTestLogger(); err != nil {
-		t.Fatalf("Failed to set up logger: %v", err)
-	}
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Burst Scenarios Integration Suite", Label("integration", "burst"))
-}
 
 var _ = Describe("Burst Scenario Integration Tests", func() {
 	var (

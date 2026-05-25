@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,15 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestWebhookResilience(t *testing.T) {
-	// Set up logger to avoid controller-runtime warning
-	if err := shared.SetupTestLogger(); err != nil {
-		t.Fatalf("Failed to set up logger: %v", err)
-	}
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Webhook Resilience Integration Suite", Label("integration"))
-}
 
 var _ = Describe("Webhook resilience and failure handling", func() {
 	var (

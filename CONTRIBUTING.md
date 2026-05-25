@@ -6,7 +6,7 @@ Thanks for your interest in improving Spotalis. This guide covers what you need 
 
 | Tool   | Version | Why                                          |
 | ------ | ------- | -------------------------------------------- |
-| Go     | 1.24+   | Matches `go.mod` and the Dockerfile builder. |
+| Go     | 1.26+   | Matches `go.mod` and the Dockerfile builder. |
 | Docker | recent  | Building the controller image, Kind nodes.   |
 | Kind   | recent  | Local cluster for integration tests.         |
 | Helm   | v3.x    | Installing/linting the chart in `deploy/helm`. |

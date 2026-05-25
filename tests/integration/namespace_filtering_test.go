@@ -22,7 +22,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,15 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestNamespaceFilteringIntegration(t *testing.T) {
-	// Set up logger to avoid controller-runtime warning
-	if err := shared.SetupTestLogger(); err != nil {
-		t.Fatalf("Failed to set up logger: %v", err)
-	}
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Namespace Filtering Integration Suite", Label("integration"))
-}
 
 var _ = Describe("Multi-tenant namespace filtering", func() {
 	var (

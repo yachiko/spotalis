@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -22,15 +21,6 @@ import (
 	"github.com/yachiko/spotalis/tests/integration/shared"
 )
 
-func TestStatefulSetOrdinalIntegration(t *testing.T) {
-	// Set up logger to avoid controller-runtime warning
-	if err := shared.SetupTestLogger(); err != nil {
-		t.Fatalf("Failed to set up logger: %v", err)
-	}
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "StatefulSet Ordinal-Aware Deletion Integration Suite", Label("integration", "ordinal"))
-}
 
 var _ = Describe("StatefulSet Ordinal-Aware Deletion Integration Tests", func() {
 	var (

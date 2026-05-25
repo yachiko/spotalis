@@ -22,7 +22,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,16 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-func TestBasicDeploymentIntegration(t *testing.T) {
-	// Set up logger to avoid controller-runtime warning
-	if err := shared.SetupTestLogger(); err != nil {
-		t.Fatalf("Failed to set up logger: %v", err)
-	}
-
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Basic Deployment Integration Suite", Label("integration"))
-}
 
 var _ = Describe("Basic workload deployment with annotations", func() {
 	var (
