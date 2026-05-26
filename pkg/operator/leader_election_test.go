@@ -59,9 +59,9 @@ var _ = Describe("Leader Election", func() {
 				defaults := DefaultLeaderElectionConfig()
 
 				Expect(defaults.Enabled).To(BeTrue())
-				Expect(defaults.ID).To(ContainSubstring("spotalis"))
+				Expect(defaults.ID).To(ContainSubstring(spotalisShortName))
 				Expect(defaults.Namespace).To(Equal(spotalisNamespace))
-				Expect(defaults.LeaseName).To(ContainSubstring("spotalis"))
+				Expect(defaults.LeaseName).To(ContainSubstring(spotalisShortName))
 				Expect(defaults.LeaseDuration).To(Equal(15 * time.Second))
 				Expect(defaults.RenewDeadline).To(Equal(10 * time.Second))
 				Expect(defaults.RetryPeriod).To(Equal(2 * time.Second))
@@ -154,7 +154,7 @@ var _ = Describe("Leader Election", func() {
 			It("should set proper identity", func() {
 				// Test identity configuration
 				Expect(leConfig.Identity).ToNot(BeEmpty())
-				Expect(leConfig.Identity).To(ContainSubstring("spotalis"))
+				Expect(leConfig.Identity).To(ContainSubstring(spotalisShortName))
 			})
 		})
 

@@ -75,6 +75,12 @@ const (
 
 	// Default log level
 	defaultLogLevel = "info"
+
+	// Other commonly-referenced strings
+	resourceLeases    = "leases"
+	spotalisShortName = "spotalis"
+	controllerShort   = "controller"
+	testNamespaceFix  = "test-ns"
 )
 
 // KubernetesConfig contains Kubernetes client configuration
@@ -218,9 +224,9 @@ func (k *KubernetesClientManager) ValidatePermissions(ctx context.Context) error
 		{resourceStatefulSets, verbGet, apiGroupApps},
 		{resourceStatefulSets, verbPatch, apiGroupApps},
 		{"events", verbCreate, ""},
-		{"leases", verbCreate, apiGroupCoordination},
-		{"leases", verbGet, apiGroupCoordination},
-		{"leases", verbUpdate, apiGroupCoordination},
+		{resourceLeases, verbCreate, apiGroupCoordination},
+		{resourceLeases, verbGet, apiGroupCoordination},
+		{resourceLeases, verbUpdate, apiGroupCoordination},
 	}
 
 	for _, perm := range permissions {
@@ -334,8 +340,8 @@ func (k *KubernetesClientManager) ensureNamespace(ctx context.Context) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.Namespace,
 			Labels: map[string]string{
-				labelAppName:       "spotalis",
-				labelAppComponent:  "controller",
+				labelAppName: spotalisShortName,
+				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},
 		},
@@ -360,8 +366,8 @@ func (k *KubernetesClientManager) ensureServiceAccount(ctx context.Context) erro
 			Name:      k.config.ServiceAccount,
 			Namespace: k.config.Namespace,
 			Labels: map[string]string{
-				labelAppName:       "spotalis",
-				labelAppComponent:  "controller",
+				labelAppName: spotalisShortName,
+				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},
 		},
@@ -385,8 +391,8 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.ClusterRole,
 			Labels: map[string]string{
-				labelAppName:       "spotalis",
-				labelAppComponent:  "controller",
+				labelAppName: spotalisShortName,
+				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},
 		},
@@ -424,7 +430,7 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 			// Leader election permissions
 			{
 				APIGroups: []string{apiGroupCoordination},
-				Resources: []string{"leases"},
+				Resources: []string{resourceLeases},
 				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete},
 			},
 			// Namespace permissions
@@ -454,8 +460,8 @@ func (k *KubernetesClientManager) ensureClusterRoleBinding(ctx context.Context) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.RoleBinding,
 			Labels: map[string]string{
-				labelAppName:       "spotalis",
-				labelAppComponent:  "controller",
+				labelAppName: spotalisShortName,
+				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},
 		},

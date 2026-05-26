@@ -91,7 +91,7 @@ var _ = Describe("Operator", func() {
 				Expect(defaults.ProbeAddr).To(Equal(healthAddr))
 				Expect(defaults.WebhookAddr).To(Equal(webhookAddr))
 				Expect(defaults.LeaderElection).To(BeTrue())
-				Expect(defaults.LeaderElectionID).To(ContainSubstring("spotalis"))
+				Expect(defaults.LeaderElectionID).To(ContainSubstring(spotalisShortName))
 				Expect(defaults.Namespace).To(Equal(spotalisNamespace))
 				Expect(defaults.ReconcileInterval).To(Equal(30 * time.Second))
 				Expect(defaults.MaxConcurrentReconciles).To(Equal(10))
