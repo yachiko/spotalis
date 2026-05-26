@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("Webhook resilience and failure handling", func() {
 	var (
 		ctx        context.Context

@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("Configuration change scenario", func() {
 	var (
 		testCtx    context.Context

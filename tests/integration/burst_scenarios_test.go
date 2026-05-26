@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("Burst Scenario Integration Tests", func() {
 	var (
 		ctx        context.Context

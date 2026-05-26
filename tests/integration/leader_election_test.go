@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("Leader Election Integration", func() {
 	var (
 		ctx        context.Context

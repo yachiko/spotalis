@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("Spotalis Integration on Kind", func() {
 	Context("Controller Health", func() {
 		It("should have Spotalis controller running", func() {

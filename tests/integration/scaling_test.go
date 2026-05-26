@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("Pod rebalancing scenario", func() {
 	var (
 		ctx        context.Context
