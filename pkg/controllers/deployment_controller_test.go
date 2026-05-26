@@ -383,8 +383,8 @@ var _ = Describe("DeploymentReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testNodeSpot,
 					Labels: map[string]string{
-						nodeInstanceTypeKey: "t3.medium",
-						"karpenter.sh/capacity-type":       "spot",
+						nodeInstanceTypeKey:          "t3.medium",
+						"karpenter.sh/capacity-type": string(apis.NodeTypeSpot),
 					},
 				},
 			}
@@ -392,8 +392,8 @@ var _ = Describe("DeploymentReconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testNodeOnDemand,
 					Labels: map[string]string{
-						nodeInstanceTypeKey: "t3.medium",
-						"karpenter.sh/capacity-type":       "on-demand",
+						nodeInstanceTypeKey:          "t3.medium",
+						"karpenter.sh/capacity-type": "on-demand",
 					},
 				},
 			}
@@ -657,7 +657,7 @@ var _ = Describe("DeploymentReconciler", func() {
 				Spec: appsv1.DeploymentSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							testAppLabel: testAppName,
+							testAppLabel:      testAppName,
 							testStringVersion: "v1",
 						},
 					},
@@ -668,7 +668,7 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(selector).To(Equal(client.MatchingLabels{
-				testAppLabel: testAppName,
+				testAppLabel:      testAppName,
 				testStringVersion: "v1",
 			}))
 		})
@@ -875,7 +875,7 @@ var _ = Describe("DeploymentReconciler", func() {
 			}
 			podsToDelete := reconciler.selectPodsForDeletion(spotPods, onDemandPods, state)
 			Expect(len(podsToDelete)).To(Equal(1))
-			Expect(podsToDelete[0].Name).To(ContainSubstring("spot"))
+			Expect(podsToDelete[0].Name).To(ContainSubstring(string(apis.NodeTypeSpot)))
 		})
 
 		It("should select excess on-demand pods for deletion", func() {

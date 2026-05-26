@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/yachiko/spotalis/internal/annotations"
 	"github.com/yachiko/spotalis/internal/config"
+	"github.com/yachiko/spotalis/pkg/apis"
 	"github.com/yachiko/spotalis/pkg/metrics"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -59,7 +60,7 @@ var _ = Describe("ControllerManager", func() {
 		// Initialize nodeClassifier with a mock client for each test
 		nodeClassifier = config.NewNodeClassifierService(nil, &config.NodeClassifierConfig{
 			SpotLabels: map[string]string{
-				"node.kubernetes.io/instance-type": "spot",
+				"node.kubernetes.io/instance-type": string(apis.NodeTypeSpot),
 			},
 			OnDemandLabels: map[string]string{
 				"node.kubernetes.io/instance-type": "on-demand",

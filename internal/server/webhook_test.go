@@ -103,7 +103,7 @@ var _ = Describe("WebhookServer", func() {
 					Kind: metav1.GroupVersionKind{
 						Group:   apiGroupApps,
 						Version: "v1",
-						Kind:    "Deployment",
+						Kind:    kindDeployment,
 					},
 					Resource: metav1.GroupVersionResource{
 						Group:    apiGroupApps,
@@ -212,7 +212,7 @@ var _ = Describe("WebhookServer", func() {
 					Kind: metav1.GroupVersionKind{
 						Group:   apiGroupApps,
 						Version: "v1",
-						Kind:    "Deployment",
+						Kind:    kindDeployment,
 					},
 					Operation: v1.Create,
 					Object: runtime.RawExtension{
@@ -344,7 +344,7 @@ var _ = Describe("WebhookServer", func() {
 					Kind: metav1.GroupVersionKind{
 						Group:   apiGroupApps,
 						Version: "v1",
-						Kind:    "Deployment",
+						Kind:    kindDeployment,
 					},
 					Operation: v1.Create,
 				}
@@ -381,7 +381,7 @@ var _ = Describe("WebhookServer", func() {
 					Kind: metav1.GroupVersionKind{
 						Group:   apiGroupApps,
 						Version: "v1",
-						Kind:    "Deployment",
+						Kind:    kindDeployment,
 					},
 					Operation: v1.Create,
 				}

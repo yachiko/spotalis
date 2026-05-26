@@ -48,11 +48,11 @@ var _ = Describe("NodeClassifierService", func() {
 
 		config = &NodeClassifierConfig{
 			SpotLabels: map[string]string{
-				labelCapacityType:     "spot",
+				labelCapacityType:    capacityTypeSpot,
 				cloudAWSCapacityType: capacityValueSPOT,
 			},
 			OnDemandLabels: map[string]string{
-				labelCapacityType:     capacityTypeOnDemand,
+				labelCapacityType:    capacityTypeOnDemand,
 				cloudAWSCapacityType: capacityValueOnDemand,
 			},
 			CacheRefreshInterval: 5 * time.Minute,
@@ -93,16 +93,16 @@ var _ = Describe("NodeClassifierService", func() {
 			Expect(defaultConfig).NotTo(BeNil())
 
 			// Test AWS labels
-			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelCapacityType, "spot"))
+			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelCapacityType, capacityTypeSpot))
 			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(cloudAWSCapacityType, capacityValueSPOT))
 			Expect(defaultConfig.OnDemandLabels).To(HaveKeyWithValue(labelCapacityType, capacityTypeOnDemand))
 			Expect(defaultConfig.OnDemandLabels).To(HaveKeyWithValue(cloudAWSCapacityType, capacityValueOnDemand))
 
 			// Test GCP labels
-			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelGKEPreemptible, "true"))
+			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelGKEPreemptible, stringTrue))
 
 			// Test Azure labels
-			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelAzureScalesetPrio, "spot"))
+			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelAzureScalesetPrio, capacityTypeSpot))
 			Expect(defaultConfig.OnDemandLabels).To(HaveKeyWithValue(labelAzureScalesetPrio, capacityValueRegular))
 
 			// Test defaults
@@ -118,7 +118,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "spot-node-1",
 						Labels: map[string]string{
-							labelCapacityType: "spot",
+							labelCapacityType: capacityTypeSpot,
 						},
 					},
 				}
@@ -143,13 +143,13 @@ var _ = Describe("NodeClassifierService", func() {
 
 			It("should classify as spot for GKE preemptible labels", func() {
 				// Update config to include GCP labels
-				nodeClassifier.config.SpotLabels[labelGKEPreemptible] = "true"
+				nodeClassifier.config.SpotLabels[labelGKEPreemptible] = stringTrue
 
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "spot-node-3",
 						Labels: map[string]string{
-							labelGKEPreemptible: "true",
+							labelGKEPreemptible: stringTrue,
 						},
 					},
 				}
@@ -160,13 +160,13 @@ var _ = Describe("NodeClassifierService", func() {
 
 			It("should classify as spot for Azure priority labels", func() {
 				// Update config to include Azure labels
-				nodeClassifier.config.SpotLabels[labelAzureScalesetPrio] = "spot"
+				nodeClassifier.config.SpotLabels[labelAzureScalesetPrio] = capacityTypeSpot
 
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "spot-node-4",
 						Labels: map[string]string{
-							labelAzureScalesetPrio: "spot",
+							labelAzureScalesetPrio: capacityTypeSpot,
 						},
 					},
 				}
@@ -215,7 +215,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "any-node",
 						Labels: map[string]string{
-							labelInstanceType: "m5.large",
+							labelInstanceType: instanceTypeM5L,
 						},
 					},
 				}
@@ -231,7 +231,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "unknown-node",
 						Labels: map[string]string{
-							labelInstanceType: "m5.large",
+							labelInstanceType: instanceTypeM5L,
 						},
 					},
 				}
@@ -248,7 +248,7 @@ var _ = Describe("NodeClassifierService", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "batch-spot-node",
 					Labels: map[string]string{
-						labelCapacityType: "spot",
+						labelCapacityType: capacityTypeSpot,
 					},
 				},
 			}
@@ -283,8 +283,8 @@ var _ = Describe("NodeClassifierService", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							labelInstanceType: "m5.large",
-							cloudAWSCapacityType:   capacityValueSPOT,
+							labelInstanceType:    instanceTypeM5L,
+							cloudAWSCapacityType: capacityValueSPOT,
 						},
 					},
 				}
@@ -297,8 +297,8 @@ var _ = Describe("NodeClassifierService", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							labelInstanceType: "m5.large",
-							cloudAWSCapacityType:   capacityValueOnDemand,
+							labelInstanceType:    instanceTypeM5L,
+							cloudAWSCapacityType: capacityValueOnDemand,
 						},
 					},
 				}
@@ -311,8 +311,8 @@ var _ = Describe("NodeClassifierService", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							labelInstanceType: "m5.large",
-							labelCapacityType:       "spot",
+							labelInstanceType: instanceTypeM5L,
+							labelCapacityType: capacityTypeSpot,
 						},
 					},
 				}
@@ -340,7 +340,7 @@ var _ = Describe("NodeClassifierService", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							labelGKEPreemptible: "true",
+							labelGKEPreemptible: stringTrue,
 						},
 					},
 				}
@@ -355,7 +355,7 @@ var _ = Describe("NodeClassifierService", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							labelAzureScalesetPrio: "spot",
+							labelAzureScalesetPrio: capacityTypeSpot,
 						},
 					},
 				}
@@ -386,7 +386,7 @@ var _ = Describe("NodeClassifierService", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "spot-node",
 					Labels: map[string]string{
-						labelCapacityType: "spot",
+						labelCapacityType: capacityTypeSpot,
 					},
 				},
 				Status: corev1.NodeStatus{
@@ -442,7 +442,7 @@ var _ = Describe("NodeClassifierService", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "spot-node",
 					Labels: map[string]string{
-						labelCapacityType: "spot",
+						labelCapacityType: capacityTypeSpot,
 					},
 				},
 			}
@@ -518,7 +518,7 @@ var _ = Describe("NodeClassifierService", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ready-spot-node",
 					Labels: map[string]string{
-						labelCapacityType: "spot",
+						labelCapacityType: capacityTypeSpot,
 					},
 				},
 				Status: corev1.NodeStatus{
@@ -532,7 +532,7 @@ var _ = Describe("NodeClassifierService", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "notready-spot-node",
 					Labels: map[string]string{
-						labelCapacityType: "spot",
+						labelCapacityType: capacityTypeSpot,
 					},
 				},
 				Status: corev1.NodeStatus{
@@ -579,7 +579,7 @@ var _ = Describe("NodeClassifierService", func() {
 		It("should update configuration and reset cache", func() {
 			newConfig := &NodeClassifierConfig{
 				SpotLabels: map[string]string{
-					"custom-label": "spot",
+					"custom-label": capacityTypeSpot,
 				},
 				CacheRefreshInterval: 10 * time.Minute,
 				CloudProvider:        cloudProviderGCP,
@@ -588,7 +588,7 @@ var _ = Describe("NodeClassifierService", func() {
 			nodeClassifier.UpdateConfig(newConfig)
 
 			currentConfig := nodeClassifier.GetConfig()
-			Expect(currentConfig.SpotLabels).To(HaveKeyWithValue("custom-label", "spot"))
+			Expect(currentConfig.SpotLabels).To(HaveKeyWithValue("custom-label", capacityTypeSpot))
 			Expect(currentConfig.CacheRefreshInterval).To(Equal(10 * time.Minute))
 			Expect(currentConfig.CloudProvider).To(Equal(cloudProviderGCP))
 
@@ -620,7 +620,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "aws-karpenter-node",
 						Labels: map[string]string{
-							labelCapacityType: "spot",
+							labelCapacityType: capacityTypeSpot,
 						},
 					},
 				}
@@ -654,7 +654,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "gcp-gke-node",
 						Labels: map[string]string{
-							labelGKEPreemptible: "true",
+							labelGKEPreemptible: stringTrue,
 						},
 					},
 				}
@@ -688,7 +688,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "azure-aks-node",
 						Labels: map[string]string{
-							labelAzureScalesetPrio: "spot",
+							labelAzureScalesetPrio: capacityTypeSpot,
 						},
 					},
 				}

@@ -40,7 +40,7 @@ var _ = Describe("AnnotationParser", func() {
 					},
 					annotations: map[string]string{
 						SpotPercentageAnnotation: testPctSeventy,
-						MinOnDemandAnnotation:   "2",
+						MinOnDemandAnnotation:    "2",
 					},
 				}
 
@@ -75,7 +75,7 @@ var _ = Describe("AnnotationParser", func() {
 					},
 					annotations: map[string]string{
 						SpotPercentageAnnotation: "0%",
-						MinOnDemandAnnotation:   "0",
+						MinOnDemandAnnotation:    "0",
 					},
 				}
 
@@ -187,8 +187,8 @@ var _ = Describe("AnnotationParser", func() {
 		It("should return false when no spotalis annotations exist", func() {
 			obj := &MockObject{
 				annotations: map[string]string{
-					testAppLabelKey: "myapp",
-					"version": "1.0",
+					testAppLabelKey: testAppName,
+					"version":       "1.0",
 				},
 			}
 
@@ -203,10 +203,10 @@ var _ = Describe("AnnotationParser", func() {
 		It("should return true when multiple spotalis annotations exist", func() {
 			obj := &MockObject{
 				annotations: map[string]string{
-					EnabledLabel:         BooleanTrue,
+					EnabledLabel:             BooleanTrue,
 					SpotPercentageAnnotation: testPctSeventy,
-					MinOnDemandAnnotation:   "2",
-					testAppLabelKey: "myapp",
+					MinOnDemandAnnotation:    "2",
+					testAppLabelKey:          testAppName,
 				},
 			}
 
@@ -351,9 +351,9 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for boundary values", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						SpotPercentageAnnotation: "0",
-						MinOnDemandAnnotation:   "0",
-						"spotalis.io/max-replicas":    "100",
+						SpotPercentageAnnotation:   "0",
+						MinOnDemandAnnotation:      "0",
+						"spotalis.io/max-replicas": "100",
 					},
 				}
 
@@ -441,7 +441,7 @@ var _ = Describe("AnnotationParser", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
 						SpotPercentageAnnotation: "150",
-						MinOnDemandAnnotation:   "-1",
+						MinOnDemandAnnotation:    "-1",
 					},
 				}
 
@@ -471,8 +471,8 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						testAppLabelKey: "myapp",
-						"version": "1.0",
+						testAppLabelKey: testAppName,
+						"version":       "1.0",
 					},
 				}
 

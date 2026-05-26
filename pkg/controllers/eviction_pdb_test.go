@@ -32,7 +32,7 @@ var _ = Describe("CheckPDBStatus", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: namespaceDefault,
-					Labels: map[string]string{testAppLabel: testAppName},
+					Labels:    map[string]string{testAppLabel: testAppName},
 				},
 			}
 
@@ -52,7 +52,7 @@ var _ = Describe("CheckPDBStatus", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: namespaceDefault,
-					Labels: map[string]string{testAppLabel: testAppName},
+					Labels:    map[string]string{testAppLabel: testAppName},
 				},
 			}
 
@@ -98,7 +98,7 @@ var _ = Describe("CheckPDBStatus", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: namespaceDefault,
-					Labels: map[string]string{testAppLabel: testAppName},
+					Labels:    map[string]string{testAppLabel: testAppName},
 				},
 			}
 
@@ -144,7 +144,7 @@ var _ = Describe("CheckPDBStatus", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: namespaceDefault,
-					Labels: map[string]string{testAppLabel: testAppName},
+					Labels:    map[string]string{testAppLabel: testAppName},
 				},
 			}
 

@@ -28,6 +28,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+// Prometheus metric label names shared across several VecOpts declarations.
+const (
+	labelNamespace    = "namespace"
+	labelWorkload     = "workload"
+	labelWorkloadType = "workload_type"
+)
+
 var (
 	// Workload metrics
 	workloadReplicas = prometheus.NewGaugeVec(
@@ -35,7 +42,7 @@ var (
 			Name: "spotalis_workload_replicas",
 			Help: "Number of replicas for managed workloads",
 		},
-		[]string{"namespace", "workload", "workload_type", "replica_type"},
+		[]string{labelNamespace, labelWorkload, labelWorkloadType, "replica_type"},
 	)
 
 	reconciliationTotal = prometheus.NewCounterVec(
@@ -43,7 +50,7 @@ var (
 			Name: "spotalis_reconciliations_total",
 			Help: "Total number of reconciliations performed",
 		},
-		[]string{"namespace", "workload", "workload_type", "action", "result"},
+		[]string{labelNamespace, labelWorkload, labelWorkloadType, "action", "result"},
 	)
 
 	reconciliationErrors = prometheus.NewCounterVec(
@@ -51,7 +58,7 @@ var (
 			Name: "spotalis_reconciliation_errors_total",
 			Help: "Total number of reconciliation errors",
 		},
-		[]string{"namespace", "workload", "workload_type", "error_type"},
+		[]string{labelNamespace, labelWorkload, labelWorkloadType, "error_type"},
 	)
 
 	// PDB blocking metrics
@@ -60,7 +67,7 @@ var (
 			Name: "spotalis_rebalancing_blocked_by_pdb_total",
 			Help: "Total number of rebalancing operations blocked by PodDisruptionBudget",
 		},
-		[]string{"namespace", "workload", "workload_type", "pdb_name"},
+		[]string{labelNamespace, labelWorkload, labelWorkloadType, "pdb_name"},
 	)
 
 	// Webhook metrics
@@ -121,10 +128,10 @@ func NewCollector() *Collector {
 // This ensures they appear in the Prometheus metrics output even if not yet used
 func initializeMetrics() {
 	// Initialize counters to 0 (they will appear in output)
-	// reconciliationTotal: []string{"namespace", "workload", "workload_type", "action", "result"}
+	// reconciliationTotal: []string{labelNamespace, labelWorkload, labelWorkloadType, "action", "result"}
 	reconciliationTotal.WithLabelValues("", "", "", "", "success").Add(0)
 
-	// reconciliationErrors: []string{"namespace", "workload", "workload_type", "error_type"}
+	// reconciliationErrors: []string{labelNamespace, labelWorkload, labelWorkloadType, "error_type"}
 	reconciliationErrors.WithLabelValues("", "", "", "").Add(0)
 
 	// webhookRequests: []string{"operation", "resource_kind", "result"}
@@ -134,7 +141,7 @@ func initializeMetrics() {
 	webhookMutations.WithLabelValues("", "").Add(0)
 
 	// Initialize gauges to 0
-	// workloadReplicas: []string{"namespace", "workload", "workload_type", "replica_type"}
+	// workloadReplicas: []string{labelNamespace, labelWorkload, labelWorkloadType, "replica_type"}
 	workloadReplicas.WithLabelValues("", "", "", "spot").Set(0)
 	workloadReplicas.WithLabelValues("", "", "", "on-demand").Set(0)
 

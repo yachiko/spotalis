@@ -120,8 +120,8 @@ func TestLoader_LoadFromEnv(t *testing.T) {
 	// Set environment variables
 	envVars := map[string]string{
 		"SPOTALIS_OPERATOR_NAMESPACE":                                   "env-namespace",
-		"SPOTALIS_OPERATOR_READ_ONLY_MODE":                              "true",
-		"SPOTALIS_LEADER_ELECTION_ENABLED":                              "false",
+		"SPOTALIS_OPERATOR_READ_ONLY_MODE":                              boolTrueStr,
+		"SPOTALIS_LEADER_ELECTION_ENABLED":                              boolFalseStr,
 		"SPOTALIS_LEADER_ELECTION_ID":                                   "env-leader",
 		"SPOTALIS_LEADER_ELECTION_LEASE_DURATION":                       "45s",
 		"SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES":                "10",
@@ -129,14 +129,14 @@ func TestLoader_LoadFromEnv(t *testing.T) {
 		"SPOTALIS_CONTROLLERS_WORKLOAD_COOLDOWN_PERIOD":                 "7s",
 		"SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_RETRY_INTERVAL":       "35s",
 		"SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_WINDOW_POLL_INTERVAL": "5m",
-		"SPOTALIS_WEBHOOK_ENABLED":                                      "false",
+		"SPOTALIS_WEBHOOK_ENABLED":                                      boolFalseStr,
 		"SPOTALIS_WEBHOOK_PORT":                                         "7443",
 		"SPOTALIS_WEBHOOK_CERT_DIR":                                     "/env/certs",
-		"SPOTALIS_METRICS_ENABLED":                                      "false",
+		"SPOTALIS_METRICS_ENABLED":                                      boolFalseStr,
 		"SPOTALIS_METRICS_BIND_ADDRESS":                                 ":7070",
 		"SPOTALIS_LOGGING_LEVEL":                                        "warn",
 		"SPOTALIS_LOGGING_FORMAT":                                       "console",
-		"SPOTALIS_HEALTH_ENABLED":                                       "false",
+		"SPOTALIS_HEALTH_ENABLED":                                       boolFalseStr,
 		"SPOTALIS_HEALTH_BIND_ADDRESS":                                  ":7071",
 	}
 
@@ -226,7 +226,7 @@ operator:
 
 	// Set environment variables that should override file
 	t.Setenv("SPOTALIS_OPERATOR_NAMESPACE", "env-namespace")
-	t.Setenv("SPOTALIS_OPERATOR_READ_ONLY_MODE", "true")
+	t.Setenv("SPOTALIS_OPERATOR_READ_ONLY_MODE", boolTrueStr)
 
 	// Load config
 	config, err := NewLoader().WithConfigFile(configFile).Load()
@@ -285,7 +285,7 @@ func TestLoader_parseBool(t *testing.T) {
 	loader := NewLoader()
 
 	// Test true values
-	assert.True(t, loader.parseBool("true", false))
+	assert.True(t, loader.parseBool(boolTrueStr, false))
 	assert.True(t, loader.parseBool("TRUE", false))
 	assert.True(t, loader.parseBool("1", false))
 	assert.True(t, loader.parseBool("yes", false))
@@ -294,7 +294,7 @@ func TestLoader_parseBool(t *testing.T) {
 	assert.True(t, loader.parseBool("ON", false))
 
 	// Test false values
-	assert.False(t, loader.parseBool("false", true))
+	assert.False(t, loader.parseBool(boolFalseStr, true))
 	assert.False(t, loader.parseBool("FALSE", true))
 	assert.False(t, loader.parseBool("0", true))
 	assert.False(t, loader.parseBool("no", true))

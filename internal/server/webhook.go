@@ -130,9 +130,9 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 			fmt.Printf("[WEBHOOK] Failed to deserialize admission request: %v\n", err)
 		}
 		c.JSON(http.StatusBadRequest, gin.H{
-			jsonFieldError:   "failed to deserialize admission request",
-			jsonFieldCode:    "INVALID_ADMISSION_REQUEST",
-			"details": err.Error(),
+			jsonFieldError: "failed to deserialize admission request",
+			jsonFieldCode:  "INVALID_ADMISSION_REQUEST",
+			"details":      err.Error(),
 		})
 		return
 	}
@@ -181,9 +181,9 @@ func (w *WebhookServer) ValidateHandler(c *gin.Context) {
 	var admissionReview v1.AdmissionReview
 	if err := w.deserializeAdmissionRequest(body, &admissionReview); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			jsonFieldError:   "failed to deserialize admission request",
-			jsonFieldCode:    "INVALID_ADMISSION_REQUEST",
-			"details": err.Error(),
+			jsonFieldError: "failed to deserialize admission request",
+			jsonFieldCode:  "INVALID_ADMISSION_REQUEST",
+			"details":      err.Error(),
 		})
 		return
 	}

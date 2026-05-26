@@ -113,7 +113,7 @@ var _ = Describe("DisruptionWindow", func() {
 			BeforeEach(func() {
 				annots := map[string]string{
 					DisruptionScheduleAnnotation: testCronDaily2AM, // Daily at 2 AM UTC
-					DisruptionDurationAnnotation: "4h",        // 4-hour window (2 AM - 6 AM)
+					DisruptionDurationAnnotation: "4h",             // 4-hour window (2 AM - 6 AM)
 				}
 				var err error
 				window, err = ParseDisruptionWindow(annots)

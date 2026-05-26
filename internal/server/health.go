@@ -47,6 +47,8 @@ const (
 	admissionReviewKind = "AdmissionReview"
 
 	statusUnhealthy = "unhealthy"
+
+	kindDeployment = "Deployment"
 )
 
 // HealthChecker provides health checking functionality for the Spotalis controller
@@ -87,7 +89,7 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	if unhealthyReason != "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			jsonFieldStatus: statusUnhealthy,
-			"reason": unhealthyReason,
+			"reason":        unhealthyReason,
 			jsonFieldUptime: time.Since(h.startTime).String(),
 		})
 		return
@@ -97,9 +99,9 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	if kubernetesDown {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			jsonFieldStatus: statusUnhealthy,
-			"component": componentKubernetesAPI,
-			jsonFieldError:     "kubernetes API marked as unavailable",
-			jsonFieldUptime:    time.Since(h.startTime).String(),
+			"component":     componentKubernetesAPI,
+			jsonFieldError:  "kubernetes API marked as unavailable",
+			jsonFieldUptime: time.Since(h.startTime).String(),
 		})
 		return
 	}
@@ -112,9 +114,9 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 		if err := h.checkKubernetesAPI(ctx); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				jsonFieldStatus: statusUnhealthy,
-				"component": componentKubernetesAPI,
-				jsonFieldError:     err.Error(),
-				jsonFieldUptime:    uptime.String(),
+				"component":     componentKubernetesAPI,
+				jsonFieldError:  err.Error(),
+				jsonFieldUptime: uptime.String(),
 			})
 			return
 		}
@@ -125,7 +127,7 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 		jsonFieldUptime: uptime.String(),
 		"checks": gin.H{
 			componentKubernetesAPI: "ok",
-			"controller":     "running",
+			"controller":           "running",
 		},
 	})
 }
@@ -204,7 +206,7 @@ func (h *HealthChecker) ReadyzHandler(c *gin.Context) {
 
 	c.JSON(statusCode, gin.H{
 		jsonFieldStatus: status,
-		"checks": checks,
+		"checks":        checks,
 		jsonFieldUptime: time.Since(h.startTime).String(),
 	})
 }

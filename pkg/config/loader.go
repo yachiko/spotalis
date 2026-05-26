@@ -10,6 +10,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	boolTrueStr  = "true"
+	boolFalseStr = "false"
+)
+
 // Loader handles loading configuration from various sources
 type Loader struct {
 	// ConfigFile is the path to the YAML configuration file
@@ -168,9 +173,9 @@ func (l *Loader) getEnv(key string) string {
 // parseBool parses a boolean string, returning fallback on error
 func (l *Loader) parseBool(val string, fallback bool) bool {
 	switch strings.ToLower(val) {
-	case "true", "1", "yes", "on":
+	case boolTrueStr, "1", "yes", "on":
 		return true
-	case "false", "0", "no", "off":
+	case boolFalseStr, "0", "no", "off":
 		return false
 	default:
 		return fallback

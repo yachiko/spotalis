@@ -199,11 +199,11 @@ var _ = Describe("Graceful Shutdown", func() {
 
 			It("should manage shutdown phases", func() {
 				phases := []string{
-					"pre-shutdown-delay",
+					hookPreShutdown,
 					"stop-accepting-requests",
 					"drain-connections",
 					"stop-controllers",
-					"cleanup-resources",
+					hookCleanup,
 					"final-cleanup",
 				}
 
@@ -327,10 +327,10 @@ var _ = Describe("Graceful Shutdown", func() {
 
 		It("should coordinate multiple shutdown phases", func() {
 			phases := []string{
-				"pre-shutdown-delay",
+				hookPreShutdown,
 				"stop-accepting-work",
 				"complete-in-flight",
-				"cleanup-resources",
+				hookCleanup,
 			}
 
 			// Test that phases can be coordinated
@@ -501,11 +501,11 @@ func isSupportedSignal(signal os.Signal) bool {
 
 func isValidShutdownPhase(phase string) bool {
 	validPhases := []string{
-		"pre-shutdown-delay",
+		hookPreShutdown,
 		"stop-accepting-requests",
 		"drain-connections",
 		"stop-controllers",
-		"cleanup-resources",
+		hookCleanup,
 		"final-cleanup",
 		"stop-accepting-work",
 		"complete-in-flight",

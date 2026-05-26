@@ -102,7 +102,7 @@ func (m *MetricsServer) HealthMetricsHandler(c *gin.Context) {
 		"metrics_collector": gin.H{
 			"last_collection": lastCollection.Format(time.RFC3339),
 			"latency_ms":      latency.Milliseconds(),
-			jsonFieldError:           collectionError,
+			jsonFieldError:    collectionError,
 		},
 	}
 

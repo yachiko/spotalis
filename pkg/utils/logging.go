@@ -242,10 +242,10 @@ func (l *Logger) WithFields(fields map[string]interface{}) *Logger {
 // LogReconciliation logs reconciliation events with structured data
 func (l *Logger) LogReconciliation(ctx context.Context, resource, namespace, name string, duration time.Duration, err error) {
 	fields := map[string]interface{}{
-		"resource":    resource,
-		"namespace":   namespace,
-		"name":        name,
-		logFieldDuration:    duration.String(),
+		"resource":         resource,
+		"namespace":        namespace,
+		"name":             name,
+		logFieldDuration:   duration.String(),
 		logFieldDurationMs: duration.Milliseconds(),
 	}
 
@@ -261,12 +261,12 @@ func (l *Logger) LogReconciliation(ctx context.Context, resource, namespace, nam
 // LogWebhookRequest logs webhook admission requests
 func (l *Logger) LogWebhookRequest(ctx context.Context, operation, resource, namespace, name string, allowed bool, duration time.Duration, err error) {
 	fields := map[string]interface{}{
-		"operation":   operation,
-		"resource":    resource,
-		"namespace":   namespace,
-		"name":        name,
-		"allowed":     allowed,
-		logFieldDuration:    duration.String(),
+		"operation":        operation,
+		"resource":         resource,
+		"namespace":        namespace,
+		"name":             name,
+		"allowed":          allowed,
+		logFieldDuration:   duration.String(),
 		logFieldDurationMs: duration.Milliseconds(),
 	}
 
@@ -286,8 +286,8 @@ func (l *Logger) LogNodeClassification(ctx context.Context, nodeName, nodeType s
 		"node_type":          nodeType,
 		"spot_instances":     spotInstances,
 		"ondemand_instances": onDemandInstances,
-		logFieldDuration:           duration.String(),
-		logFieldDurationMs:        duration.Milliseconds(),
+		logFieldDuration:     duration.String(),
+		logFieldDurationMs:   duration.Milliseconds(),
 	}
 
 	logger := l.WithContext(ctx).WithFields(fields)
@@ -297,9 +297,9 @@ func (l *Logger) LogNodeClassification(ctx context.Context, nodeName, nodeType s
 // LogMetricsCollection logs metrics collection events
 func (l *Logger) LogMetricsCollection(ctx context.Context, metricsCount int, duration time.Duration, err error) {
 	fields := map[string]interface{}{
-		"metrics_count": metricsCount,
-		logFieldDuration:      duration.String(),
-		logFieldDurationMs:   duration.Milliseconds(),
+		"metrics_count":    metricsCount,
+		logFieldDuration:   duration.String(),
+		logFieldDurationMs: duration.Milliseconds(),
 	}
 
 	logger := l.WithContext(ctx).WithFields(fields)

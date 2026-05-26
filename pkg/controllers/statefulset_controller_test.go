@@ -233,13 +233,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test-sts",
+							testAppLabel: testStsName,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test-sts",
+								testAppLabel: testStsName,
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -289,7 +289,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 						Replicas: int32Ptr(3),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"app": "test-sts",
+								testAppLabel: testStsName,
 							},
 						},
 						ServiceName: testServiceName,
@@ -370,7 +370,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test-sts",
+							testAppLabel: testStsName,
 						},
 					},
 					ServiceName: testServiceName,
@@ -411,7 +411,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 						Name:      fmt.Sprintf("test-statefulset-%d", i),
 						Namespace: namespaceDefault,
 						Labels: map[string]string{
-							"app": "test-sts",
+							testAppLabel: testStsName,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -426,7 +426,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Name:      "test-statefulset-2",
 					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"app": "test-sts",
+						testAppLabel: testStsName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -527,13 +527,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test-sts",
+							testAppLabel: testStsName,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test-sts",
+								testAppLabel: testStsName,
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -588,7 +588,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 						Name:      fmt.Sprintf("test-statefulset-%d", i),
 						Namespace: namespaceDefault,
 						Labels: map[string]string{
-							"app": "test-sts",
+							testAppLabel: testStsName,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -610,7 +610,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Name:      "test-statefulset-4",
 					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"app": "test-sts",
+						testAppLabel: testStsName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -669,7 +669,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				Spec: appsv1.StatefulSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app":     "test-sts",
+							testAppLabel:      testStsName,
 							testStringVersion: "v1",
 						},
 					},
@@ -680,7 +680,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(selector).To(Equal(client.MatchingLabels{
-				"app":     "test-sts",
+				testAppLabel:      testStsName,
 				testStringVersion: "v1",
 			}))
 		})
@@ -718,13 +718,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 						Replicas: int32Ptr(3),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"app": "ordered-test",
+								testAppLabel: "ordered-test",
 							},
 						},
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"app": "ordered-test",
+									testAppLabel: "ordered-test",
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -760,7 +760,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 			It("should handle StatefulSets with volume claim templates", func() {
 				statefulSet := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pvc-test",
+						Name:      testPVCName,
 						Namespace: namespaceDefault,
 						Labels: map[string]string{
 							annotations.EnabledLabel: enabledLabelTrue,
@@ -773,13 +773,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 						Replicas: int32Ptr(2),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"app": "pvc-test",
+								"app": testPVCName,
 							},
 						},
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"app": "pvc-test",
+									"app": testPVCName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -822,7 +822,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      "pvc-test",
+						Name:      testPVCName,
 						Namespace: namespaceDefault,
 					},
 				}
@@ -852,7 +852,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Replicas: nil, // Nil replicas
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test-sts",
+							testAppLabel: testStsName,
 						},
 					},
 					ServiceName: testServiceName,
@@ -893,7 +893,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test-sts",
+							testAppLabel: testStsName,
 						},
 					},
 					ServiceName: testServiceName,
@@ -1067,7 +1067,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 			}
 
 			// This would be called during reconciliation
-			reconciler.MetricsCollector.RecordWorkloadMetrics("default", "test-sts", "StatefulSet", state)
+			reconciler.MetricsCollector.RecordWorkloadMetrics("default", testStsName, "StatefulSet", state)
 
 			Expect(mockMetrics.RecordedMetrics).To(HaveLen(1))
 			Expect(mockMetrics.RecordedMetrics[0].Namespace).To(Equal("default"))
@@ -1096,7 +1096,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"app": "test-sts"},
+						MatchLabels: map[string]string{testAppLabel: testStsName},
 					},
 					ServiceName: testServiceName,
 				},

@@ -114,8 +114,8 @@ var _ = Describe("NodeClassification", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testNodeName,
 					Labels: map[string]string{
-						labelKubernetesOS:                 stringLinux,
-						labelNodeLifecycle:     stringSpot,
+						labelKubernetesOS:                  stringLinux,
+						labelNodeLifecycle:                 stringSpot,
 						"topology.kubernetes.io/region":    "us-west-2",
 						"topology.kubernetes.io/zone":      "us-west-2a",
 						"node.kubernetes.io/instance-type": "m5.large",

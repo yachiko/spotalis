@@ -27,6 +27,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const resourcePods = "pods"
+
 var _ = Describe("Rate Limiter", func() {
 	var (
 		config      *RateLimiterConfig
@@ -89,8 +91,8 @@ var _ = Describe("Rate Limiter", func() {
 				config.BaseDelay = 2 * time.Second
 				config.MaxDelay = 120 * time.Second
 				config.BackoffMultiplier = 1.5
-				config.PerResourceQPS = map[string]float64{"pods": 5.0}
-				config.PerResourceBurst = map[string]int{"pods": 10}
+				config.PerResourceQPS = map[string]float64{resourcePods: 5.0}
+				config.PerResourceBurst = map[string]int{resourcePods: 10}
 				config.FailureThreshold = 7
 				config.RecoveryTimeout = 45 * time.Second
 				config.HalfOpenRequests = 5
@@ -255,22 +257,22 @@ var _ = Describe("Rate Limiter", func() {
 		Describe("Per-Resource Rate Limiting", func() {
 			BeforeEach(func() {
 				// Configure per-resource limits
-				config.PerResourceQPS["pods"] = 5.0
-				config.PerResourceBurst["pods"] = 10
+				config.PerResourceQPS[resourcePods] = 5.0
+				config.PerResourceBurst[resourcePods] = 10
 				rateLimiter = NewRateLimiter(config)
 			})
 
 			It("should apply per-resource limits", func() {
-				err := rateLimiter.WaitForResource(ctx, "pods")
+				err := rateLimiter.WaitForResource(ctx, resourcePods)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("should create resource-specific limiters", func() {
-				err := rateLimiter.WaitForResource(ctx, "pods")
+				err := rateLimiter.WaitForResource(ctx, resourcePods)
 				Expect(err).NotTo(HaveOccurred())
 
 				rateLimiter.limiterMutex.RLock()
-				limiter, exists := rateLimiter.resourceLimiters["pods"]
+				limiter, exists := rateLimiter.resourceLimiters[resourcePods]
 				rateLimiter.limiterMutex.RUnlock()
 
 				Expect(exists).To(BeTrue())
@@ -394,7 +396,7 @@ var _ = Describe("Rate Limiter", func() {
 					defer wg.Done()
 					err := rateLimiter.WaitForResource(ctx, resource)
 					errors <- err
-				}("pods")
+				}(resourcePods)
 			}
 
 			wg.Wait()
@@ -408,7 +410,7 @@ var _ = Describe("Rate Limiter", func() {
 
 		It("should safely create resource limiters concurrently", func() {
 			var wg sync.WaitGroup
-			resources := []string{"pods", "services", "deployments", "configmaps", "secrets"}
+			resources := []string{resourcePods, "services", "deployments", "configmaps", "secrets"}
 
 			for _, resource := range resources {
 				wg.Add(1)

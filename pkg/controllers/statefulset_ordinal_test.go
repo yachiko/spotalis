@@ -35,15 +35,15 @@ func TestExtractPodOrdinal(t *testing.T) {
 	}{
 		{
 			name:            "ordinal 0",
-			podName:         "web-0",
-			statefulSetName: "web",
+			podName:         stsWebPod0,
+			statefulSetName: stsWeb,
 			expectedOrdinal: 0,
 			expectError:     false,
 		},
 		{
 			name:            "ordinal 5",
 			podName:         "web-5",
-			statefulSetName: "web",
+			statefulSetName: stsWeb,
 			expectedOrdinal: 5,
 			expectError:     false,
 		},
@@ -57,35 +57,35 @@ func TestExtractPodOrdinal(t *testing.T) {
 		{
 			name:            "very large ordinal",
 			podName:         "web-99999",
-			statefulSetName: "web",
+			statefulSetName: stsWeb,
 			expectedOrdinal: 99999,
 			expectError:     false,
 		},
 		{
 			name:            "mismatched prefix",
 			podName:         "other-pod-0",
-			statefulSetName: "web",
+			statefulSetName: stsWeb,
 			expectedOrdinal: -1,
 			expectError:     true,
 		},
 		{
 			name:            "invalid ordinal",
 			podName:         "web-notanumber",
-			statefulSetName: "web",
+			statefulSetName: stsWeb,
 			expectedOrdinal: -1,
 			expectError:     true,
 		},
 		{
 			name:            "no ordinal",
-			podName:         "web",
-			statefulSetName: "web",
+			podName:         stsWeb,
+			statefulSetName: stsWeb,
 			expectedOrdinal: -1,
 			expectError:     true,
 		},
 		{
 			name:            "empty pod name",
 			podName:         "",
-			statefulSetName: "web",
+			statefulSetName: stsWeb,
 			expectedOrdinal: -1,
 			expectError:     true,
 		},
@@ -113,15 +113,15 @@ func TestExtractPodOrdinal(t *testing.T) {
 
 func TestSortPodsByOrdinal_Descending(t *testing.T) {
 	pods := []corev1.Pod{
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod1}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "web-4"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-0"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-2"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod0}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod2}},
 	}
 
-	sorted := sortPodsByOrdinal(pods, "web", true)
+	sorted := sortPodsByOrdinal(pods, stsWeb, true)
 
-	expectedOrder := []string{"web-4", "web-2", "web-1", "web-0"}
+	expectedOrder := []string{"web-4", stsWebPod2, stsWebPod1, stsWebPod0}
 	assert.Equal(t, len(expectedOrder), len(sorted), "sorted list length mismatch")
 	for i, pod := range sorted {
 		assert.Equal(t, expectedOrder[i], pod.Name, "pod order mismatch at index %d", i)
@@ -131,13 +131,13 @@ func TestSortPodsByOrdinal_Descending(t *testing.T) {
 func TestSortPodsByOrdinal_Ascending(t *testing.T) {
 	pods := []corev1.Pod{
 		{ObjectMeta: metav1.ObjectMeta{Name: "web-3"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-1"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-0"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod1}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod0}},
 	}
 
-	sorted := sortPodsByOrdinal(pods, "web", false)
+	sorted := sortPodsByOrdinal(pods, stsWeb, false)
 
-	expectedOrder := []string{"web-0", "web-1", "web-3"}
+	expectedOrder := []string{stsWebPod0, stsWebPod1, "web-3"}
 	assert.Equal(t, len(expectedOrder), len(sorted), "sorted list length mismatch")
 	for i, pod := range sorted {
 		assert.Equal(t, expectedOrder[i], pod.Name, "pod order mismatch at index %d", i)
@@ -147,17 +147,17 @@ func TestSortPodsByOrdinal_Ascending(t *testing.T) {
 func TestSortPodsByOrdinal_InvalidOrdinals(t *testing.T) {
 	// Pods with invalid ordinals should be at the end (with ordinal -1)
 	pods := []corev1.Pod{
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-2"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod2}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "unknown-pod"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod1}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "web-invalid"}},
 	}
 
-	sorted := sortPodsByOrdinal(pods, "web", true)
+	sorted := sortPodsByOrdinal(pods, stsWeb, true)
 
 	// Valid ordinals first (2, 1 in descending order), then invalid (both -1)
-	assert.Equal(t, "web-2", sorted[0].Name, "highest ordinal should be first")
-	assert.Equal(t, "web-1", sorted[1].Name, "second highest ordinal should be second")
+	assert.Equal(t, stsWebPod2, sorted[0].Name, "highest ordinal should be first")
+	assert.Equal(t, stsWebPod1, sorted[1].Name, "second highest ordinal should be second")
 	// Invalid pods should be at the end
 	invalidCount := 0
 	for i := 2; i < len(sorted); i++ {
@@ -170,17 +170,17 @@ func TestSortPodsByOrdinal_InvalidOrdinals(t *testing.T) {
 
 func TestSortPodsByOrdinal_EmptyList(t *testing.T) {
 	pods := []corev1.Pod{}
-	sorted := sortPodsByOrdinal(pods, "web", true)
+	sorted := sortPodsByOrdinal(pods, stsWeb, true)
 	assert.Equal(t, 0, len(sorted), "empty list should remain empty")
 }
 
 func TestSortPodsByOrdinal_SinglePod(t *testing.T) {
 	pods := []corev1.Pod{
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-0"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod0}},
 	}
-	sorted := sortPodsByOrdinal(pods, "web", true)
+	sorted := sortPodsByOrdinal(pods, stsWeb, true)
 	assert.Equal(t, 1, len(sorted), "single pod list should have one element")
-	assert.Equal(t, "web-0", sorted[0].Name, "single pod should be preserved")
+	assert.Equal(t, stsWebPod0, sorted[0].Name, "single pod should be preserved")
 }
 
 func TestSortPodsByOrdinal_LargeOrdinals(t *testing.T) {
@@ -190,7 +190,7 @@ func TestSortPodsByOrdinal_LargeOrdinals(t *testing.T) {
 		{ObjectMeta: metav1.ObjectMeta{Name: "web-999"}},
 	}
 
-	sorted := sortPodsByOrdinal(pods, "web", true)
+	sorted := sortPodsByOrdinal(pods, stsWeb, true)
 
 	expectedOrder := []string{"web-999", "web-100", "web-50"}
 	assert.Equal(t, len(expectedOrder), len(sorted), "sorted list length mismatch")
@@ -276,17 +276,17 @@ func TestSortPodsByOrdinal_MixedValidInvalid(t *testing.T) {
 	pods := []corev1.Pod{
 		{ObjectMeta: metav1.ObjectMeta{Name: "web-5"}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "other-service-1"}}, // Different prefix
-		{ObjectMeta: metav1.ObjectMeta{Name: "web-2"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: stsWebPod2}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "web-abc"}}, // Invalid ordinal
 		{ObjectMeta: metav1.ObjectMeta{Name: "web-7"}},
 	}
 
-	sorted := sortPodsByOrdinal(pods, "web", true)
+	sorted := sortPodsByOrdinal(pods, stsWeb, true)
 
 	// First should be valid ordinals in descending order: 7, 5, 2
 	assert.Equal(t, "web-7", sorted[0].Name, "highest valid ordinal should be first")
 	assert.Equal(t, "web-5", sorted[1].Name, "second highest valid ordinal should be second")
-	assert.Equal(t, "web-2", sorted[2].Name, "third highest valid ordinal should be third")
+	assert.Equal(t, stsWebPod2, sorted[2].Name, "third highest valid ordinal should be third")
 
 	// Invalid pods should be at the end
 	invalidNames := map[string]bool{"other-service-1": true, "web-abc": true}
@@ -303,7 +303,7 @@ func TestSortPodsByOrdinal_Stability(t *testing.T) {
 		{ObjectMeta: metav1.ObjectMeta{Name: "invalid-c"}},
 	}
 
-	sorted := sortPodsByOrdinal(pods, "web", true)
+	sorted := sortPodsByOrdinal(pods, stsWeb, true)
 
 	// All should have ordinal -1, order should be preserved by stable sort
 	assert.Equal(t, 3, len(sorted), "all pods should be in result")

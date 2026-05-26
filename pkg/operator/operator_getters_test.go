@@ -142,7 +142,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 			BeforeEach(func() {
 				testOp.leaderElectionManager = &LeaderElectionManager{
 					config: &LeaderElectionConfig{
-						Identity: "test-pod",
+						Identity: testPodFix,
 					},
 				}
 			})
@@ -171,7 +171,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 				testOp.started = true // IsFollower requires IsReady() to be true
 				testOp.leaderElectionManager = &LeaderElectionManager{
 					config: &LeaderElectionConfig{
-						Identity: "test-pod",
+						Identity: testPodFix,
 					},
 				}
 			})
@@ -214,7 +214,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 				testOp.started = true
 				testOp.leaderElectionManager = &LeaderElectionManager{
 					config: &LeaderElectionConfig{
-						Identity: "test-pod",
+						Identity: testPodFix,
 					},
 					isLeader: false,
 				}
@@ -232,7 +232,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 				testOp.started = true
 				testOp.leaderElectionManager = &LeaderElectionManager{
 					config: &LeaderElectionConfig{
-						Identity: "test-pod",
+						Identity: testPodFix,
 					},
 					isLeader: true,
 				}
