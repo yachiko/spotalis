@@ -10,9 +10,9 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
-	assert.Equal(t, "info", config.Level)
-	assert.Equal(t, "json", config.Format)
-	assert.Equal(t, "json", config.Format)
+	assert.Equal(t, LevelInfo, config.Level)
+	assert.Equal(t, FormatJSON, config.Format)
+	assert.Equal(t, FormatJSON, config.Format)
 }
 
 func TestNewLogger(t *testing.T) {
@@ -29,23 +29,23 @@ func TestNewLogger(t *testing.T) {
 		{
 			name: "json format configuration",
 			config: &Config{
-				Level:  "debug",
-				Format: "json",
+				Level:  LevelDebug,
+				Format: FormatJSON,
 			},
 			want: &Config{
-				Level:  "debug",
-				Format: "json",
+				Level:  LevelDebug,
+				Format: FormatJSON,
 			},
 		},
 		{
 			name: "console format configuration",
 			config: &Config{
-				Level:  "warn",
-				Format: "console",
+				Level:  LevelWarn,
+				Format: FormatConsole,
 			},
 			want: &Config{
-				Level:  "warn",
-				Format: "console",
+				Level:  LevelWarn,
+				Format: FormatConsole,
 			},
 		},
 	}
@@ -66,15 +66,15 @@ func TestParseLogLevel(t *testing.T) {
 		level    string
 		expected string
 	}{
-		{"debug", "debug"},
-		{"info", "info"},
-		{"warn", "warn"},
-		{"warning", "warn"},
-		{"error", "error"},
-		{"panic", "panic"},
-		{"fatal", "fatal"},
-		{"invalid", "info"}, // defaults to info
-		{"", "info"},        // defaults to info
+		{LevelDebug, LevelDebug},
+		{LevelInfo, LevelInfo},
+		{LevelWarn, LevelWarn},
+		{"warning", LevelWarn},
+		{LevelError, LevelError},
+		{LevelPanic, LevelPanic},
+		{LevelFatal, LevelFatal},
+		{"invalid", LevelInfo}, // defaults to info
+		{"", LevelInfo},        // defaults to info
 	}
 
 	for _, tt := range tests {
@@ -87,8 +87,8 @@ func TestParseLogLevel(t *testing.T) {
 
 func TestLoggerWithMethods(t *testing.T) {
 	config := &Config{
-		Level:  "info",
-		Format: "json",
+		Level:  LevelInfo,
+		Format: FormatJSON,
 	}
 
 	logger, err := NewLogger(config)
@@ -127,8 +127,8 @@ func TestGetLoggerFromEnv(t *testing.T) {
 	require.NotNil(t, logger)
 
 	config := logger.GetConfig()
-	assert.Equal(t, "info", config.Level)
-	assert.Equal(t, "json", config.Format)
+	assert.Equal(t, LevelInfo, config.Level)
+	assert.Equal(t, FormatJSON, config.Format)
 }
 
 func TestBuildZapConfig(t *testing.T) {
@@ -139,15 +139,15 @@ func TestBuildZapConfig(t *testing.T) {
 		{
 			name: "json format",
 			config: &Config{
-				Level:  "debug",
-				Format: "json",
+				Level:  LevelDebug,
+				Format: FormatJSON,
 			},
 		},
 		{
 			name: "console format",
 			config: &Config{
-				Level:  "info",
-				Format: "console",
+				Level:  LevelInfo,
+				Format: FormatConsole,
 			},
 		},
 	}

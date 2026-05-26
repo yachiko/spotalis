@@ -13,6 +13,19 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+// Log level and format identifiers used across the logging package and its tests.
+const (
+	LevelDebug = "debug"
+	LevelInfo  = "info"
+	LevelWarn  = "warn"
+	LevelError = "error"
+	LevelPanic = "panic"
+	LevelFatal = "fatal"
+
+	FormatJSON    = "json"
+	FormatConsole = "console"
+)
+
 // Config defines the logging configuration
 type Config struct {
 	// Level is the log level (debug, info, warn, error)
@@ -31,16 +44,16 @@ type Logger struct {
 // DefaultConfig returns default logging configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Level:  "info", // Default to info level for general logging
-		Format: "json",
+		Level:  LevelInfo, // Default to info level for general logging
+		Format: FormatJSON,
 	}
 }
 
 // DefaultDebugConfig returns logging configuration optimized for debug mode
 func DefaultDebugConfig() *Config {
 	return &Config{
-		Level:  "debug",
-		Format: "json",
+		Level:  LevelDebug,
+		Format: FormatJSON,
 	}
 }
 
@@ -56,7 +69,7 @@ func NewLogger(config *Config) (*Logger, error) {
 	}
 
 	// Configure based on format
-	if config.Format == "json" {
+	if config.Format == FormatJSON {
 		encoderConfig := zap.NewProductionEncoderConfig()
 		encoderConfig.TimeKey = "time"
 		encoderConfig.LevelKey = "level"
@@ -88,7 +101,7 @@ func NewLogger(config *Config) (*Logger, error) {
 func buildZapConfig(config *Config) zap.Config {
 	var zapConfig zap.Config
 
-	if config.Format == "json" {
+	if config.Format == FormatJSON {
 		zapConfig = zap.NewProductionConfig()
 		zapConfig.EncoderConfig = zap.NewProductionEncoderConfig()
 		zapConfig.EncoderConfig.TimeKey = "time"
@@ -117,17 +130,17 @@ func parseLogLevel(level string) zapcore.Level {
 // parseZapLevel converts string log level to zap.AtomicLevel
 func parseZapLevel(level string) zapcore.Level {
 	switch level {
-	case "debug":
+	case LevelDebug:
 		return zapcore.DebugLevel
-	case "info":
+	case LevelInfo:
 		return zapcore.InfoLevel
-	case "warn", "warning":
+	case LevelWarn, "warning":
 		return zapcore.WarnLevel
-	case "error":
+	case LevelError:
 		return zapcore.ErrorLevel
-	case "panic":
+	case LevelPanic:
 		return zapcore.PanicLevel
-	case "fatal":
+	case LevelFatal:
 		return zapcore.FatalLevel
 	default:
 		return zapcore.InfoLevel
@@ -227,8 +240,8 @@ func SetGlobalLogger(logger *Logger) error {
 // GetLoggerFromEnv creates a logger from environment variables
 func GetLoggerFromEnv() (*Logger, error) {
 	config := &Config{
-		Level:  getEnvOrDefault("SPOTALIS_LOG_LEVEL", "info"),
-		Format: getEnvOrDefault("SPOTALIS_LOG_FORMAT", "json"),
+		Level:  getEnvOrDefault("SPOTALIS_LOG_LEVEL", LevelInfo),
+		Format: getEnvOrDefault("SPOTALIS_LOG_FORMAT", FormatJSON),
 	}
 
 	return NewLogger(config)
