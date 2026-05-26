@@ -39,8 +39,8 @@ var _ = Describe("Logging", func() {
 	BeforeEach(func() {
 		buffer = new(bytes.Buffer)
 		config = &LoggerConfig{
-			Level:            "info",
-			Format:           "json",
+			Level:            logLevelInfo,
+			Format:           logFormatJSON,
 			Development:      false,
 			Output:           buffer,
 			ErrorOutput:      buffer,
@@ -59,8 +59,8 @@ var _ = Describe("Logging", func() {
 			It("should return sensible defaults", func() {
 				defaults := DefaultLoggerConfig()
 
-				Expect(defaults.Level).To(Equal("info"))
-				Expect(defaults.Format).To(Equal("json"))
+				Expect(defaults.Level).To(Equal(logLevelInfo))
+				Expect(defaults.Format).To(Equal(logFormatJSON))
 				Expect(defaults.Development).To(BeFalse())
 				Expect(defaults.Output).To(Equal(os.Stdout))
 				Expect(defaults.ErrorOutput).To(Equal(os.Stderr))
@@ -80,7 +80,7 @@ var _ = Describe("Logging", func() {
 
 				// Test that we can set all expected fields
 				config.Level = logLevelDebug
-				config.Format = "text"
+				config.Format = logFormatText
 				config.Development = true
 				config.Output = buffer
 				config.ErrorOutput = buffer
@@ -96,8 +96,8 @@ var _ = Describe("Logging", func() {
 				config.AsyncLogging = true
 
 				// Verify fields are set correctly
-				Expect(config.Level).To(Equal("debug"))
-				Expect(config.Format).To(Equal("text"))
+				Expect(config.Level).To(Equal(logLevelDebug))
+				Expect(config.Format).To(Equal(logFormatText))
 				Expect(config.Development).To(BeTrue())
 				Expect(config.BufferSize).To(Equal(2048))
 				Expect(config.AsyncLogging).To(BeTrue())
@@ -106,7 +106,7 @@ var _ = Describe("Logging", func() {
 
 		Describe("Validation", func() {
 			It("should validate log levels", func() {
-				validLevels := []string{"debug", "info", "warn", "error"}
+				validLevels := []string{logLevelDebug, logLevelInfo, logLevelWarn, logLevelError}
 				for _, level := range validLevels {
 					config.Level = level
 					Expect(isValidLogLevel(level)).To(BeTrue())
@@ -114,7 +114,7 @@ var _ = Describe("Logging", func() {
 			})
 
 			It("should validate log formats", func() {
-				validFormats := []string{"json", "text", "console"}
+				validFormats := []string{logFormatJSON, logFormatText, logFormatConsole}
 				for _, format := range validFormats {
 					config.Format = format
 					Expect(isValidLogFormat(format)).To(BeTrue())
@@ -138,31 +138,31 @@ var _ = Describe("Logging", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(logger).ToNot(BeNil())
 				Expect(logger.config).ToNot(BeNil())
-				Expect(logger.config.Level).To(Equal("info"))
+				Expect(logger.config.Level).To(Equal(logLevelInfo))
 			})
 
 			It("should create logger with JSON format", func() {
-				config.Format = "json"
+				config.Format = logFormatJSON
 				logger, err := NewLogger(config)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(logger).ToNot(BeNil())
-				Expect(logger.config.Format).To(Equal("json"))
+				Expect(logger.config.Format).To(Equal(logFormatJSON))
 			})
 
 			It("should create logger with text format", func() {
-				config.Format = "text"
+				config.Format = logFormatText
 				logger, err := NewLogger(config)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(logger).ToNot(BeNil())
-				Expect(logger.config.Format).To(Equal("text"))
+				Expect(logger.config.Format).To(Equal(logFormatText))
 			})
 
 			It("should create logger with console format", func() {
-				config.Format = "console"
+				config.Format = logFormatConsole
 				logger, err := NewLogger(config)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(logger).ToNot(BeNil())
-				Expect(logger.config.Format).To(Equal("console"))
+				Expect(logger.config.Format).To(Equal(logFormatConsole))
 			})
 
 			It("should return error for invalid format", func() {
@@ -205,7 +205,7 @@ var _ = Describe("Logging", func() {
 			})
 
 			It("should log debug messages when level is debug", func() {
-				config.Level = "debug"
+				config.Level = logLevelDebug
 				logger, err := NewLogger(config)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -354,7 +354,7 @@ var _ = Describe("Logging", func() {
 		It("should handle invalid log configuration", func() {
 			invalidConfig := &LoggerConfig{
 				Level:  "invalid",
-				Format: "json",
+				Format:           logFormatJSON,
 				Output: buffer,
 			}
 
@@ -416,7 +416,7 @@ var _ = Describe("Logging", func() {
 
 	Describe("Integration Scenarios", func() {
 		It("should work with different output formats", func() {
-			formats := []string{"json", "text", "console"}
+			formats := []string{logFormatJSON, logFormatText, logFormatConsole}
 			for _, format := range formats {
 				config.Format = format
 				logger, err := NewLogger(config)
@@ -445,7 +445,7 @@ var _ = Describe("Logging", func() {
 // Helper functions for testing
 
 func isValidLogLevel(level string) bool {
-	validLevels := []string{"debug", "info", "warn", "error"}
+	validLevels := []string{logLevelDebug, logLevelInfo, logLevelWarn, logLevelError}
 	level = strings.ToLower(level)
 	for _, valid := range validLevels {
 		if level == valid {
@@ -456,7 +456,7 @@ func isValidLogLevel(level string) bool {
 }
 
 func isValidLogFormat(format string) bool {
-	validFormats := []string{"json", "text", "console"}
+	validFormats := []string{logFormatJSON, logFormatText, logFormatConsole}
 	format = strings.ToLower(format)
 	for _, valid := range validFormats {
 		if format == valid {

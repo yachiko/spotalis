@@ -36,11 +36,11 @@ var _ = Describe("AnnotationParser", func() {
 			It("should parse all configuration values with label-based enablement", func() {
 				obj := &MockObject{
 					labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						EnabledLabel: "true",
 					},
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "70%",
-						"spotalis.io/min-on-demand":   "2",
+						MinOnDemandAnnotation:   "2",
 					},
 				}
 
@@ -54,7 +54,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should parse minimal configuration with label-based enablement", func() {
 				obj := &MockObject{
 					labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						EnabledLabel: "true",
 					},
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "50%",
@@ -71,11 +71,11 @@ var _ = Describe("AnnotationParser", func() {
 			It("should handle zero values for tuning annotations", func() {
 				obj := &MockObject{
 					labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						EnabledLabel: "true",
 					},
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "0%",
-						"spotalis.io/min-on-demand":   "0",
+						MinOnDemandAnnotation:   "0",
 					},
 				}
 
@@ -90,7 +90,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should fail with invalid spot percentage", func() {
 				obj := &MockObject{
 					labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						EnabledLabel: "true",
 					},
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "invalid",
@@ -105,7 +105,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should fail with invalid spot percentage", func() {
 				obj := &MockObject{
 					labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						EnabledLabel: "true",
 					},
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "not-a-number",
@@ -120,10 +120,10 @@ var _ = Describe("AnnotationParser", func() {
 			It("should fail with invalid min-on-demand", func() {
 				obj := &MockObject{
 					labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						EnabledLabel: "true",
 					},
 					annotations: map[string]string{
-						"spotalis.io/min-on-demand": "not-a-number",
+						MinOnDemandAnnotation: "not-a-number",
 					},
 				}
 
@@ -158,7 +158,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should succeed with label-based enablement and no annotations", func() {
 				obj := &MockObject{
 					labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						EnabledLabel: "true",
 					},
 					annotations: nil,
 				}
@@ -175,7 +175,7 @@ var _ = Describe("AnnotationParser", func() {
 		It("should return true when spotalis annotations exist", func() {
 			testCases := []map[string]string{
 				{"spotalis.io/spot-percentage": "70%"},
-				{"spotalis.io/min-on-demand": "2"},
+				{MinOnDemandAnnotation: "2"},
 			}
 
 			for _, annotations := range testCases {
@@ -203,9 +203,9 @@ var _ = Describe("AnnotationParser", func() {
 		It("should return true when multiple spotalis annotations exist", func() {
 			obj := &MockObject{
 				annotations: map[string]string{
-					"spotalis.io/enabled":         "true",
+					EnabledLabel:         "true",
 					"spotalis.io/spot-percentage": "70%",
-					"spotalis.io/min-on-demand":   "2",
+					MinOnDemandAnnotation:   "2",
 					"app":                         "myapp",
 				},
 			}
@@ -340,7 +340,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for valid min-on-demand", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/min-on-demand": "3",
+						MinOnDemandAnnotation: "3",
 					},
 				}
 
@@ -352,7 +352,7 @@ var _ = Describe("AnnotationParser", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "0",
-						"spotalis.io/min-on-demand":   "0",
+						MinOnDemandAnnotation:   "0",
 						"spotalis.io/max-replicas":    "100",
 					},
 				}
@@ -415,7 +415,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for negative min-on-demand", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/min-on-demand": "-5",
+						MinOnDemandAnnotation: "-5",
 					},
 				}
 
@@ -428,7 +428,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for non-numeric min-on-demand", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/min-on-demand": "abc",
+						MinOnDemandAnnotation: "abc",
 					},
 				}
 
@@ -441,7 +441,7 @@ var _ = Describe("AnnotationParser", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
 						"spotalis.io/spot-percentage": "150",
-						"spotalis.io/min-on-demand":   "-1",
+						MinOnDemandAnnotation:   "-1",
 					},
 				}
 

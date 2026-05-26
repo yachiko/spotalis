@@ -29,7 +29,7 @@ var _ = Describe("DisruptionWindow", func() {
 			It("should parse schedule and duration", func() {
 				annots := map[string]string{
 					"spotalis.io/disruption-schedule": "0 2 * * *",
-					"spotalis.io/disruption-duration": "4h",
+					DisruptionDurationAnnotation: "4h",
 				}
 				window, err := ParseDisruptionWindow(annots)
 				Expect(err).NotTo(HaveOccurred())
@@ -56,7 +56,7 @@ var _ = Describe("DisruptionWindow", func() {
 
 			It("should fail if only duration is present", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-duration": "4h",
+					DisruptionDurationAnnotation: "4h",
 				}
 				_, err := ParseDisruptionWindow(annots)
 				Expect(err).To(HaveOccurred())
@@ -68,7 +68,7 @@ var _ = Describe("DisruptionWindow", func() {
 			It("should fail with invalid cron format", func() {
 				annots := map[string]string{
 					"spotalis.io/disruption-schedule": "invalid",
-					"spotalis.io/disruption-duration": "4h",
+					DisruptionDurationAnnotation: "4h",
 				}
 				_, err := ParseDisruptionWindow(annots)
 				Expect(err).To(HaveOccurred())
@@ -78,7 +78,7 @@ var _ = Describe("DisruptionWindow", func() {
 			It("should fail with 6-field cron (only 5-field supported)", func() {
 				annots := map[string]string{
 					"spotalis.io/disruption-schedule": "0 0 2 * * *", // 6 fields
-					"spotalis.io/disruption-duration": "4h",
+					DisruptionDurationAnnotation: "4h",
 				}
 				_, err := ParseDisruptionWindow(annots)
 				Expect(err).To(HaveOccurred())
@@ -89,7 +89,7 @@ var _ = Describe("DisruptionWindow", func() {
 			It("should fail with invalid duration format", func() {
 				annots := map[string]string{
 					"spotalis.io/disruption-schedule": "0 2 * * *",
-					"spotalis.io/disruption-duration": "invalid",
+					DisruptionDurationAnnotation: "invalid",
 				}
 				_, err := ParseDisruptionWindow(annots)
 				Expect(err).To(HaveOccurred())
@@ -113,7 +113,7 @@ var _ = Describe("DisruptionWindow", func() {
 			BeforeEach(func() {
 				annots := map[string]string{
 					"spotalis.io/disruption-schedule": "0 2 * * *", // Daily at 2 AM UTC
-					"spotalis.io/disruption-duration": "4h",        // 4-hour window (2 AM - 6 AM)
+					DisruptionDurationAnnotation: "4h",        // 4-hour window (2 AM - 6 AM)
 				}
 				var err error
 				window, err = ParseDisruptionWindow(annots)
@@ -149,7 +149,7 @@ var _ = Describe("DisruptionWindow", func() {
 			It("should handle 30m duration", func() {
 				annots := map[string]string{
 					"spotalis.io/disruption-schedule": "0 12 * * *", // Daily at noon
-					"spotalis.io/disruption-duration": "30m",
+					DisruptionDurationAnnotation: "30m",
 				}
 				window, err := ParseDisruptionWindow(annots)
 				Expect(err).NotTo(HaveOccurred())
@@ -166,7 +166,7 @@ var _ = Describe("DisruptionWindow", func() {
 			It("should handle 2h30m duration", func() {
 				annots := map[string]string{
 					"spotalis.io/disruption-schedule": "0 14 * * *", // Daily at 2 PM
-					"spotalis.io/disruption-duration": "2h30m",
+					DisruptionDurationAnnotation: "2h30m",
 				}
 				window, err := ParseDisruptionWindow(annots)
 				Expect(err).NotTo(HaveOccurred())

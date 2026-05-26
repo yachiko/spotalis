@@ -36,8 +36,13 @@ import (
 
 const (
 	// RBAC verbs
-	verbGet  = "get"
-	verbList = "list"
+	verbGet    = "get"
+	verbList   = "list"
+	verbWatch  = "watch"
+	verbCreate = "create"
+	verbUpdate = "update"
+	verbPatch  = "patch"
+	verbDelete = "delete"
 )
 
 // KubernetesConfig contains Kubernetes client configuration
@@ -169,21 +174,21 @@ func (k *KubernetesClientManager) ValidatePermissions(ctx context.Context) error
 		verb     string
 		group    string
 	}{
-		{"nodes", "list", ""},
+		{"nodes", verbList, ""},
 		{"nodes", verbGet, ""},
-		{"pods", "list", ""},
+		{"pods", verbList, ""},
 		{"pods", verbGet, ""},
-		{"pods", "patch", ""},
-		{"deployments", "list", "apps"},
+		{"pods", verbPatch, ""},
+		{"deployments", verbList, "apps"},
 		{"deployments", verbGet, "apps"},
-		{"deployments", "patch", "apps"},
-		{"statefulsets", "list", "apps"},
+		{"deployments", verbPatch, "apps"},
+		{"statefulsets", verbList, "apps"},
 		{"statefulsets", verbGet, "apps"},
-		{"statefulsets", "patch", "apps"},
-		{"events", "create", ""},
-		{"leases", "create", "coordination.k8s.io"},
+		{"statefulsets", verbPatch, "apps"},
+		{"events", verbCreate, ""},
+		{"leases", verbCreate, "coordination.k8s.io"},
 		{"leases", verbGet, "coordination.k8s.io"},
-		{"leases", "update", "coordination.k8s.io"},
+		{"leases", verbUpdate, "coordination.k8s.io"},
 	}
 
 	for _, perm := range permissions {
@@ -358,25 +363,25 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 			{
 				APIGroups: []string{""},
 				Resources: []string{"nodes"},
-				Verbs:     []string{"get", "list", "watch"},
+				Verbs:     []string{verbGet, verbList, verbWatch},
 			},
 			// Pod permissions
 			{
 				APIGroups: []string{""},
 				Resources: []string{"pods"},
-				Verbs:     []string{"get", "list", "watch", "patch", "delete"},
+				Verbs:     []string{verbGet, verbList, verbWatch, verbPatch, verbDelete},
 			},
 			// Deployment permissions
 			{
 				APIGroups: []string{"apps"},
 				Resources: []string{"deployments"},
-				Verbs:     []string{"get", "list", "watch", "patch"},
+				Verbs:     []string{verbGet, verbList, verbWatch, verbPatch},
 			},
 			// StatefulSet permissions
 			{
 				APIGroups: []string{"apps"},
 				Resources: []string{"statefulsets"},
-				Verbs:     []string{"get", "list", "watch", "patch"},
+				Verbs:     []string{verbGet, verbList, verbWatch, verbPatch},
 			},
 			// Event permissions
 			{
@@ -388,13 +393,13 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 			{
 				APIGroups: []string{"coordination.k8s.io"},
 				Resources: []string{"leases"},
-				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete},
 			},
 			// Namespace permissions
 			{
 				APIGroups: []string{""},
 				Resources: []string{"namespaces"},
-				Verbs:     []string{"get", "list", "watch"},
+				Verbs:     []string{verbGet, verbList, verbWatch},
 			},
 		},
 	}

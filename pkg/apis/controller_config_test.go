@@ -398,7 +398,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		})
 
 		It("should accept spot labels only", func() {
-			nodeLabels.SpotLabels = map[string]string{"type": "spot"}
+			nodeLabels.SpotLabels = map[string]string{"type": string(NodeTypeSpot)}
 			nodeLabels.OnDemandLabels = nil
 
 			err := nodeLabels.Validate()
@@ -407,7 +407,7 @@ var _ = Describe("ControllerConfiguration", func() {
 
 		It("should accept on-demand labels only", func() {
 			nodeLabels.SpotLabels = nil
-			nodeLabels.OnDemandLabels = map[string]string{"type": "on-demand"}
+			nodeLabels.OnDemandLabels = map[string]string{"type": string(NodeTypeOnDemand)}
 
 			err := nodeLabels.Validate()
 			Expect(err).ToNot(HaveOccurred())
@@ -415,7 +415,7 @@ var _ = Describe("ControllerConfiguration", func() {
 
 		It("should accept empty maps if at least one is non-nil", func() {
 			nodeLabels.SpotLabels = make(map[string]string)
-			nodeLabels.OnDemandLabels = map[string]string{"type": "on-demand"}
+			nodeLabels.OnDemandLabels = map[string]string{"type": string(NodeTypeOnDemand)}
 
 			err := nodeLabels.Validate()
 			Expect(err).ToNot(HaveOccurred())

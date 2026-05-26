@@ -111,9 +111,9 @@ func TestAdmissionStateTracker_WorkloadKey(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"default", "Deployment", "test", "default/Deployment/test"},
+		{"default", workloadTypeDeployment, "test", "default/Deployment/test"},
 		{"kube-system", "StatefulSet", "my-app", "kube-system/StatefulSet/my-app"},
-		{"ns1", "Deployment", "app", "ns1/Deployment/app"},
+		{"ns1", workloadTypeDeployment, "app", "ns1/Deployment/app"},
 	}
 
 	for _, tt := range tests {
