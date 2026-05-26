@@ -113,8 +113,8 @@ var _ = Describe("NodeClassification", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: stringTestNode,
 					Labels: map[string]string{
-						labelKubernetesOS:                 "linux",
-						labelNodeLifecycle:     "spot",
+						labelKubernetesOS:                  stringLinux,
+						labelNodeLifecycle:                 "spot",
 						"topology.kubernetes.io/region":    "us-west-2",
 						"topology.kubernetes.io/zone":      "us-west-2a",
 						"node.kubernetes.io/instance-type": "m5.large",
@@ -164,7 +164,7 @@ var _ = Describe("NodeClassification", func() {
 
 		It("should handle missing topology labels", func() {
 			node.Labels = map[string]string{
-				labelKubernetesOS: "linux",
+				labelKubernetesOS: stringLinux,
 			}
 			classification := &NodeClassification{
 				NodeName: stringTestNode,
@@ -221,7 +221,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							labelKubernetesOS: "linux",
+							labelKubernetesOS: stringLinux,
 						},
 					},
 				}
@@ -284,7 +284,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				SpotLabels: []metav1.LabelSelector{
 					{
 						MatchLabels: map[string]string{
-							labelNodeLifecycle: "spot",
+							labelNodeLifecycle: string(NodeTypeSpot),
 						},
 					},
 				},
@@ -301,7 +301,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 			awsSpotNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						labelNodeLifecycle: "spot",
+						labelNodeLifecycle: string(NodeTypeSpot),
 					},
 				},
 			}

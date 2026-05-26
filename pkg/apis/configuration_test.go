@@ -196,7 +196,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 		Context("when workload is disabled via label (enabled=false)", func() {
 			It("should return disabled configuration regardless of annotations", func() {
 				annotations := map[string]string{
-					annotationMinOnDemand:   "2",
+					annotationMinOnDemand:    "2",
 					annotationSpotPercentage: "70%",
 				}
 				config, err := ParseFromAnnotations(annotations, false)
@@ -210,7 +210,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 		Context("when workload is enabled via label", func() {
 			It("should parse all valid tuning annotations", func() {
 				annotations := map[string]string{
-					annotationMinOnDemand:   "2",
+					annotationMinOnDemand:    "2",
 					annotationSpotPercentage: "70%",
 				}
 				config, err := ParseFromAnnotations(annotations, true)

@@ -209,7 +209,7 @@ logging:
 				// Set environment variables that should override
 				// Set environment variables
 				envVars := map[string]string{
-					envNamespace:    "env-namespace",
+					envNamespace:   "env-namespace",
 					envWebhookPort: "7443",
 				}
 
@@ -273,14 +273,14 @@ webhook:
 		Context("when environment variables are set", func() {
 			It("should load configuration from environment variables", func() {
 				envVars := map[string]string{
-					envNamespace:                 "env-namespace",
+					envNamespace:               "env-namespace",
 					envMaxConcurrentReconciles: "15",
-					envWebhookPort:              "7443",
-					envWebhookEnabled:           "false",
-					envLogLevel:                 "debug",
-					envLogDevelopment:           "true",
+					envWebhookPort:             "7443",
+					envWebhookEnabled:          boolFalseStr,
+					envLogLevel:                "debug",
+					envLogDevelopment:          stringTrue,
 					envMetricsBindAddress:      ":7080",
-					envLeaderElectionEnabled:   "false",
+					envLeaderElectionEnabled:   boolFalseStr,
 				}
 
 				for key, value := range envVars {

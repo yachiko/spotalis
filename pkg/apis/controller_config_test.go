@@ -120,7 +120,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		It("should monitor namespace that matches selector", func() {
 			config.NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					labelManagedBy: "spotalis",
+					labelManagedBy: stringSpotalis,
 				},
 			}
 
@@ -128,7 +128,7 @@ var _ = Describe("ControllerConfiguration", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-namespace",
 					Labels: map[string]string{
-						labelManagedBy: "spotalis",
+						labelManagedBy: stringSpotalis,
 					},
 				},
 			}
@@ -139,7 +139,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		It("should not monitor namespace that does not match selector", func() {
 			config.NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					labelManagedBy: "spotalis",
+					labelManagedBy: stringSpotalis,
 				},
 			}
 
@@ -158,7 +158,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		It("should handle namespace with no labels", func() {
 			config.NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					labelManagedBy: "spotalis",
+					labelManagedBy: stringSpotalis,
 				},
 			}
 

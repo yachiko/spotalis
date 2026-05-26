@@ -41,7 +41,7 @@ var _ = Describe("AnnotationParser", func() {
 					},
 					annotations: map[string]string{
 						annotationSpotPercentage: stringPct70,
-						annotationMinOnDemand:   "2",
+						annotationMinOnDemand:    "2",
 					},
 				}
 
@@ -76,7 +76,7 @@ var _ = Describe("AnnotationParser", func() {
 					},
 					annotations: map[string]string{
 						annotationSpotPercentage: "0%",
-						annotationMinOnDemand:   "0",
+						annotationMinOnDemand:    "0",
 					},
 				}
 
@@ -90,7 +90,7 @@ var _ = Describe("AnnotationParser", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
 						annotationSpotPercentage: stringPct70,
-						annotationMinOnDemand:   "2",
+						annotationMinOnDemand:    "2",
 					},
 				}
 
@@ -168,7 +168,7 @@ var _ = Describe("AnnotationParser", func() {
 		It("should return false when no spotalis annotations exist", func() {
 			obj := &MockObject{
 				annotations: map[string]string{
-					stringApp:     stringMyApp,
+					stringApp: stringMyApp,
 					"version": "1.0",
 				},
 			}
@@ -184,10 +184,10 @@ var _ = Describe("AnnotationParser", func() {
 		It("should return true when multiple spotalis annotations exist", func() {
 			obj := &MockObject{
 				annotations: map[string]string{
-					annotationEnabled:         stringTrue,
+					annotationEnabled:        stringTrue,
 					annotationSpotPercentage: stringPct70,
-					annotationMinOnDemand:   "2",
-					stringApp:                         stringMyApp,
+					annotationMinOnDemand:    "2",
+					stringApp:                stringMyApp,
 				},
 			}
 
@@ -310,7 +310,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for valid spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:         stringTrue,
+						annotationEnabled:        stringTrue,
 						annotationSpotPercentage: "75%",
 					},
 				}
@@ -322,7 +322,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for valid min-on-demand", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:       stringTrue,
+						annotationEnabled:     stringTrue,
 						annotationMinOnDemand: "3",
 					},
 				}
@@ -334,9 +334,9 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for boundary values", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:         stringTrue,
+						annotationEnabled:        stringTrue,
 						annotationSpotPercentage: "0%",
-						annotationMinOnDemand:   "0",
+						annotationMinOnDemand:    "0",
 					},
 				}
 
@@ -347,7 +347,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for 100% spot", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:         stringTrue,
+						annotationEnabled:        stringTrue,
 						annotationSpotPercentage: "100%",
 					},
 				}
@@ -372,7 +372,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for invalid spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:         stringTrue,
+						annotationEnabled:        stringTrue,
 						annotationSpotPercentage: "150%",
 					},
 				}
@@ -386,7 +386,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for negative spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:         stringTrue,
+						annotationEnabled:        stringTrue,
 						annotationSpotPercentage: "-10%",
 					},
 				}
@@ -399,7 +399,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for non-numeric spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:         stringTrue,
+						annotationEnabled:        stringTrue,
 						annotationSpotPercentage: "not-a-number%",
 					},
 				}
@@ -413,7 +413,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for negative min-on-demand", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:       stringTrue,
+						annotationEnabled:     stringTrue,
 						annotationMinOnDemand: "-5",
 					},
 				}
@@ -427,7 +427,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for non-numeric min-on-demand", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:       stringTrue,
+						annotationEnabled:     stringTrue,
 						annotationMinOnDemand: "abc",
 					},
 				}
@@ -440,9 +440,9 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return multiple errors for multiple invalid annotations", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						annotationEnabled:         stringTrue,
+						annotationEnabled:        stringTrue,
 						annotationSpotPercentage: "150%",
-						annotationMinOnDemand:   "-1",
+						annotationMinOnDemand:    "-1",
 					},
 				}
 
@@ -485,7 +485,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						stringApp:     stringMyApp,
+						stringApp: stringMyApp,
 						"version": "1.0",
 					},
 				}

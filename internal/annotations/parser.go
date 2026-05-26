@@ -56,6 +56,8 @@ const (
 	testAppLabelKey = "app"
 	// testCronDaily2AM is the example cron schedule used by disruption-window tests.
 	testCronDaily2AM = "0 2 * * *"
+	// testAppName is the canonical app-name fixture used in parser test cases.
+	testAppName = "myapp"
 
 	// BooleanFalse represents the string "false" for annotation values
 	BooleanFalse = "false"

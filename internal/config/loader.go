@@ -288,10 +288,10 @@ func (cl *ConfigurationLoader) LoadFromFile(path string) error {
 func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 	envMappings := map[string]func(string) error{
 		// Controller configuration
-		envNamespace:                 cl.setControllerNamespace,
-		envMaxConcurrentReconciles: cl.setMaxConcurrentReconciles,
-		envReconcileInterval:        cl.setReconcileInterval,
-		envReconcileTimeout:         cl.setReconcileTimeout,
+		envNamespace:                         cl.setControllerNamespace,
+		envMaxConcurrentReconciles:           cl.setMaxConcurrentReconciles,
+		envReconcileInterval:                 cl.setReconcileInterval,
+		envReconcileTimeout:                  cl.setReconcileTimeout,
 		"SPOTALIS_ENABLE_DEPLOYMENTS":        cl.setEnableDeployments,
 		"SPOTALIS_ENABLE_STATEFULSETS":       cl.setEnableStatefulSets,
 		"SPOTALIS_ENABLE_DAEMONSETS":         cl.setEnableDaemonSets,
@@ -299,8 +299,8 @@ func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 		"SPOTALIS_GRACEFUL_SHUTDOWN_TIMEOUT": cl.setGracefulShutdownTimeout,
 
 		// Webhook configuration
-		envWebhookEnabled:           cl.setWebhookEnabled,
-		envWebhookPort:              cl.setWebhookPort,
+		envWebhookEnabled:                    cl.setWebhookEnabled,
+		envWebhookPort:                       cl.setWebhookPort,
 		"SPOTALIS_WEBHOOK_CERT_DIR":          cl.setWebhookCertDir,
 		"SPOTALIS_WEBHOOK_CERT_NAME":         cl.setWebhookCertName,
 		"SPOTALIS_WEBHOOK_KEY_NAME":          cl.setWebhookKeyName,
@@ -315,13 +315,13 @@ func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 		"SPOTALIS_KUBE_CONTEXT":    cl.setKubeContext,
 		"SPOTALIS_KUBE_QPS":        cl.setKubeQPS,
 		"SPOTALIS_KUBE_BURST":      cl.setKubeBurst,
-		envKubeTimeout:    cl.setKubeTimeout,
+		envKubeTimeout:             cl.setKubeTimeout,
 		"SPOTALIS_SERVICE_ACCOUNT": cl.setServiceAccount,
 		"SPOTALIS_CLUSTER_ROLE":    cl.setClusterRole,
 		"SPOTALIS_ROLE_BINDING":    cl.setRoleBinding,
 
 		// Leader election configuration
-		envLeaderElectionEnabled:        cl.setLeaderElectionEnabled,
+		envLeaderElectionEnabled:                  cl.setLeaderElectionEnabled,
 		"SPOTALIS_LEADER_ELECTION_ID":             cl.setLeaderElectionID,
 		"SPOTALIS_LEADER_ELECTION_LEASE_NAME":     cl.setLeaderElectionLeaseName,
 		"SPOTALIS_LEADER_ELECTION_LEASE_DURATION": cl.setLeaderElectionLeaseDuration,
@@ -329,12 +329,12 @@ func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 		"SPOTALIS_LEADER_ELECTION_RETRY_PERIOD":   cl.setLeaderElectionRetryPeriod,
 
 		// Logging configuration
-		envLogLevel:       cl.setLogLevel,
-		envLogDevelopment: cl.setLogDevelopment,
-		"SPOTALIS_ENABLE_PPROF":    cl.setEnablePprof,
+		envLogLevel:             cl.setLogLevel,
+		envLogDevelopment:       cl.setLogDevelopment,
+		"SPOTALIS_ENABLE_PPROF": cl.setEnablePprof,
 
 		// Metrics configuration
-		envMetricsBindAddress:        cl.setMetricsBindAddress,
+		envMetricsBindAddress:                  cl.setMetricsBindAddress,
 		"SPOTALIS_METRICS_ENABLE_PROFILING":    cl.setMetricsEnableProfiling,
 		"SPOTALIS_METRICS_PROFILING_ADDRESS":   cl.setMetricsProfilingAddress,
 		"SPOTALIS_HEALTH_BIND_ADDRESS":         cl.setHealthBindAddress,

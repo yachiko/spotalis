@@ -38,6 +38,13 @@ const (
 	testNodeOnDemand    = "ondemand-node-1"
 	testNonexistent     = "nonexistent"
 	nodeInstanceTypeKey = "node.kubernetes.io/instance-type"
+	testPVCName         = "pvc-test"
+
+	stsWeb      = "web"
+	stsWebPod0  = "web-0"
+	stsWebPod1  = "web-1"
+	stsWebPod2  = "web-2"
+	testStsName = "test-sts"
 )
 
 func TestControllers(t *testing.T) {

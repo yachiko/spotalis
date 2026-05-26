@@ -170,7 +170,7 @@ var _ = Describe("KubernetesConfig", func() {
 						Name:      kubeConfig.ServiceAccount,
 						Namespace: kubeConfig.Namespace,
 						Labels: map[string]string{
-							labelAppName: spotalisShortName,
+							labelAppName:      spotalisShortName,
 							labelAppComponent: controllerShort,
 						},
 					},
@@ -348,9 +348,9 @@ func containsResource(resources []string, resource string) bool {
 
 func createStandardLabels() map[string]string {
 	return map[string]string{
-		labelAppName: spotalisShortName,
-		labelAppComponent: controllerShort,
-		"app.kubernetes.io/part-of":   "spotalis",
+		labelAppName:                spotalisShortName,
+		labelAppComponent:           controllerShort,
+		"app.kubernetes.io/part-of": "spotalis",
 	}
 }
 
