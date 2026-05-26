@@ -39,7 +39,7 @@ var _ = Describe("AnnotationParser", func() {
 						EnabledLabel: BooleanTrue,
 					},
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": testPctSeventy,
+						SpotPercentageAnnotation: testPctSeventy,
 						MinOnDemandAnnotation:   "2",
 					},
 				}
@@ -57,7 +57,7 @@ var _ = Describe("AnnotationParser", func() {
 						EnabledLabel: BooleanTrue,
 					},
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "50%",
+						SpotPercentageAnnotation: "50%",
 					},
 				}
 
@@ -74,7 +74,7 @@ var _ = Describe("AnnotationParser", func() {
 						EnabledLabel: BooleanTrue,
 					},
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "0%",
+						SpotPercentageAnnotation: "0%",
 						MinOnDemandAnnotation:   "0",
 					},
 				}
@@ -93,7 +93,7 @@ var _ = Describe("AnnotationParser", func() {
 						EnabledLabel: BooleanTrue,
 					},
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": testInvalid,
+						SpotPercentageAnnotation: testInvalid,
 					},
 				}
 
@@ -108,7 +108,7 @@ var _ = Describe("AnnotationParser", func() {
 						EnabledLabel: BooleanTrue,
 					},
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": testNotANumber,
+						SpotPercentageAnnotation: testNotANumber,
 					},
 				}
 
@@ -146,7 +146,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return disabled config when label is missing", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": testPctSeventy,
+						SpotPercentageAnnotation: testPctSeventy,
 					},
 				}
 
@@ -174,7 +174,7 @@ var _ = Describe("AnnotationParser", func() {
 	Describe("HasSpotalisAnnotations", func() {
 		It("should return true when spotalis annotations exist", func() {
 			testCases := []map[string]string{
-				{"spotalis.io/spot-percentage": testPctSeventy},
+				{SpotPercentageAnnotation: testPctSeventy},
 				{MinOnDemandAnnotation: "2"},
 			}
 
@@ -204,7 +204,7 @@ var _ = Describe("AnnotationParser", func() {
 			obj := &MockObject{
 				annotations: map[string]string{
 					EnabledLabel:         BooleanTrue,
-					"spotalis.io/spot-percentage": testPctSeventy,
+					SpotPercentageAnnotation: testPctSeventy,
 					MinOnDemandAnnotation:   "2",
 					testAppLabelKey: "myapp",
 				},
@@ -329,7 +329,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for valid spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "75",
+						SpotPercentageAnnotation: "75",
 					},
 				}
 
@@ -351,7 +351,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for boundary values", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "0",
+						SpotPercentageAnnotation: "0",
 						MinOnDemandAnnotation:   "0",
 						"spotalis.io/max-replicas":    "100",
 					},
@@ -364,7 +364,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return no errors for 100% spot", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "100",
+						SpotPercentageAnnotation: "100",
 					},
 				}
 
@@ -377,7 +377,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for invalid spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "150",
+						SpotPercentageAnnotation: "150",
 					},
 				}
 
@@ -390,7 +390,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for negative spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "-10",
+						SpotPercentageAnnotation: "-10",
 					},
 				}
 
@@ -402,7 +402,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return error for non-numeric spot percentage", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": testNotANumber,
+						SpotPercentageAnnotation: testNotANumber,
 					},
 				}
 
@@ -440,7 +440,7 @@ var _ = Describe("AnnotationParser", func() {
 			It("should return multiple errors for multiple invalid annotations", func() {
 				obj := &MockObject{
 					annotations: map[string]string{
-						"spotalis.io/spot-percentage": "150",
+						SpotPercentageAnnotation: "150",
 						MinOnDemandAnnotation:   "-1",
 					},
 				}
