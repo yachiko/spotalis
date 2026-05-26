@@ -116,16 +116,21 @@ var _ = Describe("Burst Scenario Integration Tests", func() {
 				return true
 			}, 90*time.Second, 3*time.Second).Should(BeTrue())
 
-			By("Verifying pod distribution is within tolerance")
+			By("Waiting for distribution to converge")
 			// Expected: 10 * 70% = 7 spot, min 1 on-demand → 7 spot, 3 on-demand
 			// Allow +/- 1 tolerance for rounding
-			spotCount, onDemandCount := countPodDistribution(ctx, k8sClient, namespace, "burst-10-70")
 			expectedSpot := calculateExpectedSpot(10, spotPercentage, minOnDemand)
+			var spotCount, onDemandCount int
 
+			Eventually(func() bool {
+				spotCount, onDemandCount = countPodDistribution(ctx, k8sClient, namespace, "burst-10-70")
+				return spotCount >= expectedSpot-1 && spotCount <= expectedSpot+1
+			}, 180*time.Second, 5*time.Second).Should(BeTrue())
+
+			By("Verifying pod distribution is within tolerance")
 			GinkgoWriter.Printf("Distribution: spot=%d, on-demand=%d (expected spot ~%d)\n",
 				spotCount, onDemandCount, expectedSpot)
 
-			// Spot count should be within tolerance
 			Expect(spotCount).To(BeNumerically(">=", expectedSpot-1))
 			Expect(spotCount).To(BeNumerically("<=", expectedSpot+1))
 			// On-demand should meet minimum
