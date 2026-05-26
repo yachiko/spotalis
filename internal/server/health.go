@@ -45,6 +45,8 @@ const (
 
 	admissionAPIVersion = "admission.k8s.io/v1"
 	admissionReviewKind = "AdmissionReview"
+
+	statusUnhealthy = "unhealthy"
 )
 
 // HealthChecker provides health checking functionality for the Spotalis controller
@@ -84,7 +86,7 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	// Check if manually set to unhealthy
 	if unhealthyReason != "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			jsonFieldStatus: "unhealthy",
+			jsonFieldStatus: statusUnhealthy,
 			"reason": unhealthyReason,
 			jsonFieldUptime: time.Since(h.startTime).String(),
 		})
@@ -94,7 +96,7 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	// Check if Kubernetes is manually set as down
 	if kubernetesDown {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			jsonFieldStatus:    "unhealthy",
+			jsonFieldStatus: statusUnhealthy,
 			"component": componentKubernetesAPI,
 			jsonFieldError:     "kubernetes API marked as unavailable",
 			jsonFieldUptime:    time.Since(h.startTime).String(),
@@ -109,7 +111,7 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	if h.kubeClient != nil {
 		if err := h.checkKubernetesAPI(ctx); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
-				jsonFieldStatus:    "unhealthy",
+				jsonFieldStatus: statusUnhealthy,
 				"component": componentKubernetesAPI,
 				jsonFieldError:     err.Error(),
 				jsonFieldUptime:    uptime.String(),
@@ -381,7 +383,7 @@ func (h *HealthHandler) SetChecker(checker *HealthChecker) {
 func (h *HealthHandler) Healthz(c *gin.Context) {
 	if h.checker == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			jsonFieldStatus: "unhealthy",
+			jsonFieldStatus: statusUnhealthy,
 			jsonFieldError:  "health checker not initialized",
 		})
 		return

@@ -49,11 +49,11 @@ var _ = Describe("NodeClassifierService", func() {
 		config = &NodeClassifierConfig{
 			SpotLabels: map[string]string{
 				labelCapacityType:     "spot",
-				"eks.amazonaws.com/capacityType": capacityValueSPOT,
+				cloudAWSCapacityType: capacityValueSPOT,
 			},
 			OnDemandLabels: map[string]string{
 				labelCapacityType:     capacityTypeOnDemand,
-				"eks.amazonaws.com/capacityType": capacityValueOnDemand,
+				cloudAWSCapacityType: capacityValueOnDemand,
 			},
 			CacheRefreshInterval: 5 * time.Minute,
 			CloudProvider:        "aws",
@@ -94,9 +94,9 @@ var _ = Describe("NodeClassifierService", func() {
 
 			// Test AWS labels
 			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelCapacityType, "spot"))
-			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue("eks.amazonaws.com/capacityType", capacityValueSPOT))
+			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(cloudAWSCapacityType, capacityValueSPOT))
 			Expect(defaultConfig.OnDemandLabels).To(HaveKeyWithValue(labelCapacityType, capacityTypeOnDemand))
-			Expect(defaultConfig.OnDemandLabels).To(HaveKeyWithValue("eks.amazonaws.com/capacityType", capacityValueOnDemand))
+			Expect(defaultConfig.OnDemandLabels).To(HaveKeyWithValue(cloudAWSCapacityType, capacityValueOnDemand))
 
 			// Test GCP labels
 			Expect(defaultConfig.SpotLabels).To(HaveKeyWithValue(labelGKEPreemptible, "true"))
@@ -132,7 +132,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "spot-node-2",
 						Labels: map[string]string{
-							"eks.amazonaws.com/capacityType": capacityValueSPOT,
+							cloudAWSCapacityType: capacityValueSPOT,
 						},
 					},
 				}
@@ -196,7 +196,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "ondemand-node-2",
 						Labels: map[string]string{
-							"eks.amazonaws.com/capacityType": capacityValueOnDemand,
+							cloudAWSCapacityType: capacityValueOnDemand,
 						},
 					},
 				}
@@ -284,7 +284,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							labelInstanceType: "m5.large",
-							"eks.amazonaws.com/capacityType":   capacityValueSPOT,
+							cloudAWSCapacityType:   capacityValueSPOT,
 						},
 					},
 				}
@@ -298,7 +298,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							labelInstanceType: "m5.large",
-							"eks.amazonaws.com/capacityType":   capacityValueOnDemand,
+							cloudAWSCapacityType:   capacityValueOnDemand,
 						},
 					},
 				}
@@ -604,7 +604,7 @@ var _ = Describe("NodeClassifierService", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "aws-eks-node",
 						Labels: map[string]string{
-							"eks.amazonaws.com/capacityType": capacityValueOnDemand,
+							cloudAWSCapacityType: capacityValueOnDemand,
 						},
 					},
 				}

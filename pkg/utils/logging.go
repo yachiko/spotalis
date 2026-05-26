@@ -44,6 +44,10 @@ const (
 	logFormatJSON    = "json"
 	logFormatText    = "text"
 	logFormatConsole = "console"
+
+	// Structured log field names
+	logFieldDuration   = "duration"
+	logFieldDurationMs = "duration_ms"
 )
 
 // LoggerConfig contains logging configuration
@@ -241,8 +245,8 @@ func (l *Logger) LogReconciliation(ctx context.Context, resource, namespace, nam
 		"resource":    resource,
 		"namespace":   namespace,
 		"name":        name,
-		"duration":    duration.String(),
-		"duration_ms": duration.Milliseconds(),
+		logFieldDuration:    duration.String(),
+		logFieldDurationMs: duration.Milliseconds(),
 	}
 
 	logger := l.WithContext(ctx).WithFields(fields)
@@ -262,8 +266,8 @@ func (l *Logger) LogWebhookRequest(ctx context.Context, operation, resource, nam
 		"namespace":   namespace,
 		"name":        name,
 		"allowed":     allowed,
-		"duration":    duration.String(),
-		"duration_ms": duration.Milliseconds(),
+		logFieldDuration:    duration.String(),
+		logFieldDurationMs: duration.Milliseconds(),
 	}
 
 	logger := l.WithContext(ctx).WithFields(fields)
@@ -282,8 +286,8 @@ func (l *Logger) LogNodeClassification(ctx context.Context, nodeName, nodeType s
 		"node_type":          nodeType,
 		"spot_instances":     spotInstances,
 		"ondemand_instances": onDemandInstances,
-		"duration":           duration.String(),
-		"duration_ms":        duration.Milliseconds(),
+		logFieldDuration:           duration.String(),
+		logFieldDurationMs:        duration.Milliseconds(),
 	}
 
 	logger := l.WithContext(ctx).WithFields(fields)
@@ -294,8 +298,8 @@ func (l *Logger) LogNodeClassification(ctx context.Context, nodeName, nodeType s
 func (l *Logger) LogMetricsCollection(ctx context.Context, metricsCount int, duration time.Duration, err error) {
 	fields := map[string]interface{}{
 		"metrics_count": metricsCount,
-		"duration":      duration.String(),
-		"duration_ms":   duration.Milliseconds(),
+		logFieldDuration:      duration.String(),
+		logFieldDurationMs:   duration.Milliseconds(),
 	}
 
 	logger := l.WithContext(ctx).WithFields(fields)
