@@ -98,11 +98,11 @@ func (m *MetricsServer) HealthMetricsHandler(c *gin.Context) {
 	statusCode := http.StatusOK
 
 	health := gin.H{
-		"status": status,
+		jsonFieldStatus: status,
 		"metrics_collector": gin.H{
 			"last_collection": lastCollection.Format(time.RFC3339),
 			"latency_ms":      latency.Milliseconds(),
-			"error":           collectionError,
+			jsonFieldError:           collectionError,
 		},
 	}
 
@@ -216,8 +216,8 @@ func (m *MetricsHandler) SetServer(server *MetricsServer) {
 func (m *MetricsHandler) Metrics(c *gin.Context) {
 	if m.server == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "metrics server not initialized",
-			"code":  "METRICS_SERVER_NOT_INITIALIZED",
+			jsonFieldError: "metrics server not initialized",
+			jsonFieldCode:  "METRICS_SERVER_NOT_INITIALIZED",
 		})
 		return
 	}
