@@ -285,14 +285,14 @@ func jsonPointerUnescape(s string) string {
 
 // getCapacityTypeLabelConfig extracts the label key and values for spot/on-demand
 // from the NodeClassifierConfig. Falls back to Karpenter defaults if not configured.
-func (m *MutationHandler) getCapacityTypeLabelConfig() (labelKey string, spotValue string, onDemandValue string) {
+func (m *MutationHandler) getCapacityTypeLabelConfig() (labelKey, spotValue, onDemandValue string) {
 	// Defaults (Karpenter)
 	labelKey = "karpenter.sh/capacity-type"
 	spotValue = "spot"
 	onDemandValue = "on-demand"
 
 	if m.NodeClassifierConfig == nil {
-		return
+		return labelKey, spotValue, onDemandValue
 	}
 
 	// Extract spot label config
@@ -316,7 +316,7 @@ func (m *MutationHandler) getCapacityTypeLabelConfig() (labelKey string, spotVal
 		}
 	}
 
-	return
+	return labelKey, spotValue, onDemandValue
 }
 
 // generateNodeSelectorPatches generates patches for node selector based on current pod distribution
@@ -497,46 +497,6 @@ func (m *MutationHandler) getWorkloadInfo(pod *corev1.Pod) (workloadType, worklo
 	}
 
 	return "", "", fmt.Errorf("no supported workload owner found")
-}
-
-// countCurrentPods counts existing spot and on-demand pods for a workload
-func (m *MutationHandler) countCurrentPods(ctx context.Context, namespace, workloadName, workloadKind, excludePodName string) (spotCount, onDemandCount int, err error) {
-	// List all pods in the namespace
-	var podList corev1.PodList
-	if err := m.Client.List(ctx, &podList, client.InNamespace(namespace)); err != nil {
-		return 0, 0, err
-	}
-
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-
-		// Skip the pod being mutated (it should not influence its own placement decision)
-		if pod.Name == excludePodName {
-			continue
-		}
-
-		// Skip pods that are not running or pending
-		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
-			continue
-		}
-
-		// Check if this pod belongs to our workload
-		if !m.podBelongsToWorkload(pod, workloadName, workloadKind) {
-			continue
-		}
-
-		// Determine capacity type based on nodeSelector or node affinity
-		capacityType := m.getPodCapacityType(pod)
-
-		switch capacityType {
-		case capacityTypeSpot:
-			spotCount++
-		case capacityTypeOnDemand:
-			onDemandCount++
-		}
-	}
-
-	return spotCount, onDemandCount, nil
 }
 
 // countCurrentPodsWithRV lists pods and returns the list's resourceVersion
