@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Tuning knobs for the in-memory admission state tracker.
 const (
 	DefaultAdmissionTTL  = 30 * time.Second
 	CleanupInterval      = 10 * time.Second
@@ -15,6 +16,7 @@ const (
 // StaleReason describes why state is considered stale
 type StaleReason string
 
+// Reasons reported by staleness checks against the admission state tracker.
 const (
 	StaleReasonNone       StaleReason = ""
 	StaleReasonGeneration StaleReason = "workload_generation_changed"
