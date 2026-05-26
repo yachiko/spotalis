@@ -43,6 +43,38 @@ const (
 	verbUpdate = "update"
 	verbPatch  = "patch"
 	verbDelete = "delete"
+
+	// API resources
+	resourceNodes        = "nodes"
+	resourcePods         = "pods"
+	resourceDeployments  = "deployments"
+	resourceStatefulSets = "statefulsets"
+
+	// API groups
+	apiGroupApps         = "apps"
+	apiGroupCoordination = "coordination.k8s.io"
+
+	// Spotalis default identifiers
+	spotalisController       = "spotalis-controller"
+	spotalisNamespace        = "spotalis-system"
+	spotalisControllerLeader = "spotalis-controller-leader"
+
+	// Network endpoints
+	metricsAddr = ":8080"
+	healthAddr  = ":8081"
+	webhookAddr = ":9443"
+
+	// TLS file names
+	tlsCertFile = "tls.crt"
+	tlsKeyFile  = "tls.key"
+
+	// Standard kubernetes labels
+	labelAppName      = "app.kubernetes.io/name"
+	labelAppComponent = "app.kubernetes.io/component"
+	labelAppManagedBy = "app.kubernetes.io/managed-by"
+
+	// Default log level
+	defaultLogLevel = "info"
 )
 
 // KubernetesConfig contains Kubernetes client configuration
@@ -78,10 +110,10 @@ func DefaultKubernetesConfig() *KubernetesConfig {
 		Burst:              30,
 		Timeout:            30 * time.Second,
 		UserAgent:          "spotalis-controller/1.0",
-		ServiceAccount:     "spotalis-controller",
-		Namespace:          "spotalis-system",
-		ClusterRole:        "spotalis-controller",
-		RoleBinding:        "spotalis-controller",
+		ServiceAccount:     spotalisController,
+		Namespace:          spotalisNamespace,
+		ClusterRole:        spotalisController,
+		RoleBinding:        spotalisController,
 		DisableCompression: false,
 		ContentType:        "application/json",
 		AcceptContentTypes: "application/json",
@@ -174,21 +206,21 @@ func (k *KubernetesClientManager) ValidatePermissions(ctx context.Context) error
 		verb     string
 		group    string
 	}{
-		{"nodes", verbList, ""},
-		{"nodes", verbGet, ""},
-		{"pods", verbList, ""},
-		{"pods", verbGet, ""},
-		{"pods", verbPatch, ""},
-		{"deployments", verbList, "apps"},
-		{"deployments", verbGet, "apps"},
-		{"deployments", verbPatch, "apps"},
-		{"statefulsets", verbList, "apps"},
-		{"statefulsets", verbGet, "apps"},
-		{"statefulsets", verbPatch, "apps"},
+		{resourceNodes, verbList, ""},
+		{resourceNodes, verbGet, ""},
+		{resourcePods, verbList, ""},
+		{resourcePods, verbGet, ""},
+		{resourcePods, verbPatch, ""},
+		{resourceDeployments, verbList, apiGroupApps},
+		{resourceDeployments, verbGet, apiGroupApps},
+		{resourceDeployments, verbPatch, apiGroupApps},
+		{resourceStatefulSets, verbList, apiGroupApps},
+		{resourceStatefulSets, verbGet, apiGroupApps},
+		{resourceStatefulSets, verbPatch, apiGroupApps},
 		{"events", verbCreate, ""},
-		{"leases", verbCreate, "coordination.k8s.io"},
-		{"leases", verbGet, "coordination.k8s.io"},
-		{"leases", verbUpdate, "coordination.k8s.io"},
+		{"leases", verbCreate, apiGroupCoordination},
+		{"leases", verbGet, apiGroupCoordination},
+		{"leases", verbUpdate, apiGroupCoordination},
 	}
 
 	for _, perm := range permissions {
@@ -302,9 +334,9 @@ func (k *KubernetesClientManager) ensureNamespace(ctx context.Context) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "spotalis",
-				"app.kubernetes.io/component":  "controller",
-				"app.kubernetes.io/managed-by": "spotalis-controller",
+				labelAppName:       "spotalis",
+				labelAppComponent:  "controller",
+				labelAppManagedBy: spotalisController,
 			},
 		},
 	}
@@ -328,9 +360,9 @@ func (k *KubernetesClientManager) ensureServiceAccount(ctx context.Context) erro
 			Name:      k.config.ServiceAccount,
 			Namespace: k.config.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "spotalis",
-				"app.kubernetes.io/component":  "controller",
-				"app.kubernetes.io/managed-by": "spotalis-controller",
+				labelAppName:       "spotalis",
+				labelAppComponent:  "controller",
+				labelAppManagedBy: spotalisController,
 			},
 		},
 	}
@@ -353,34 +385,34 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.ClusterRole,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "spotalis",
-				"app.kubernetes.io/component":  "controller",
-				"app.kubernetes.io/managed-by": "spotalis-controller",
+				labelAppName:       "spotalis",
+				labelAppComponent:  "controller",
+				labelAppManagedBy: spotalisController,
 			},
 		},
 		Rules: []rbacv1.PolicyRule{
 			// Node permissions
 			{
 				APIGroups: []string{""},
-				Resources: []string{"nodes"},
+				Resources: []string{resourceNodes},
 				Verbs:     []string{verbGet, verbList, verbWatch},
 			},
 			// Pod permissions
 			{
 				APIGroups: []string{""},
-				Resources: []string{"pods"},
+				Resources: []string{resourcePods},
 				Verbs:     []string{verbGet, verbList, verbWatch, verbPatch, verbDelete},
 			},
 			// Deployment permissions
 			{
-				APIGroups: []string{"apps"},
-				Resources: []string{"deployments"},
+				APIGroups: []string{apiGroupApps},
+				Resources: []string{resourceDeployments},
 				Verbs:     []string{verbGet, verbList, verbWatch, verbPatch},
 			},
 			// StatefulSet permissions
 			{
-				APIGroups: []string{"apps"},
-				Resources: []string{"statefulsets"},
+				APIGroups: []string{apiGroupApps},
+				Resources: []string{resourceStatefulSets},
 				Verbs:     []string{verbGet, verbList, verbWatch, verbPatch},
 			},
 			// Event permissions
@@ -391,7 +423,7 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 			},
 			// Leader election permissions
 			{
-				APIGroups: []string{"coordination.k8s.io"},
+				APIGroups: []string{apiGroupCoordination},
 				Resources: []string{"leases"},
 				Verbs:     []string{verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete},
 			},
@@ -422,9 +454,9 @@ func (k *KubernetesClientManager) ensureClusterRoleBinding(ctx context.Context) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.RoleBinding,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "spotalis",
-				"app.kubernetes.io/component":  "controller",
-				"app.kubernetes.io/managed-by": "spotalis-controller",
+				labelAppName:       "spotalis",
+				labelAppComponent:  "controller",
+				labelAppManagedBy: spotalisController,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -458,22 +490,22 @@ func (k *KubernetesClientManager) validatePermission(ctx context.Context, resour
 	// This would typically use SubjectAccessReview, but for simplicity
 	// we'll just try to perform a basic operation
 	switch resource {
-	case "nodes":
+	case resourceNodes:
 		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
-	case "pods":
+	case resourcePods:
 		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
-	case "deployments":
+	case resourceDeployments:
 		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.AppsV1().Deployments("").List(ctx, metav1.ListOptions{Limit: 1})
 			return err
 		}
-	case "statefulsets":
+	case resourceStatefulSets:
 		if verb == verbList || verb == verbGet {
 			_, err := k.kubeClient.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{Limit: 1})
 			return err
