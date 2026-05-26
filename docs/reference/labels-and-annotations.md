@@ -16,14 +16,14 @@ spotalis.io/enabled=true
 If the label is absent or not "true", the workload is ignored even if tuning annotations are present.
 
 ## Summary Table
-Kind | Key | Type | Default | Required | Description | Stability | Since
------|-----|------|---------|----------|-------------|----------|------
-Label | `spotalis.io/enabled` | string (`"true"` to enable) | (absent = disabled) | Yes (to activate) | Opts workload into management | Stable | v0.x
-Annotation | `spotalis.io/spot-percentage` | int (0–100) | 70 | No | Target % of replicas on spot (capped by safety floor) | Stable | v0.x
-Annotation | `spotalis.io/min-on-demand` | int (>=0) | 1 | No | Minimum on-demand replica floor | Stable | v0.x
+Kind | Key | Type | If absent | Required | Description | Stability | Since
+-----|-----|------|-----------|----------|-------------|----------|------
+Label | `spotalis.io/enabled` | string (`"true"` to enable) | workload is ignored | Yes (to activate) | Opts workload into management | Stable | v0.x
+Annotation | `spotalis.io/spot-percentage` | int (0–100) | `0` (all replicas on on-demand) | No | Target % of replicas on spot (capped by safety floor) | Stable | v0.x
+Annotation | `spotalis.io/min-on-demand` | int (>=0) | `0` (no on-demand floor) | No | Minimum on-demand replica floor | Stable | v0.x
 
 ## Tuning Annotation Details
-Use annotations only after the label enables the workload. Absent annotations fall back to defaults.
+Use annotations only after the label enables the workload. Annotations are parsed by `ParseFromAnnotations` in `pkg/apis/configuration.go`; **missing annotations are not back-filled with sensible defaults** — `spot-percentage` and `min-on-demand` both become `0` if you do not set them. Enabling a workload with the label alone produces a 100% on-demand layout until you add at least one of the tuning annotations.
 
 ## Precedence & Inheritance
 1. Workload annotations (highest)
@@ -41,14 +41,14 @@ Floor feasibility | `min-on-demand` > replicas | Controller clamps spot target t
 Enablement missing | enablement label absent or != "true" | Annotations ignored
 
 ## Rounding & Calculation
-Distribution formula (see strategy doc for full detail):
+Distribution formula (see strategy doc for full detail). Spot uses **integer division**, not `ceil` or `round`:
 ```
-targetSpot = min( ceil(totalReplicas * spotPercentage/100), totalReplicas - minOnDemand )
+targetSpot = min( (totalReplicas * spotPercentage) / 100, totalReplicas - minOnDemand )
 ```
 Edge Cases:
 - `totalReplicas == 0`: no action.
-- `totalReplicas < minOnDemand`: force all replicas to on-demand (targetSpot = 0).
-- High percentage with small replica count may collapse after ceiling; verify logs.
+- `totalReplicas ≤ minOnDemand`: force all replicas to on-demand (targetSpot = 0).
+- Truncation: 73% of 10 yields 7 spot replicas, not 8. Set `spot-percentage` slightly higher than the rounded value you have in mind if you want to bias toward more spot.
 
 ## Examples
 Namespace defaulting example (label only):

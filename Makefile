@@ -52,6 +52,10 @@ build:
 deploy: ## Deploy Spotalis to Kubernetes cluster (generates certs dynamically with templates)
 	@./scripts/deploy.sh
 
+.PHONY: undeploy
+undeploy: ## Remove Spotalis from the current Kubernetes cluster
+	@./scripts/undeploy.sh
+
 .PHONY: build-deploy
 build-deploy: kind-load ## Build, load to Kind, and deploy
 	@echo "✅ Build and deployment completed"
