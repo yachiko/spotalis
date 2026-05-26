@@ -31,11 +31,22 @@ import (
 )
 
 const (
-	// Capacity types
-	capacityTypeSpot = "spot"
+	// Capacity types and values used by various cloud providers
+	capacityTypeSpot      = "spot"
+	capacityTypeOnDemand  = "on-demand"
+	capacityValueSPOT     = "SPOT"
+	capacityValueOnDemand = "ON_DEMAND"
+	capacityValueRegular  = "regular"
 
 	// Cloud providers
 	cloudProviderAWS = "aws"
+	cloudProviderGCP = "gcp"
+
+	// Node label keys used by cloud providers
+	labelCapacityType      = "karpenter.sh/capacity-type"
+	labelInstanceType      = "node.kubernetes.io/instance-type"
+	labelGKEPreemptible    = "cloud.google.com/gke-preemptible"
+	labelAzureScalesetPrio = "kubernetes.azure.com/scalesetpriority"
 )
 
 // NodeClassifierService provides node classification functionality
@@ -103,21 +114,21 @@ func getDefaultNodeClassifierConfig() *NodeClassifierConfig {
 	return &NodeClassifierConfig{
 		SpotLabels: map[string]string{
 			// AWS
-			"karpenter.sh/capacity-type":       "spot",
-			"eks.amazonaws.com/capacityType":   "SPOT",
-			"node.kubernetes.io/instance-type": "*",
+			labelCapacityType:       "spot",
+			"eks.amazonaws.com/capacityType":   capacityValueSPOT,
+			labelInstanceType: "*",
 			// GCP
-			"cloud.google.com/gke-preemptible": "true",
+			labelGKEPreemptible: "true",
 			// Azure
-			"kubernetes.azure.com/scalesetpriority": "spot",
+			labelAzureScalesetPrio: "spot",
 		},
 		OnDemandLabels: map[string]string{
 			// AWS
-			"karpenter.sh/capacity-type":     "on-demand",
-			"eks.amazonaws.com/capacityType": "ON_DEMAND",
+			labelCapacityType:     capacityTypeOnDemand,
+			"eks.amazonaws.com/capacityType": capacityValueOnDemand,
 			// GCP (absence of preemptible label indicates on-demand)
 			// Azure
-			"kubernetes.azure.com/scalesetpriority": "regular",
+			labelAzureScalesetPrio: capacityValueRegular,
 		},
 		CacheRefreshInterval: 5 * time.Minute,
 		CloudProvider:        "auto", // Auto-detect
@@ -160,23 +171,23 @@ func (n *NodeClassifierService) ClassifyNode(node *corev1.Node) apis.NodeType {
 // classifyByCloudProvider uses cloud provider-specific logic
 func (n *NodeClassifierService) classifyByCloudProvider(node *corev1.Node) apis.NodeType {
 	// AWS EKS specific detection
-	if instanceType, exists := node.Labels["node.kubernetes.io/instance-type"]; exists {
+	if instanceType, exists := node.Labels[labelInstanceType]; exists {
 		// Check EKS managed node groups
 		if capacityType, exists := node.Labels["eks.amazonaws.com/capacityType"]; exists {
-			if capacityType == "SPOT" {
+			if capacityType == capacityValueSPOT {
 				return apis.NodeTypeSpot
 			}
-			if capacityType == "ON_DEMAND" {
+			if capacityType == capacityValueOnDemand {
 				return apis.NodeTypeOnDemand
 			}
 		}
 
 		// Check Karpenter nodes
-		if capacityType, exists := node.Labels["karpenter.sh/capacity-type"]; exists {
+		if capacityType, exists := node.Labels[labelCapacityType]; exists {
 			if capacityType == capacityTypeSpot {
 				return apis.NodeTypeSpot
 			}
-			if capacityType == "on-demand" {
+			if capacityType == capacityTypeOnDemand {
 				return apis.NodeTypeOnDemand
 			}
 		}
@@ -188,16 +199,16 @@ func (n *NodeClassifierService) classifyByCloudProvider(node *corev1.Node) apis.
 	}
 
 	// GCP GKE specific detection
-	if _, exists := node.Labels["cloud.google.com/gke-preemptible"]; exists {
+	if _, exists := node.Labels[labelGKEPreemptible]; exists {
 		return apis.NodeTypeSpot
 	}
 
 	// Azure AKS specific detection
-	if priority, exists := node.Labels["kubernetes.azure.com/scalesetpriority"]; exists {
+	if priority, exists := node.Labels[labelAzureScalesetPrio]; exists {
 		if priority == "spot" {
 			return apis.NodeTypeSpot
 		}
-		if priority == "regular" {
+		if priority == capacityValueRegular {
 			return apis.NodeTypeOnDemand
 		}
 	}
@@ -490,17 +501,17 @@ func (n *NodeClassifierService) DetectCloudProvider(ctx context.Context) (string
 	if _, exists := node.Labels["eks.amazonaws.com/capacityType"]; exists {
 		return cloudProviderAWS, nil
 	}
-	if _, exists := node.Labels["karpenter.sh/capacity-type"]; exists {
+	if _, exists := node.Labels[labelCapacityType]; exists {
 		return cloudProviderAWS, nil
 	}
 
 	// Check for GCP/GKE
-	if _, exists := node.Labels["cloud.google.com/gke-preemptible"]; exists {
-		return "gcp", nil
+	if _, exists := node.Labels[labelGKEPreemptible]; exists {
+		return cloudProviderGCP, nil
 	}
 
 	// Check for Azure/AKS
-	if _, exists := node.Labels["kubernetes.azure.com/scalesetpriority"]; exists {
+	if _, exists := node.Labels[labelAzureScalesetPrio]; exists {
 		return "azure", nil
 	}
 
@@ -510,8 +521,8 @@ func (n *NodeClassifierService) DetectCloudProvider(ctx context.Context) (string
 		if strings.Contains(providerID, "aws") {
 			return cloudProviderAWS, nil
 		}
-		if strings.Contains(providerID, "gce") || strings.Contains(providerID, "gcp") {
-			return "gcp", nil
+		if strings.Contains(providerID, "gce") || strings.Contains(providerID, cloudProviderGCP) {
+			return cloudProviderGCP, nil
 		}
 		if strings.Contains(providerID, "azure") {
 			return "azure", nil
