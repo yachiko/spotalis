@@ -35,19 +35,19 @@ var _ = Describe("Operator Getters and State Methods", func() {
 
 	BeforeEach(func() {
 		testConfig = &Config{
-			MetricsAddr:             ":8080",
-			ProbeAddr:               ":8081",
-			WebhookAddr:             ":9443",
+			MetricsAddr:             metricsAddr,
+			ProbeAddr:               healthAddr,
+			WebhookAddr:             webhookAddr,
 			LeaderElection:          false,
 			LeaderElectionID:        "test-leader",
 			Namespace:               "test-ns",
 			ReconcileInterval:       10 * time.Second,
 			MaxConcurrentReconciles: 5,
 			WebhookCertDir:          "/tmp/certs",
-			WebhookCertName:         "tls.crt",
-			WebhookKeyName:          "tls.key",
+			WebhookCertName:         tlsCertFile,
+			WebhookKeyName:          tlsKeyFile,
 			WebhookPort:             9443,
-			LogLevel:                "info",
+			LogLevel:                defaultLogLevel,
 			EnablePprof:             false,
 			EnableWebhook:           false,
 			ReadOnlyMode:            false,
@@ -68,7 +68,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 		It("should return the operator configuration", func() {
 			config := testOp.GetConfig()
 			Expect(config).NotTo(BeNil())
-			Expect(config.MetricsAddr).To(Equal(":8080"))
+			Expect(config.MetricsAddr).To(Equal(metricsAddr))
 			Expect(config.Namespace).To(Equal("test-ns"))
 			Expect(config.LeaderElectionID).To(Equal("test-leader"))
 		})
@@ -349,10 +349,10 @@ var _ = Describe("Operator Getters and State Methods", func() {
 		It("should create config with default values", func() {
 			config := DefaultOperatorConfig()
 
-			Expect(config.MetricsAddr).To(Equal(":8080"))
-			Expect(config.ProbeAddr).To(Equal(":8081"))
-			Expect(config.WebhookAddr).To(Equal(":9443"))
-			Expect(config.LeaderElectionID).To(Equal("spotalis-controller-leader"))
+			Expect(config.MetricsAddr).To(Equal(metricsAddr))
+			Expect(config.ProbeAddr).To(Equal(healthAddr))
+			Expect(config.WebhookAddr).To(Equal(webhookAddr))
+			Expect(config.LeaderElectionID).To(Equal(spotalisControllerLeader))
 			Expect(config.ReconcileInterval).To(Equal(30 * time.Second))
 			Expect(config.MaxConcurrentReconciles).To(Equal(10))
 			Expect(config.APIQPSLimit).To(Equal(float32(20.0))) // Actual default is 20.0

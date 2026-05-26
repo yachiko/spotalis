@@ -38,8 +38,8 @@ var _ = Describe("Leader Election", func() {
 		leConfig = &LeaderElectionConfig{
 			Enabled:       true,
 			ID:            "spotalis-leader-election",
-			Namespace:     "spotalis-system",
-			LeaseName:     "spotalis-controller",
+			Namespace:     spotalisNamespace,
+			LeaseName:     spotalisController,
 			LeaseDuration: 30 * time.Second,
 			RenewDeadline: 20 * time.Second,
 			RetryPeriod:   5 * time.Second,
@@ -60,7 +60,7 @@ var _ = Describe("Leader Election", func() {
 
 				Expect(defaults.Enabled).To(BeTrue())
 				Expect(defaults.ID).To(ContainSubstring("spotalis"))
-				Expect(defaults.Namespace).To(Equal("spotalis-system"))
+				Expect(defaults.Namespace).To(Equal(spotalisNamespace))
 				Expect(defaults.LeaseName).To(ContainSubstring("spotalis"))
 				Expect(defaults.LeaseDuration).To(Equal(15 * time.Second))
 				Expect(defaults.RenewDeadline).To(Equal(10 * time.Second))
@@ -234,19 +234,19 @@ var _ = Describe("Leader Election", func() {
 
 	Describe("Identity Generation", func() {
 		It("should generate unique identity", func() {
-			identity1 := generateIdentity("spotalis-controller")
-			identity2 := generateIdentity("spotalis-controller")
+			identity1 := generateIdentity(spotalisController)
+			identity2 := generateIdentity(spotalisController)
 
 			Expect(identity1).ToNot(BeEmpty())
 			Expect(identity2).ToNot(BeEmpty())
 			Expect(identity1).ToNot(Equal(identity2)) // Should be unique
-			Expect(identity1).To(ContainSubstring("spotalis-controller"))
+			Expect(identity1).To(ContainSubstring(spotalisController))
 		})
 
 		It("should handle hostname in identity", func() {
 			Skip("Hostname testing requires real system environment")
-			// identity := generateIdentityWithHostname("spotalis-controller")
-			// Expect(identity).To(ContainSubstring("spotalis-controller"))
+			// identity := generateIdentityWithHostname(spotalisController)
+			// Expect(identity).To(ContainSubstring(spotalisController))
 		})
 
 		It("should validate identity format", func() {

@@ -49,10 +49,10 @@ var _ = Describe("KubernetesConfig", func() {
 			Burst:          100,
 			Timeout:        30 * time.Second,
 			UserAgent:      "spotalis-operator",
-			ServiceAccount: "spotalis-controller",
-			Namespace:      "spotalis-system",
-			ClusterRole:    "spotalis-controller",
-			RoleBinding:    "spotalis-controller",
+			ServiceAccount: spotalisController,
+			Namespace:      spotalisNamespace,
+			ClusterRole:    spotalisController,
+			RoleBinding:    spotalisController,
 		}
 	})
 
@@ -71,9 +71,9 @@ var _ = Describe("KubernetesConfig", func() {
 				Expect(defaults.Burst).To(Equal(30))
 				Expect(defaults.Timeout).To(Equal(30 * time.Second))
 				Expect(defaults.UserAgent).To(ContainSubstring("spotalis"))
-				Expect(defaults.ServiceAccount).To(Equal("spotalis-controller"))
-				Expect(defaults.Namespace).To(Equal("spotalis-system"))
-				Expect(defaults.ClusterRole).To(Equal("spotalis-controller"))
+				Expect(defaults.ServiceAccount).To(Equal(spotalisController))
+				Expect(defaults.Namespace).To(Equal(spotalisNamespace))
+				Expect(defaults.ClusterRole).To(Equal(spotalisController))
 			})
 		})
 
@@ -170,16 +170,16 @@ var _ = Describe("KubernetesConfig", func() {
 						Name:      kubeConfig.ServiceAccount,
 						Namespace: kubeConfig.Namespace,
 						Labels: map[string]string{
-							"app.kubernetes.io/name":      "spotalis",
-							"app.kubernetes.io/component": "controller",
+							labelAppName:      "spotalis",
+							labelAppComponent: "controller",
 						},
 					},
 				}
 
 				Expect(sa.Name).To(Equal(kubeConfig.ServiceAccount))
 				Expect(sa.Namespace).To(Equal(kubeConfig.Namespace))
-				Expect(sa.Labels).To(HaveKey("app.kubernetes.io/name"))
-				Expect(sa.Labels["app.kubernetes.io/name"]).To(Equal("spotalis"))
+				Expect(sa.Labels).To(HaveKey(labelAppName))
+				Expect(sa.Labels[labelAppName]).To(Equal("spotalis"))
 			})
 
 			It("should create service account in cluster", func() {
@@ -206,7 +206,7 @@ var _ = Describe("KubernetesConfig", func() {
 			It("should require proper permissions for deployments", func() {
 				// Test that we know what permissions are needed
 				requiredVerbs := []string{verbGet, verbList, verbWatch, verbUpdate, verbPatch}
-				requiredResources := []string{"deployments", "deployments/status"}
+				requiredResources := []string{resourceDeployments, "deployments/status"}
 
 				for _, verb := range requiredVerbs {
 					Expect(verb).To(BeElementOf(verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete))
@@ -220,7 +220,7 @@ var _ = Describe("KubernetesConfig", func() {
 			It("should require proper permissions for statefulsets", func() {
 				// Test that we know what permissions are needed
 				requiredVerbs := []string{verbGet, verbList, verbWatch, verbUpdate, verbPatch}
-				requiredResources := []string{"statefulsets", "statefulsets/status"}
+				requiredResources := []string{resourceStatefulSets, "statefulsets/status"}
 
 				for _, verb := range requiredVerbs {
 					Expect(verb).To(BeElementOf(verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete))
@@ -234,7 +234,7 @@ var _ = Describe("KubernetesConfig", func() {
 			It("should require proper permissions for pods and nodes", func() {
 				// Test that we know what permissions are needed
 				requiredVerbs := []string{verbGet, verbList, verbWatch}
-				requiredResources := []string{"pods", "nodes"}
+				requiredResources := []string{resourcePods, resourceNodes}
 
 				for _, verb := range requiredVerbs {
 					Expect(verb).To(BeElementOf(verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete))
@@ -308,16 +308,16 @@ var _ = Describe("KubernetesConfig", func() {
 
 	Describe("Helper Functions", func() {
 		It("should check if resource exists in rule", func() {
-			resources := []string{"deployments", "statefulsets", "pods"}
-			Expect(containsResource(resources, "deployments")).To(BeTrue())
+			resources := []string{resourceDeployments, resourceStatefulSets, resourcePods}
+			Expect(containsResource(resources, resourceDeployments)).To(BeTrue())
 			Expect(containsResource(resources, "services")).To(BeFalse())
 		})
 
 		It("should apply proper labels", func() {
 			labels := createStandardLabels()
-			Expect(labels).To(HaveKey("app.kubernetes.io/name"))
-			Expect(labels).To(HaveKey("app.kubernetes.io/component"))
-			Expect(labels["app.kubernetes.io/name"]).To(Equal("spotalis"))
+			Expect(labels).To(HaveKey(labelAppName))
+			Expect(labels).To(HaveKey(labelAppComponent))
+			Expect(labels[labelAppName]).To(Equal("spotalis"))
 		})
 
 		It("should create resource with proper metadata", func() {
@@ -329,7 +329,7 @@ var _ = Describe("KubernetesConfig", func() {
 			}
 
 			applyStandardMetadata(&sa.ObjectMeta)
-			Expect(sa.Labels).To(HaveKey("app.kubernetes.io/name"))
+			Expect(sa.Labels).To(HaveKey(labelAppName))
 			Expect(sa.Annotations).To(HaveKey("spotalis.io/managed-by"))
 		})
 	})
@@ -348,8 +348,8 @@ func containsResource(resources []string, resource string) bool {
 
 func createStandardLabels() map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":      "spotalis",
-		"app.kubernetes.io/component": "controller",
+		labelAppName:      "spotalis",
+		labelAppComponent: "controller",
 		"app.kubernetes.io/part-of":   "spotalis",
 	}
 }

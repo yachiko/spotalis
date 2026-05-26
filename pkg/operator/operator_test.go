@@ -34,19 +34,19 @@ var _ = Describe("Operator", func() {
 	BeforeEach(func() {
 		_, cancel = context.WithCancel(context.Background())
 		config = &Config{
-			MetricsAddr:             ":8080",
-			ProbeAddr:               ":8081",
-			WebhookAddr:             ":9443",
+			MetricsAddr:             metricsAddr,
+			ProbeAddr:               healthAddr,
+			WebhookAddr:             webhookAddr,
 			LeaderElection:          false, // Disable for tests
 			LeaderElectionID:        "spotalis-leader-election",
-			Namespace:               "spotalis-system",
+			Namespace:               spotalisNamespace,
 			ReconcileInterval:       30 * time.Second,
 			MaxConcurrentReconciles: 10,
 			WebhookCertDir:          "/tmp/k8s-webhook-server/serving-certs",
-			WebhookCertName:         "tls.crt",
-			WebhookKeyName:          "tls.key",
+			WebhookCertName:         tlsCertFile,
+			WebhookKeyName:          tlsKeyFile,
 			WebhookPort:             9443,
-			LogLevel:                "info",
+			LogLevel:                defaultLogLevel,
 			EnablePprof:             false,
 			EnableWebhook:           false, // Disable for tests
 			ReadOnlyMode:            false,
@@ -74,8 +74,8 @@ var _ = Describe("Operator", func() {
 		It("should use default configuration when nil config provided", func() {
 			defaultConfig := DefaultOperatorConfig()
 			Expect(defaultConfig).ToNot(BeNil())
-			Expect(defaultConfig.MetricsAddr).To(Equal(":8080"))
-			Expect(defaultConfig.ProbeAddr).To(Equal(":8081"))
+			Expect(defaultConfig.MetricsAddr).To(Equal(metricsAddr))
+			Expect(defaultConfig.ProbeAddr).To(Equal(healthAddr))
 			Expect(defaultConfig.LeaderElection).To(BeTrue())
 			Expect(defaultConfig.ReconcileInterval).To(Equal(30 * time.Second))
 			Expect(defaultConfig.MaxConcurrentReconciles).To(Equal(10))
@@ -87,16 +87,16 @@ var _ = Describe("Operator", func() {
 			It("should return sensible defaults", func() {
 				defaults := DefaultOperatorConfig()
 
-				Expect(defaults.MetricsAddr).To(Equal(":8080"))
-				Expect(defaults.ProbeAddr).To(Equal(":8081"))
-				Expect(defaults.WebhookAddr).To(Equal(":9443"))
+				Expect(defaults.MetricsAddr).To(Equal(metricsAddr))
+				Expect(defaults.ProbeAddr).To(Equal(healthAddr))
+				Expect(defaults.WebhookAddr).To(Equal(webhookAddr))
 				Expect(defaults.LeaderElection).To(BeTrue())
 				Expect(defaults.LeaderElectionID).To(ContainSubstring("spotalis"))
-				Expect(defaults.Namespace).To(Equal("spotalis-system"))
+				Expect(defaults.Namespace).To(Equal(spotalisNamespace))
 				Expect(defaults.ReconcileInterval).To(Equal(30 * time.Second))
 				Expect(defaults.MaxConcurrentReconciles).To(Equal(10))
 				Expect(defaults.WebhookPort).To(Equal(9443))
-				Expect(defaults.LogLevel).To(Equal("info"))
+				Expect(defaults.LogLevel).To(Equal(defaultLogLevel))
 				Expect(defaults.EnablePprof).To(BeFalse())
 				Expect(defaults.EnableWebhook).To(BeTrue())
 				Expect(defaults.ReadOnlyMode).To(BeFalse())
@@ -110,17 +110,17 @@ var _ = Describe("Operator", func() {
 				config := &Config{}
 
 				// Test that we can set all expected fields
-				config.MetricsAddr = ":8080"
-				config.ProbeAddr = ":8081"
-				config.WebhookAddr = ":9443"
+				config.MetricsAddr = metricsAddr
+				config.ProbeAddr = healthAddr
+				config.WebhookAddr = webhookAddr
 				config.LeaderElection = true
 				config.LeaderElectionID = "test"
 				config.Namespace = "test-namespace"
 				config.ReconcileInterval = 30 * time.Second
 				config.MaxConcurrentReconciles = 5
 				config.WebhookCertDir = "/tmp/certs"
-				config.WebhookCertName = "tls.crt"
-				config.WebhookKeyName = "tls.key"
+				config.WebhookCertName = tlsCertFile
+				config.WebhookKeyName = tlsKeyFile
 				config.WebhookPort = 9443
 				config.LogLevel = "debug"
 				config.EnablePprof = true
@@ -131,7 +131,7 @@ var _ = Describe("Operator", func() {
 				config.APIBurstLimit = 200
 
 				// Verify fields are set correctly
-				Expect(config.MetricsAddr).To(Equal(":8080"))
+				Expect(config.MetricsAddr).To(Equal(metricsAddr))
 				Expect(config.LeaderElection).To(BeTrue())
 				Expect(config.ReconcileInterval).To(Equal(30 * time.Second))
 				Expect(config.MaxConcurrentReconciles).To(Equal(5))
@@ -339,7 +339,7 @@ var _ = Describe("Operator", func() {
 		})
 
 		It("should handle log level validation", func() {
-			validLevels := []string{"debug", "info", "warn", "error"}
+			validLevels := []string{"debug", defaultLogLevel, "warn", "error"}
 			Expect(validLevels).To(ContainElement(config.LogLevel))
 		})
 	})

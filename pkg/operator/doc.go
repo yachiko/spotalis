@@ -102,7 +102,7 @@ Enable leader election for high availability:
 	operator:
 	  leaderElection:
 	    enabled: true
-	    leaseName: "spotalis-controller-leader"
+	    leaseName: spotalisControllerLeader
 	    leaseDuration: "15s"
 	    renewDeadline: "10s"
 	    retryPeriod: "2s"
@@ -156,8 +156,8 @@ Operator starts three HTTP servers:
 Configure ports:
 
 	operator:
-	  metricsAddr: ":8080"
-	  healthAddr: ":8081"
+	  metricsAddr: metricsAddr
+	  healthAddr: healthAddr
 	webhook:
 	  port: 9443
 	  certDir: "/tmp/k8s-webhook-server/serving-certs"
@@ -213,9 +213,9 @@ Operator exposes comprehensive observability:
 
 **Logs (structured JSON):**
 
-	{"level":"info","msg":"Starting Spotalis operator","version":"v0.1.0"}
-	{"level":"info","msg":"Leader election enabled","leaseName":"spotalis-controller-leader"}
-	{"level":"info","msg":"HTTP servers started","metrics":":8080","health":":8081","webhook":":9443"}
+	{"level":defaultLogLevel,"msg":"Starting Spotalis operator","version":"v0.1.0"}
+	{"level":defaultLogLevel,"msg":"Leader election enabled","leaseName":spotalisControllerLeader}
+	{"level":defaultLogLevel,"msg":"HTTP servers started","metrics":metricsAddr,"health":healthAddr,"webhook":webhookAddr}
 
 **Metrics (Prometheus):**
 
