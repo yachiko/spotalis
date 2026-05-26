@@ -43,7 +43,7 @@ var _ = Describe("DisruptionPolicy", func() {
 		workloadRef = corev1.ObjectReference{
 			Kind:       "Deployment",
 			Name:       "test-deployment",
-			Namespace:  "default",
+			Namespace:  stringDefault,
 			APIVersion: "apps/v1",
 		}
 
@@ -51,7 +51,7 @@ var _ = Describe("DisruptionPolicy", func() {
 		pdb = &policyv1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-pdb",
-				Namespace: "default",
+				Namespace: stringDefault,
 			},
 			Spec: policyv1.PodDisruptionBudgetSpec{
 				MaxUnavailable: &maxUnavailable,

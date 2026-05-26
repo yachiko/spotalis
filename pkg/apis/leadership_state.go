@@ -20,6 +20,10 @@ import (
 	"time"
 )
 
+// leadershipRoleLeader is the role string applied when this instance owns
+// the leader lease.
+const leadershipRoleLeader = "leader"
+
 // LeadershipState represents the current leader election state for controller coordination
 type LeadershipState struct {
 	// IsLeader indicates whether this instance is the current leader
@@ -154,7 +158,7 @@ func (l *LeadershipState) GetHealthStatus() LeadershipHealth {
 			Status:     "unhealthy",
 			Healthy:    false,
 			Message:    "Lease renewal deadline exceeded",
-			Leadership: "leader",
+			Leadership: leadershipRoleLeader,
 		}
 	}
 
@@ -163,7 +167,7 @@ func (l *LeadershipState) GetHealthStatus() LeadershipHealth {
 			Status:     "warning",
 			Healthy:    true,
 			Message:    "Lease renewal overdue",
-			Leadership: "leader",
+			Leadership: leadershipRoleLeader,
 		}
 	}
 
@@ -171,7 +175,7 @@ func (l *LeadershipState) GetHealthStatus() LeadershipHealth {
 		Status:     "healthy",
 		Healthy:    true,
 		Message:    "Leadership active",
-		Leadership: "leader",
+		Leadership: leadershipRoleLeader,
 	}
 }
 
