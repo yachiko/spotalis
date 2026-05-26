@@ -147,19 +147,19 @@ type HealthStatus struct {
 // DefaultOperatorConfig creates a default configuration
 func DefaultOperatorConfig() *Config {
 	return &Config{
-		MetricsAddr:             ":8080",
-		ProbeAddr:               ":8081",
-		WebhookAddr:             ":9443",
+		MetricsAddr:             metricsAddr,
+		ProbeAddr:               healthAddr,
+		WebhookAddr:             webhookAddr,
 		LeaderElection:          true,
-		LeaderElectionID:        "spotalis-controller-leader",
-		Namespace:               "spotalis-system",
+		LeaderElectionID:        spotalisControllerLeader,
+		Namespace:               spotalisNamespace,
 		ReconcileInterval:       30 * time.Second,
 		MaxConcurrentReconciles: 10,
 		WebhookCertDir:          "/tmp/k8s-webhook-server/serving-certs",
-		WebhookCertName:         "tls.crt",
-		WebhookKeyName:          "tls.key",
+		WebhookCertName:         tlsCertFile,
+		WebhookKeyName:          tlsKeyFile,
 		WebhookPort:             9443,
-		LogLevel:                "info",
+		LogLevel:                defaultLogLevel,
 		EnablePprof:             false,
 		EnableWebhook:           true,
 		ReadOnlyMode:            false,
@@ -593,7 +593,7 @@ func (o *Operator) updateControllerHealthMetrics() {
 		return
 	}
 
-	controllerName := "spotalis-controller"
+	controllerName := spotalisController
 	isLeader := o.IsLeader()
 
 	o.metricsCollector.UpdateControllerHealth(controllerName, isLeader)

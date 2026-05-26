@@ -66,9 +66,9 @@ func DefaultLeaderElectionConfig() *LeaderElectionConfig {
 
 	return &LeaderElectionConfig{
 		Enabled:       true,
-		ID:            "spotalis-controller-leader",
-		Namespace:     "spotalis-system",
-		LeaseName:     "spotalis-controller-leader",
+		ID:            spotalisControllerLeader,
+		Namespace:     spotalisNamespace,
+		LeaseName:     spotalisControllerLeader,
 		LeaseDuration: 15 * time.Second,
 		RenewDeadline: 10 * time.Second,
 		RetryPeriod:   2 * time.Second,
