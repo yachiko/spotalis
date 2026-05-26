@@ -46,6 +46,17 @@ const (
 	// BooleanTrue represents the string "true" for annotation values
 	BooleanTrue = "true"
 
+	// testPctSeventy is the canonical "70%" string used in spot-percentage tests.
+	testPctSeventy = "70%"
+	// testInvalid is the placeholder value used to assert parser rejection.
+	testInvalid = "invalid"
+	// testNotANumber is another placeholder used to assert numeric-parse failure.
+	testNotANumber = "not-a-number"
+	// testAppLabelKey is the standard "app" Kubernetes label key.
+	testAppLabelKey = "app"
+	// testCronDaily2AM is the example cron schedule used by disruption-window tests.
+	testCronDaily2AM = "0 2 * * *"
+
 	// BooleanFalse represents the string "false" for annotation values
 	BooleanFalse = "false"
 )

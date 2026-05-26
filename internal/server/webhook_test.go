@@ -101,12 +101,12 @@ var _ = Describe("WebhookServer", func() {
 				admissionReq := &v1.AdmissionRequest{
 					UID: types.UID("test-uid"),
 					Kind: metav1.GroupVersionKind{
-						Group:   "apps",
+						Group:   apiGroupApps,
 						Version: "v1",
 						Kind:    "Deployment",
 					},
 					Resource: metav1.GroupVersionResource{
-						Group:    "apps",
+						Group:    apiGroupApps,
 						Version:  "v1",
 						Resource: "deployments",
 					},
@@ -146,8 +146,8 @@ var _ = Describe("WebhookServer", func() {
 
 				admissionReview := &v1.AdmissionReview{
 					TypeMeta: metav1.TypeMeta{
-						APIVersion: "admission.k8s.io/v1",
-						Kind:       "AdmissionReview",
+						APIVersion: admissionAPIVersion,
+						Kind:       admissionReviewKind,
 					},
 					Request: admissionReq,
 				}
@@ -210,7 +210,7 @@ var _ = Describe("WebhookServer", func() {
 				admissionReq := &v1.AdmissionRequest{
 					UID: types.UID("test-uid"),
 					Kind: metav1.GroupVersionKind{
-						Group:   "apps",
+						Group:   apiGroupApps,
 						Version: "v1",
 						Kind:    "Deployment",
 					},
@@ -229,8 +229,8 @@ var _ = Describe("WebhookServer", func() {
 
 				admissionReview := &v1.AdmissionReview{
 					TypeMeta: metav1.TypeMeta{
-						APIVersion: "admission.k8s.io/v1",
-						Kind:       "AdmissionReview",
+						APIVersion: admissionAPIVersion,
+						Kind:       admissionReviewKind,
 					},
 					Request: admissionReq,
 				}
@@ -342,7 +342,7 @@ var _ = Describe("WebhookServer", func() {
 				admissionReq := &v1.AdmissionRequest{
 					UID: types.UID("test-uid"),
 					Kind: metav1.GroupVersionKind{
-						Group:   "apps",
+						Group:   apiGroupApps,
 						Version: "v1",
 						Kind:    "Deployment",
 					},
@@ -351,8 +351,8 @@ var _ = Describe("WebhookServer", func() {
 
 				admissionReview := &v1.AdmissionReview{
 					TypeMeta: metav1.TypeMeta{
-						APIVersion: "admission.k8s.io/v1",
-						Kind:       "AdmissionReview",
+						APIVersion: admissionAPIVersion,
+						Kind:       admissionReviewKind,
 					},
 					Request: admissionReq,
 				}
@@ -379,7 +379,7 @@ var _ = Describe("WebhookServer", func() {
 				admissionReq := &v1.AdmissionRequest{
 					UID: types.UID("test-uid"),
 					Kind: metav1.GroupVersionKind{
-						Group:   "apps",
+						Group:   apiGroupApps,
 						Version: "v1",
 						Kind:    "Deployment",
 					},
@@ -388,8 +388,8 @@ var _ = Describe("WebhookServer", func() {
 
 				admissionReview := &v1.AdmissionReview{
 					TypeMeta: metav1.TypeMeta{
-						APIVersion: "admission.k8s.io/v1",
-						Kind:       "AdmissionReview",
+						APIVersion: admissionAPIVersion,
+						Kind:       admissionReviewKind,
 					},
 					Request: admissionReq,
 				}

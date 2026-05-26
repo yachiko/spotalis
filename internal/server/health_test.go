@@ -127,7 +127,7 @@ var _ = Describe("HealthChecker", func() {
 				err := parseJSONResponse(response, &result)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result["status"]).To(Equal("unhealthy"))
-				Expect(result["component"]).To(Equal("kubernetes-api"))
+				Expect(result["component"]).To(Equal(componentKubernetesAPI))
 				Expect(result["error"]).To(Equal("kubernetes API marked as unavailable"))
 			})
 		})
@@ -199,7 +199,7 @@ var _ = Describe("HealthChecker", func() {
 				// Check that Kubernetes is marked as unavailable in checks
 				checks, ok := result["checks"].(map[string]interface{})
 				Expect(ok).To(BeTrue())
-				Expect(checks["kubernetes-api"]).To(Equal("manually marked as unavailable"))
+				Expect(checks[componentKubernetesAPI]).To(Equal("manually marked as unavailable"))
 			})
 		})
 	})

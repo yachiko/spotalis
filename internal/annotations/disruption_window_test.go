@@ -28,7 +28,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with valid annotations", func() {
 			It("should parse schedule and duration", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "0 2 * * *",
+					"spotalis.io/disruption-schedule": testCronDaily2AM,
 					DisruptionDurationAnnotation: "4h",
 				}
 				window, err := ParseDisruptionWindow(annots)
@@ -47,7 +47,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with partial annotations", func() {
 			It("should fail if only schedule is present", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "0 2 * * *",
+					"spotalis.io/disruption-schedule": testCronDaily2AM,
 				}
 				_, err := ParseDisruptionWindow(annots)
 				Expect(err).To(HaveOccurred())
@@ -67,7 +67,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with invalid cron expression", func() {
 			It("should fail with invalid cron format", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "invalid",
+					"spotalis.io/disruption-schedule": testInvalid,
 					DisruptionDurationAnnotation: "4h",
 				}
 				_, err := ParseDisruptionWindow(annots)
@@ -88,8 +88,8 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with invalid duration", func() {
 			It("should fail with invalid duration format", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "0 2 * * *",
-					DisruptionDurationAnnotation: "invalid",
+					"spotalis.io/disruption-schedule": testCronDaily2AM,
+					DisruptionDurationAnnotation: testInvalid,
 				}
 				_, err := ParseDisruptionWindow(annots)
 				Expect(err).To(HaveOccurred())
@@ -112,7 +112,7 @@ var _ = Describe("DisruptionWindow", func() {
 
 			BeforeEach(func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "0 2 * * *", // Daily at 2 AM UTC
+					"spotalis.io/disruption-schedule": testCronDaily2AM, // Daily at 2 AM UTC
 					DisruptionDurationAnnotation: "4h",        // 4-hour window (2 AM - 6 AM)
 				}
 				var err error
