@@ -70,12 +70,11 @@ Practical patterns:
 | Maximum savings for stateless service | `spot-percentage=80`, `min-on-demand=1` |
 | Keep majority stable but test spot | `spot-percentage=40`, `min-on-demand=2` |
 
-Steps (simplified):
-1. Compute tentative spot = round(P% * replicas)
-2. Compute tentative on‑demand = replicas - spot
-3. Enforce floor: if on‑demand < F then on‑demand = F and spot = replicas - F
-4. Clamp: ensure spot >= 0
-5. Produce (desiredSpot, desiredOnDemand)
+Steps (simplified, matches `ReplicaState.CalculateDesiredDistribution` in `pkg/apis/replica_state.go`):
+1. Compute tentative spot = `(replicas * P) / 100` (integer division, i.e. truncates toward zero)
+2. Cap spot at `replicas - F` so the floor is always reserved for on‑demand
+3. desiredOnDemand = replicas - desiredSpot
+4. Special case: if the workload is disabled, all replicas are placed on on‑demand
 
 Edge cases considered:
 * Very small replica counts (e.g. 1) – floor may consume all capacity -> 0 spot
@@ -116,14 +115,15 @@ Debug assistance: [debug mutation how-to](../how-to/debug-mutation.md).
 
 State: see [state management](../reference/state-management.md) for internal structs capturing observed vs desired splits and leadership info.
 
-Key metrics (names illustrative):
+Key metrics (see [metrics reference](../reference/metrics.md) for the full list and label sets):
 | Metric | Type | Meaning |
 |--------|------|---------|
-| `spotalis_replicas_desired{type="spot|on_demand"}` | Gauge | Computed desired counts |
-| `spotalis_replicas_realized{type="spot|on_demand"}` | Gauge | Observed running pods |
-| `spotalis_reconcile_total` | Counter | Reconcile loop executions |
-| `spotalis_reconcile_errors_total` | Counter | Errors in reconcile cycles |
-| `spotalis_annotation_parse_failures_total` | Counter | Invalid annotation inputs |
+| `spotalis_workload_replicas{replica_type="spot\|on-demand"}` | Gauge | Observed replica counts per managed workload |
+| `spotalis_reconciliations_total{result="success\|error"}` | Counter | Reconcile attempts |
+| `spotalis_reconciliation_errors_total` | Counter | Reconcile errors by `error_type` |
+| `spotalis_rebalancing_blocked_by_pdb_total` | Counter | Rebalances blocked by a PodDisruptionBudget |
+| `spotalis_webhook_requests_total` | Counter | Admission requests processed by the mutating webhook |
+| `spotalis_leader_election_status` | Gauge | `1` if this replica owns the lease, `0` otherwise |
 
 Port & endpoint mapping: [runtime ports](../reference/runtime-ports.md) and [metrics reference](../reference/metrics.md).
 

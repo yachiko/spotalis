@@ -23,8 +23,10 @@ Related docs: [Labels & Annotations](../reference/labels-and-annotations.md), [S
 ## Core Formula
 Let T=total replicas, P=spot percentage (0-100), M=min on-demand.
 
+Spot uses **integer division** (truncation toward zero) — not `round` or `ceil`. The implementation is `ReplicaState.CalculateDesiredDistribution` in `pkg/apis/replica_state.go`.
+
 ```
-targetSpot = min( ceil(T * P / 100), T - M )
+targetSpot = min( (T * P) / 100, T - M )
 ```
 Derived On-Demand:
 ```
@@ -33,17 +35,21 @@ targetOnDemand = T - targetSpot
 
 Edge Handling:
 - Clamp P < 0 to 0; P > 100 to 100 (implicit by parser validation)
-- If T < M then all replicas forced on-demand (targetSpot=0, targetOnDemand=T)
-- If P = 0 -> targetSpot=0 (all on-demand)
+- If T ≤ M then all replicas forced on-demand (targetSpot=0, targetOnDemand=T)
+- If P = 0 → targetSpot=0 (all on-demand)
 
 ## Example Scenarios
-| T | P | M | Computation | Result (Spot/OnDemand) |
-|---|---|---|------------|------------------------|
-| 10 | 70 | 1 | min( ceil(10*70/100)=7, 9 ) | 7 / 3 |
-| 10 | 90 | 4 | min( ceil(9)=9, 6 ) | 6 / 4 |
-| 3 | 80 | 2 | min( ceil(2.4)=3, 1 ) | 1 / 2 |
-| 2 | 50 | 3 | min( ceil(1)=1, -1 ) -> clamp negative | 0 / 2 |
-| 5 | 0  | 1 | min(0,4)=0 | 0 / 5 |
+| T  | P  | M | Computation                                  | Result (Spot/OnDemand) |
+|----|----|---|----------------------------------------------|------------------------|
+| 10 | 70 | 1 | min( (10*70)/100=7,  10-1=9 )                | 7 / 3                  |
+| 10 | 73 | 1 | min( (10*73)/100=7,  10-1=9 )                | 7 / 3                  |
+| 10 | 90 | 4 | min( (10*90)/100=9,  10-4=6 )                | 6 / 4                  |
+| 3  | 80 | 2 | min( (3*80)/100=2,   3-2=1 )                 | 1 / 2                  |
+| 5  | 0  | 1 | spot skipped because P=0                     | 0 / 5                  |
+
+Row 2 illustrates the truncation rule: 73% of 10 is 7.3, but integer division produces 7 (not 8 — there is no rounding).
+
+> Avoid configurations where M > T (the minimum floor exceeds the total). The current code does not specifically clamp this case; pick `min-on-demand` ≤ `replicas`.
 
 ## Reconciliation Actions
 The `ReplicaState.GetNextAction()` method selects next step:

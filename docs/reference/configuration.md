@@ -10,6 +10,8 @@ Authoritative reference for the operator's consolidated runtime configuration. T
 
 Related docs: [Labels & Annotations](./labels-and-annotations.md), [Runtime Ports](./runtime-ports.md), [Design Choices](../explanation/design-choices.md)
 
+> **Defaults shown below are the controller binary's built-in defaults** (from `DefaultManagerConfig` in `pkg/controllers/manager.go` and friends). The Helm chart at `deploy/helm/values.yaml` ships a different starting point for a few fields — notably `controllers.maxConcurrentReconciles: 2` and `controllers.reconcileInterval: 60s`. If you install via Helm, those Helm values win unless you override them. Specific overrides are called out inline below.
+
 ## Canonical YAML (with defaults)
 ```yaml
 operator:
@@ -65,8 +67,8 @@ observability:
 | SPOTALIS_LEADER_ELECTION_ENABLED                              | operator.leaderElection.enabled                         | bool     | true                                  | Disable only for single-replica dev    |
 | SPOTALIS_LEADER_ELECTION_ID                                   | operator.leaderElection.id                              | string   | spotalis-controller-leader            | Lease name                             |
 | SPOTALIS_LEADER_ELECTION_LEASE_DURATION                       | operator.leaderElection.leaseDuration                   | duration | 15s                                   | Go duration syntax                     |
-| SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES                | controllers.maxConcurrentReconciles                     | int      | 1                                     | >1 increases parallelism               |
-| SPOTALIS_CONTROLLERS_RECONCILE_INTERVAL                       | controllers.reconcileInterval                           | duration | 5m                                    | Interval between periodic reconciles   |
+| SPOTALIS_CONTROLLERS_MAX_CONCURRENT_RECONCILES                | controllers.maxConcurrentReconciles                     | int      | 1 (Helm: 2)                           | >1 increases parallelism               |
+| SPOTALIS_CONTROLLERS_RECONCILE_INTERVAL                       | controllers.reconcileInterval                           | duration | 5m (Helm: 60s)                        | Interval between periodic reconciles   |
 | SPOTALIS_CONTROLLERS_WORKLOAD_COOLDOWN_PERIOD                 | controllers.workloadTiming.cooldownPeriod               | duration | 10s                                   | Minimum wait after disruption          |
 | SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_RETRY_INTERVAL       | controllers.workloadTiming.disruptionRetryInterval      | duration | 1m                                    | Retry when window resolution fails     |
 | SPOTALIS_CONTROLLERS_WORKLOAD_DISRUPTION_WINDOW_POLL_INTERVAL | controllers.workloadTiming.disruptionWindowPollInterval | duration | 10m                                   | Polling cadence outside window         |
