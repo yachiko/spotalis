@@ -27,6 +27,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Default resource and identifier names used across the configuration package.
+const (
+	defaultNamespace          = "spotalis-system"
+	defaultControllerName     = "spotalis-controller"
+	defaultLeaderElectionID   = "spotalis-controller-leader"
+	defaultWebhookServiceName = "spotalis-webhook-service"
+
+	tlsCertName = "tls.crt"
+	tlsKeyName  = "tls.key"
+
+	envNamespace               = "SPOTALIS_NAMESPACE"
+	envMaxConcurrentReconciles = "SPOTALIS_MAX_CONCURRENT_RECONCILES"
+	envReconcileInterval       = "SPOTALIS_RECONCILE_INTERVAL"
+	envReconcileTimeout        = "SPOTALIS_RECONCILE_TIMEOUT"
+	envWebhookEnabled          = "SPOTALIS_WEBHOOK_ENABLED"
+	envWebhookPort             = "SPOTALIS_WEBHOOK_PORT"
+	envKubeTimeout             = "SPOTALIS_KUBE_TIMEOUT"
+	envLeaderElectionEnabled   = "SPOTALIS_LEADER_ELECTION_ENABLED"
+	envLogLevel                = "SPOTALIS_LOG_LEVEL"
+	envLogDevelopment          = "SPOTALIS_LOG_DEVELOPMENT"
+	envMetricsBindAddress      = "SPOTALIS_METRICS_BIND_ADDRESS"
+)
+
 // Configuration represents the complete Spotalis configuration
 type Configuration struct {
 	// Controller configuration
@@ -158,7 +181,7 @@ type NamespacesConfig struct {
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
 		Controller: ControllerConfig{
-			Namespace:               "spotalis-system",
+			Namespace:               defaultNamespace,
 			MaxConcurrentReconciles: 10,
 			ReconcileInterval:       30 * time.Second,
 			ReconcileTimeout:        5 * time.Minute,
@@ -172,10 +195,10 @@ func DefaultConfiguration() *Configuration {
 			Enabled:          true,
 			Port:             9443,
 			CertDir:          "/tmp/k8s-webhook-server/serving-certs",
-			CertName:         "tls.crt",
-			KeyName:          "tls.key",
-			ServiceName:      "spotalis-webhook-service",
-			ServiceNamespace: "spotalis-system",
+			CertName:         tlsCertName,
+			KeyName:          tlsKeyName,
+			ServiceName:      defaultWebhookServiceName,
+			ServiceNamespace: defaultNamespace,
 			ServicePath:      "/mutate",
 			TLSMinVersion:    "1.3",
 			FailurePolicy:    "Fail",
@@ -185,14 +208,14 @@ func DefaultConfiguration() *Configuration {
 			QPS:            20.0,
 			Burst:          30,
 			Timeout:        30 * time.Second,
-			ServiceAccount: "spotalis-controller",
-			ClusterRole:    "spotalis-controller",
-			RoleBinding:    "spotalis-controller",
+			ServiceAccount: defaultControllerName,
+			ClusterRole:    defaultControllerName,
+			RoleBinding:    defaultControllerName,
 		},
 		LeaderElection: LeaderElectionConfig{
 			Enabled:       true,
-			ID:            "spotalis-controller-leader",
-			LeaseName:     "spotalis-controller-leader",
+			ID:            defaultLeaderElectionID,
+			LeaseName:     defaultLeaderElectionID,
 			LeaseDuration: 15 * time.Second,
 			RenewDeadline: 10 * time.Second,
 			RetryPeriod:   2 * time.Second,
@@ -265,10 +288,10 @@ func (cl *ConfigurationLoader) LoadFromFile(path string) error {
 func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 	envMappings := map[string]func(string) error{
 		// Controller configuration
-		"SPOTALIS_NAMESPACE":                 cl.setControllerNamespace,
-		"SPOTALIS_MAX_CONCURRENT_RECONCILES": cl.setMaxConcurrentReconciles,
-		"SPOTALIS_RECONCILE_INTERVAL":        cl.setReconcileInterval,
-		"SPOTALIS_RECONCILE_TIMEOUT":         cl.setReconcileTimeout,
+		envNamespace:                 cl.setControllerNamespace,
+		envMaxConcurrentReconciles: cl.setMaxConcurrentReconciles,
+		envReconcileInterval:        cl.setReconcileInterval,
+		envReconcileTimeout:         cl.setReconcileTimeout,
 		"SPOTALIS_ENABLE_DEPLOYMENTS":        cl.setEnableDeployments,
 		"SPOTALIS_ENABLE_STATEFULSETS":       cl.setEnableStatefulSets,
 		"SPOTALIS_ENABLE_DAEMONSETS":         cl.setEnableDaemonSets,
@@ -276,8 +299,8 @@ func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 		"SPOTALIS_GRACEFUL_SHUTDOWN_TIMEOUT": cl.setGracefulShutdownTimeout,
 
 		// Webhook configuration
-		"SPOTALIS_WEBHOOK_ENABLED":           cl.setWebhookEnabled,
-		"SPOTALIS_WEBHOOK_PORT":              cl.setWebhookPort,
+		envWebhookEnabled:           cl.setWebhookEnabled,
+		envWebhookPort:              cl.setWebhookPort,
 		"SPOTALIS_WEBHOOK_CERT_DIR":          cl.setWebhookCertDir,
 		"SPOTALIS_WEBHOOK_CERT_NAME":         cl.setWebhookCertName,
 		"SPOTALIS_WEBHOOK_KEY_NAME":          cl.setWebhookKeyName,
@@ -292,13 +315,13 @@ func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 		"SPOTALIS_KUBE_CONTEXT":    cl.setKubeContext,
 		"SPOTALIS_KUBE_QPS":        cl.setKubeQPS,
 		"SPOTALIS_KUBE_BURST":      cl.setKubeBurst,
-		"SPOTALIS_KUBE_TIMEOUT":    cl.setKubeTimeout,
+		envKubeTimeout:    cl.setKubeTimeout,
 		"SPOTALIS_SERVICE_ACCOUNT": cl.setServiceAccount,
 		"SPOTALIS_CLUSTER_ROLE":    cl.setClusterRole,
 		"SPOTALIS_ROLE_BINDING":    cl.setRoleBinding,
 
 		// Leader election configuration
-		"SPOTALIS_LEADER_ELECTION_ENABLED":        cl.setLeaderElectionEnabled,
+		envLeaderElectionEnabled:        cl.setLeaderElectionEnabled,
 		"SPOTALIS_LEADER_ELECTION_ID":             cl.setLeaderElectionID,
 		"SPOTALIS_LEADER_ELECTION_LEASE_NAME":     cl.setLeaderElectionLeaseName,
 		"SPOTALIS_LEADER_ELECTION_LEASE_DURATION": cl.setLeaderElectionLeaseDuration,
@@ -306,12 +329,12 @@ func (cl *ConfigurationLoader) LoadFromEnvironment() error {
 		"SPOTALIS_LEADER_ELECTION_RETRY_PERIOD":   cl.setLeaderElectionRetryPeriod,
 
 		// Logging configuration
-		"SPOTALIS_LOG_LEVEL":       cl.setLogLevel,
-		"SPOTALIS_LOG_DEVELOPMENT": cl.setLogDevelopment,
+		envLogLevel:       cl.setLogLevel,
+		envLogDevelopment: cl.setLogDevelopment,
 		"SPOTALIS_ENABLE_PPROF":    cl.setEnablePprof,
 
 		// Metrics configuration
-		"SPOTALIS_METRICS_BIND_ADDRESS":        cl.setMetricsBindAddress,
+		envMetricsBindAddress:        cl.setMetricsBindAddress,
 		"SPOTALIS_METRICS_ENABLE_PROFILING":    cl.setMetricsEnableProfiling,
 		"SPOTALIS_METRICS_PROFILING_ADDRESS":   cl.setMetricsProfilingAddress,
 		"SPOTALIS_HEALTH_BIND_ADDRESS":         cl.setHealthBindAddress,
