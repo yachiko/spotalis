@@ -363,7 +363,7 @@ var _ = Describe("Configurable Labels", func() {
 			It("should extract EKS capacity type labels", func() {
 				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 					SpotLabels: []metav1.LabelSelector{
-						{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": "SPOT"}},
+						{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": capacityValueSPOT}},
 					},
 					OnDemandLabels: []metav1.LabelSelector{
 						{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": "ON_DEMAND"}},
@@ -371,7 +371,7 @@ var _ = Describe("Configurable Labels", func() {
 				}
 				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
 				Expect(labelKey).To(Equal("eks.amazonaws.com/capacityType"))
-				Expect(spotValue).To(Equal("SPOT"))
+				Expect(spotValue).To(Equal(capacityValueSPOT))
 				Expect(onDemandValue).To(Equal("ON_DEMAND"))
 			})
 		})
@@ -380,14 +380,14 @@ var _ = Describe("Configurable Labels", func() {
 			It("should extract GKE preemptible labels", func() {
 				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 					SpotLabels: []metav1.LabelSelector{
-						{MatchLabels: map[string]string{"cloud.google.com/gke-preemptible": "true"}},
+						{MatchLabels: map[string]string{cloudGKEPreemptible: "true"}},
 					},
 					OnDemandLabels: []metav1.LabelSelector{
-						{MatchLabels: map[string]string{"cloud.google.com/gke-preemptible": "false"}},
+						{MatchLabels: map[string]string{cloudGKEPreemptible: "false"}},
 					},
 				}
 				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
-				Expect(labelKey).To(Equal("cloud.google.com/gke-preemptible"))
+				Expect(labelKey).To(Equal(cloudGKEPreemptible))
 				Expect(spotValue).To(Equal("true"))
 				Expect(onDemandValue).To(Equal("false"))
 			})
@@ -414,15 +414,15 @@ var _ = Describe("Configurable Labels", func() {
 			It("should use first selector from spot labels", func() {
 				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 					SpotLabels: []metav1.LabelSelector{
-						{MatchLabels: map[string]string{"custom.io/type": "preemptible"}},
+						{MatchLabels: map[string]string{customLabelType: "preemptible"}},
 						{MatchLabels: map[string]string{"other.io/type": "spot"}},
 					},
 					OnDemandLabels: []metav1.LabelSelector{
-						{MatchLabels: map[string]string{"custom.io/type": "standard"}},
+						{MatchLabels: map[string]string{customLabelType: "standard"}},
 					},
 				}
 				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
-				Expect(labelKey).To(Equal("custom.io/type"))
+				Expect(labelKey).To(Equal(customLabelType))
 				Expect(spotValue).To(Equal("preemptible"))
 				Expect(onDemandValue).To(Equal("standard"))
 			})
@@ -450,10 +450,10 @@ var _ = Describe("Configurable Labels", func() {
 		It("should use custom label key in patches", func() {
 			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 				SpotLabels: []metav1.LabelSelector{
-					{MatchLabels: map[string]string{"custom.io/type": "spot-instance"}},
+					{MatchLabels: map[string]string{customLabelType: "spot-instance"}},
 				},
 				OnDemandLabels: []metav1.LabelSelector{
-					{MatchLabels: map[string]string{"custom.io/type": "on-demand-instance"}},
+					{MatchLabels: map[string]string{customLabelType: "on-demand-instance"}},
 				},
 			}
 
@@ -492,14 +492,14 @@ var _ = Describe("Configurable Labels", func() {
 		It("should detect spot from custom EKS labels", func() {
 			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 				SpotLabels: []metav1.LabelSelector{
-					{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": "SPOT"}},
+					{MatchLabels: map[string]string{"eks.amazonaws.com/capacityType": capacityValueSPOT}},
 				},
 			}
 
 			pod := &corev1.Pod{
 				Spec: corev1.PodSpec{
 					NodeSelector: map[string]string{
-						"eks.amazonaws.com/capacityType": "SPOT",
+						"eks.amazonaws.com/capacityType": capacityValueSPOT,
 					},
 				},
 			}
@@ -511,14 +511,14 @@ var _ = Describe("Configurable Labels", func() {
 		It("should detect on-demand from custom GKE labels", func() {
 			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 				SpotLabels: []metav1.LabelSelector{
-					{MatchLabels: map[string]string{"cloud.google.com/gke-preemptible": "true"}},
+					{MatchLabels: map[string]string{cloudGKEPreemptible: "true"}},
 				},
 			}
 
 			pod := &corev1.Pod{
 				Spec: corev1.PodSpec{
 					NodeSelector: map[string]string{
-						"cloud.google.com/gke-preemptible": "false",
+						cloudGKEPreemptible: "false",
 					},
 				},
 			}
@@ -530,7 +530,7 @@ var _ = Describe("Configurable Labels", func() {
 		It("should return empty for unknown label value", func() {
 			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 				SpotLabels: []metav1.LabelSelector{
-					{MatchLabels: map[string]string{"custom.io/type": "spot"}},
+					{MatchLabels: map[string]string{customLabelType: "spot"}},
 				},
 			}
 
@@ -551,7 +551,7 @@ var _ = Describe("Configurable Labels", func() {
 		It("should detect spot from custom label in required affinity", func() {
 			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 				SpotLabels: []metav1.LabelSelector{
-					{MatchLabels: map[string]string{"custom.io/capacity": "spot"}},
+					{MatchLabels: map[string]string{customLabelCapacity: "spot"}},
 				},
 			}
 
@@ -561,7 +561,7 @@ var _ = Describe("Configurable Labels", func() {
 						{
 							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									Key:      "custom.io/capacity",
+									Key:      customLabelCapacity,
 									Operator: corev1.NodeSelectorOpIn,
 									Values:   []string{"spot"},
 								},
@@ -578,7 +578,7 @@ var _ = Describe("Configurable Labels", func() {
 		It("should detect on-demand from custom label in required affinity", func() {
 			handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{
 				SpotLabels: []metav1.LabelSelector{
-					{MatchLabels: map[string]string{"custom.io/capacity": "spot"}},
+					{MatchLabels: map[string]string{customLabelCapacity: "spot"}},
 				},
 			}
 
@@ -588,7 +588,7 @@ var _ = Describe("Configurable Labels", func() {
 						{
 							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									Key:      "custom.io/capacity",
+									Key:      customLabelCapacity,
 									Operator: corev1.NodeSelectorOpIn,
 									Values:   []string{"on-demand"},
 								},
