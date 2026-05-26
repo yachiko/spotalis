@@ -8,9 +8,9 @@ You may obtain a copy of the License at
 		Context("when spotalis is enabled", func() {
 			It("should parse all valid annotations", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled":          "true",
-					"spotalis.io/min-on-demand":    "2",
-					"spotalis.io/spot-percentage":  "70%",
+					annotationEnabled:          stringTrue,
+					annotationMinOnDemand:    "2",
+					annotationSpotPercentage:  stringPct70,
 					"spotalis.io/replica-strategy": "spread",
 					"spotalis.io/scaling-policy":   "gradual",
 				}
@@ -209,7 +209,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 		Context("when spotalis is disabled", func() {
 			It("should return disabled configuration", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled": "false",
+					annotationEnabled: "false",
 				}
 
 				config, err := apis.ParseFromAnnotations(annotations, true)
@@ -229,9 +229,9 @@ var _ = Describe("WorkloadConfiguration", func() {
 		Context("when spotalis is enabled", func() {
 			It("should parse all valid annotations", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled":         "true",
-					"spotalis.io/min-on-demand":   "2",
-					"spotalis.io/spot-percentage": "70%",
+					annotationEnabled:         stringTrue,
+					annotationMinOnDemand:   "2",
+					annotationSpotPercentage: stringPct70,
 				}
 
 				config, err := apis.ParseFromAnnotations(annotations, true)
@@ -243,8 +243,8 @@ var _ = Describe("WorkloadConfiguration", func() {
 
 			It("should handle spot percentage without % symbol", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled":         "true",
-					"spotalis.io/spot-percentage": "80",
+					annotationEnabled:         stringTrue,
+					annotationSpotPercentage: "80",
 				}
 
 				config, err := apis.ParseFromAnnotations(annotations, true)
@@ -256,7 +256,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 		Context("with invalid annotations", func() {
 			It("should fail with invalid enabled value", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled": "invalid",
+					annotationEnabled: stringInvalid,
 				}
 
 				_, err := apis.ParseFromAnnotations(annotations, true)
@@ -266,8 +266,8 @@ var _ = Describe("WorkloadConfiguration", func() {
 
 			It("should fail with invalid min-on-demand value", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled":       "true",
-					"spotalis.io/min-on-demand": "invalid",
+					annotationEnabled:       stringTrue,
+					annotationMinOnDemand: stringInvalid,
 				}
 
 				_, err := apis.ParseFromAnnotations(annotations, true)
@@ -277,8 +277,8 @@ var _ = Describe("WorkloadConfiguration", func() {
 
 			It("should fail with invalid spot-percentage value", func() {
 				annotations := map[string]string{
-					"spotalis.io/enabled":         "true",
-					"spotalis.io/spot-percentage": "invalid%",
+					annotationEnabled:         stringTrue,
+					annotationSpotPercentage: "invalid%",
 				}
 
 				_, err := apis.ParseFromAnnotations(annotations, true)
@@ -297,9 +297,9 @@ var _ = Describe("WorkloadConfiguration", func() {
 			}
 
 			annotations := config.ToAnnotations()
-			Expect(annotations["spotalis.io/enabled"]).To(Equal("true"))
-			Expect(annotations["spotalis.io/min-on-demand"]).To(Equal("2"))
-			Expect(annotations["spotalis.io/spot-percentage"]).To(Equal("70%"))
+			Expect(annotations[annotationEnabled]).To(Equal(stringTrue))
+			Expect(annotations[annotationMinOnDemand]).To(Equal("2"))
+			Expect(annotations[annotationSpotPercentage]).To(Equal(stringPct70))
 		})
 
 		It("should convert disabled configuration to minimal annotations", func() {
@@ -308,7 +308,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 			}
 
 			annotations := config.ToAnnotations()
-			Expect(annotations["spotalis.io/enabled"]).To(Equal("false"))
+			Expect(annotations[annotationEnabled]).To(Equal("false"))
 			Expect(annotations).To(HaveLen(1))
 		})
 

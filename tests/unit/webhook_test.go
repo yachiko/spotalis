@@ -88,13 +88,13 @@ var _ = Describe("MutationHandler", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-pod",
-						Namespace: "default",
+						Namespace: stringDefault,
 					},
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:  "test-container",
-								Image: "nginx:latest",
+								Name:  testContainerName,
+								Image: testImageNginx,
 							},
 						},
 					},
@@ -122,27 +122,27 @@ var _ = Describe("MutationHandler", func() {
 			It("should process Deployment requests", func() {
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-deployment",
-						Namespace: "default",
+						Name:      testDeploymentName,
+						Namespace: stringDefault,
 					},
 					Spec: appsv1.DeploymentSpec{
 						Replicas: int32Ptr(3),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"app": "test",
+								stringApp: stringTest,
 							},
 						},
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"app": "test",
+									stringApp: stringTest,
 								},
 							},
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "test-container",
-										Image: "nginx:latest",
+										Name:  testContainerName,
+										Image: testImageNginx,
 									},
 								},
 							},
@@ -156,7 +156,7 @@ var _ = Describe("MutationHandler", func() {
 				req := admission.Request{
 					AdmissionRequest: admissionv1.AdmissionRequest{
 						Kind: metav1.GroupVersionKind{
-							Kind: "Deployment",
+							Kind: stringDeployment,
 						},
 						Object: runtime.RawExtension{
 							Raw: deploymentBytes,
@@ -173,27 +173,27 @@ var _ = Describe("MutationHandler", func() {
 			It("should process StatefulSet requests", func() {
 				statefulSet := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-statefulset",
-						Namespace: "default",
+						Name:      testStatefulSetName,
+						Namespace: stringDefault,
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Replicas: int32Ptr(3),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"app": "test",
+								stringApp: stringTest,
 							},
 						},
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"app": "test",
+									stringApp: stringTest,
 								},
 							},
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "test-container",
-										Image: "nginx:latest",
+										Name:  testContainerName,
+										Image: testImageNginx,
 									},
 								},
 							},
@@ -207,7 +207,7 @@ var _ = Describe("MutationHandler", func() {
 				req := admission.Request{
 					AdmissionRequest: admissionv1.AdmissionRequest{
 						Kind: metav1.GroupVersionKind{
-							Kind: "StatefulSet",
+							Kind: stringStatefulSet,
 						},
 						Object: runtime.RawExtension{
 							Raw: statefulSetBytes,
@@ -227,30 +227,30 @@ var _ = Describe("MutationHandler", func() {
 		It("should deny deployment with invalid annotations", func() {
 			deployment := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: stringDefault,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "150", // Invalid: > 100
+						annotationSpotPercentage: "150", // Invalid: > 100
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							stringApp: stringTest,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								stringApp: stringTest,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -264,7 +264,7 @@ var _ = Describe("MutationHandler", func() {
 			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Kind: metav1.GroupVersionKind{
-						Kind: "Deployment",
+						Kind: stringDeployment,
 					},
 					Object: runtime.RawExtension{
 						Raw: deploymentBytes,
@@ -280,31 +280,31 @@ var _ = Describe("MutationHandler", func() {
 		It("should allow deployment with valid annotations", func() {
 			deployment := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: stringDefault,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70",
-						"spotalis.io/min-on-demand":   "1",
+						annotationSpotPercentage: "70",
+						annotationMinOnDemand:   "1",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							stringApp: stringTest,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								stringApp: stringTest,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -318,7 +318,7 @@ var _ = Describe("MutationHandler", func() {
 			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Kind: metav1.GroupVersionKind{
-						Kind: "Deployment",
+						Kind: stringDeployment,
 					},
 					Object: runtime.RawExtension{
 						Raw: deploymentBytes,
@@ -336,30 +336,30 @@ var _ = Describe("MutationHandler", func() {
 		It("should deny StatefulSet with invalid annotations", func() {
 			statefulSet := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: stringDefault,
 					Annotations: map[string]string{
-						"spotalis.io/min-on-demand": "-1", // Invalid: negative
+						annotationMinOnDemand: "-1", // Invalid: negative
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							stringApp: stringTest,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								stringApp: stringTest,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -373,7 +373,7 @@ var _ = Describe("MutationHandler", func() {
 			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Kind: metav1.GroupVersionKind{
-						Kind: "StatefulSet",
+						Kind: stringStatefulSet,
 					},
 					Object: runtime.RawExtension{
 						Raw: statefulSetBytes,
@@ -389,31 +389,31 @@ var _ = Describe("MutationHandler", func() {
 		It("should allow StatefulSet with valid annotations", func() {
 			statefulSet := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: stringDefault,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "50",
-						"spotalis.io/min-on-demand":   "2",
+						annotationSpotPercentage: "50",
+						annotationMinOnDemand:   "2",
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							stringApp: stringTest,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								stringApp: stringTest,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -427,7 +427,7 @@ var _ = Describe("MutationHandler", func() {
 			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Kind: metav1.GroupVersionKind{
-						Kind: "StatefulSet",
+						Kind: stringStatefulSet,
 					},
 					Object: runtime.RawExtension{
 						Raw: statefulSetBytes,
@@ -446,7 +446,7 @@ var _ = Describe("MutationHandler", func() {
 			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Kind: metav1.GroupVersionKind{
-						Kind: "Deployment",
+						Kind: stringDeployment,
 					},
 					Object: runtime.RawExtension{
 						Raw: []byte("invalid json"),

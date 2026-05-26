@@ -500,18 +500,18 @@ var _ = Describe("ReplicaState", func() {
 	Describe("WorkloadRef", func() {
 		It("should properly store workload reference", func() {
 			ref := corev1.ObjectReference{
-				Kind:      "Deployment",
-				Name:      "test-deployment",
-				Namespace: "default",
+				Kind:      stringDeployment,
+				Name:      testDeploymentName,
+				Namespace: stringDefault,
 			}
 
 			state := &apis.ReplicaState{
 				WorkloadRef: ref,
 			}
 
-			Expect(state.WorkloadRef.Kind).To(Equal("Deployment"))
-			Expect(state.WorkloadRef.Name).To(Equal("test-deployment"))
-			Expect(state.WorkloadRef.Namespace).To(Equal("default"))
+			Expect(state.WorkloadRef.Kind).To(Equal(stringDeployment))
+			Expect(state.WorkloadRef.Name).To(Equal(testDeploymentName))
+			Expect(state.WorkloadRef.Namespace).To(Equal(stringDefault))
 		})
 	})
 })
