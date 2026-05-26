@@ -28,7 +28,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with valid annotations", func() {
 			It("should parse schedule and duration", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": testCronDaily2AM,
+					DisruptionScheduleAnnotation: testCronDaily2AM,
 					DisruptionDurationAnnotation: "4h",
 				}
 				window, err := ParseDisruptionWindow(annots)
@@ -47,7 +47,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with partial annotations", func() {
 			It("should fail if only schedule is present", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": testCronDaily2AM,
+					DisruptionScheduleAnnotation: testCronDaily2AM,
 				}
 				_, err := ParseDisruptionWindow(annots)
 				Expect(err).To(HaveOccurred())
@@ -67,7 +67,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with invalid cron expression", func() {
 			It("should fail with invalid cron format", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": testInvalid,
+					DisruptionScheduleAnnotation: testInvalid,
 					DisruptionDurationAnnotation: "4h",
 				}
 				_, err := ParseDisruptionWindow(annots)
@@ -77,7 +77,7 @@ var _ = Describe("DisruptionWindow", func() {
 
 			It("should fail with 6-field cron (only 5-field supported)", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "0 0 2 * * *", // 6 fields
+					DisruptionScheduleAnnotation: "0 0 2 * * *", // 6 fields
 					DisruptionDurationAnnotation: "4h",
 				}
 				_, err := ParseDisruptionWindow(annots)
@@ -88,7 +88,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with invalid duration", func() {
 			It("should fail with invalid duration format", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": testCronDaily2AM,
+					DisruptionScheduleAnnotation: testCronDaily2AM,
 					DisruptionDurationAnnotation: testInvalid,
 				}
 				_, err := ParseDisruptionWindow(annots)
@@ -112,7 +112,7 @@ var _ = Describe("DisruptionWindow", func() {
 
 			BeforeEach(func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": testCronDaily2AM, // Daily at 2 AM UTC
+					DisruptionScheduleAnnotation: testCronDaily2AM, // Daily at 2 AM UTC
 					DisruptionDurationAnnotation: "4h",        // 4-hour window (2 AM - 6 AM)
 				}
 				var err error
@@ -148,7 +148,7 @@ var _ = Describe("DisruptionWindow", func() {
 		Context("with different duration formats", func() {
 			It("should handle 30m duration", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "0 12 * * *", // Daily at noon
+					DisruptionScheduleAnnotation: "0 12 * * *", // Daily at noon
 					DisruptionDurationAnnotation: "30m",
 				}
 				window, err := ParseDisruptionWindow(annots)
@@ -165,7 +165,7 @@ var _ = Describe("DisruptionWindow", func() {
 
 			It("should handle 2h30m duration", func() {
 				annots := map[string]string{
-					"spotalis.io/disruption-schedule": "0 14 * * *", // Daily at 2 PM
+					DisruptionScheduleAnnotation: "0 14 * * *", // Daily at 2 PM
 					DisruptionDurationAnnotation: "2h30m",
 				}
 				window, err := ParseDisruptionWindow(annots)

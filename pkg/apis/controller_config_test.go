@@ -120,7 +120,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		It("should monitor namespace that matches selector", func() {
 			config.NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"managed-by": "spotalis",
+					labelManagedBy: "spotalis",
 				},
 			}
 
@@ -128,7 +128,7 @@ var _ = Describe("ControllerConfiguration", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "managed-namespace",
 					Labels: map[string]string{
-						"managed-by": "spotalis",
+						labelManagedBy: "spotalis",
 					},
 				},
 			}
@@ -139,7 +139,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		It("should not monitor namespace that does not match selector", func() {
 			config.NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"managed-by": "spotalis",
+					labelManagedBy: "spotalis",
 				},
 			}
 
@@ -147,7 +147,7 @@ var _ = Describe("ControllerConfiguration", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "unmanaged-namespace",
 					Labels: map[string]string{
-						"managed-by": "other",
+						labelManagedBy: valueOther,
 					},
 				},
 			}
@@ -158,7 +158,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		It("should handle namespace with no labels", func() {
 			config.NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"managed-by": "spotalis",
+					labelManagedBy: "spotalis",
 				},
 			}
 
@@ -398,7 +398,7 @@ var _ = Describe("ControllerConfiguration", func() {
 		})
 
 		It("should accept spot labels only", func() {
-			nodeLabels.SpotLabels = map[string]string{"type": string(NodeTypeSpot)}
+			nodeLabels.SpotLabels = map[string]string{labelTypeKey: string(NodeTypeSpot)}
 			nodeLabels.OnDemandLabels = nil
 
 			err := nodeLabels.Validate()
@@ -407,7 +407,7 @@ var _ = Describe("ControllerConfiguration", func() {
 
 		It("should accept on-demand labels only", func() {
 			nodeLabels.SpotLabels = nil
-			nodeLabels.OnDemandLabels = map[string]string{"type": string(NodeTypeOnDemand)}
+			nodeLabels.OnDemandLabels = map[string]string{labelTypeKey: string(NodeTypeOnDemand)}
 
 			err := nodeLabels.Validate()
 			Expect(err).ToNot(HaveOccurred())
@@ -415,7 +415,7 @@ var _ = Describe("ControllerConfiguration", func() {
 
 		It("should accept empty maps if at least one is non-nil", func() {
 			nodeLabels.SpotLabels = make(map[string]string)
-			nodeLabels.OnDemandLabels = map[string]string{"type": string(NodeTypeOnDemand)}
+			nodeLabels.OnDemandLabels = map[string]string{labelTypeKey: string(NodeTypeOnDemand)}
 
 			err := nodeLabels.Validate()
 			Expect(err).ToNot(HaveOccurred())

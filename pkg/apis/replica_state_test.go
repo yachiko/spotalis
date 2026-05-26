@@ -501,7 +501,7 @@ var _ = Describe("ReplicaState", func() {
 			ref := corev1.ObjectReference{
 				Kind:      "Deployment",
 				Name:      "test-deployment",
-				Namespace: "default",
+				Namespace: stringDefault,
 			}
 
 			state := &ReplicaState{
@@ -510,7 +510,7 @@ var _ = Describe("ReplicaState", func() {
 
 			Expect(state.WorkloadRef.Kind).To(Equal("Deployment"))
 			Expect(state.WorkloadRef.Name).To(Equal("test-deployment"))
-			Expect(state.WorkloadRef.Namespace).To(Equal("default"))
+			Expect(state.WorkloadRef.Namespace).To(Equal(stringDefault))
 		})
 	})
 })

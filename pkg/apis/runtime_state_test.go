@@ -33,7 +33,7 @@ var _ = Describe("RuntimeState", func() {
 		BeforeEach(func() {
 			selector := &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"managed-by": "spotalis",
+					labelManagedBy: "spotalis",
 				},
 			}
 			filter = NewNamespaceFilter(selector)
@@ -42,7 +42,7 @@ var _ = Describe("RuntimeState", func() {
 		Describe("NewNamespaceFilter", func() {
 			It("should create a filter with the provided selector", func() {
 				Expect(filter.Selector).ToNot(BeNil())
-				Expect(filter.Selector.MatchLabels["managed-by"]).To(Equal("spotalis"))
+				Expect(filter.Selector.MatchLabels[labelManagedBy]).To(Equal("spotalis"))
 				Expect(filter.AllowAll).To(BeFalse())
 				Expect(filter.MonitoredNamespaces).To(BeEmpty())
 				Expect(filter.TotalWorkloads).To(Equal(0))
@@ -61,7 +61,7 @@ var _ = Describe("RuntimeState", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "managed-namespace",
 						Labels: map[string]string{
-							"managed-by": "spotalis",
+							labelManagedBy: "spotalis",
 						},
 					},
 				}
@@ -74,7 +74,7 @@ var _ = Describe("RuntimeState", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "unmanaged-namespace",
 						Labels: map[string]string{
-							"managed-by": "other",
+							labelManagedBy: "other",
 						},
 					},
 				}
@@ -120,7 +120,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "managed-1",
 							Labels: map[string]string{
-								"managed-by": "spotalis",
+								labelManagedBy: "spotalis",
 							},
 						},
 					},
@@ -128,7 +128,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "managed-2",
 							Labels: map[string]string{
-								"managed-by": "spotalis",
+								labelManagedBy: "spotalis",
 							},
 						},
 					},
@@ -136,7 +136,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "unmanaged",
 							Labels: map[string]string{
-								"managed-by": "other",
+								labelManagedBy: "other",
 							},
 						},
 					},
@@ -164,7 +164,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "z-namespace",
 							Labels: map[string]string{
-								"managed-by": "spotalis",
+								labelManagedBy: "spotalis",
 							},
 						},
 					},
@@ -172,7 +172,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "a-namespace",
 							Labels: map[string]string{
-								"managed-by": "spotalis",
+								labelManagedBy: "spotalis",
 							},
 						},
 					},
@@ -204,7 +204,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "ns-1",
 							Labels: map[string]string{
-								"managed-by": "spotalis",
+								labelManagedBy: "spotalis",
 							},
 						},
 					},
@@ -212,7 +212,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "ns-2",
 							Labels: map[string]string{
-								"managed-by": "spotalis",
+								labelManagedBy: "spotalis",
 							},
 						},
 					},
@@ -248,7 +248,7 @@ var _ = Describe("RuntimeState", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "managed-ns",
 							Labels: map[string]string{
-								"managed-by": "spotalis",
+								labelManagedBy: "spotalis",
 							},
 						},
 					},
