@@ -18,7 +18,7 @@ webhooks:
     service:
       name: {{ include "spotalis.fullname" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1-pod
+      path: /mutate
       port: {{ .Values.service.webhookPort }}
   failurePolicy: {{ .Values.webhook.failurePolicy }}
   sideEffects: None
