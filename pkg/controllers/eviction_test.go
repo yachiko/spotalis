@@ -45,7 +45,7 @@ var _ = Describe("EvictPod", func() {
 		It("should return EvictionResultEvicted", func() {
 			// Intercept SubResource().Create() and return success
 			funcs := interceptor.Funcs{
-				SubResourceCreate: func(_ context.Context, c client.Client, subResourceName string, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 					return nil
 				},
 			}
@@ -65,7 +65,7 @@ var _ = Describe("EvictPod", func() {
 	Context("when pod is not found", func() {
 		It("should return EvictionResultAlreadyGone", func() {
 			funcs := interceptor.Funcs{
-				SubResourceCreate: func(_ context.Context, c client.Client, subResourceName string, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 					return apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pods"}, "test-pod")
 				},
 			}
@@ -84,7 +84,7 @@ var _ = Describe("EvictPod", func() {
 	Context("when PDB blocks eviction", func() {
 		It("should return EvictionResultPDBBlocked with error", func() {
 			funcs := interceptor.Funcs{
-				SubResourceCreate: func(_ context.Context, c client.Client, subResourceName string, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 					return apierrors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget", 0)
 				},
 			}
@@ -105,7 +105,7 @@ var _ = Describe("EvictPod", func() {
 	Context("when unexpected error occurs", func() {
 		It("should return EvictionResultError with error", func() {
 			funcs := interceptor.Funcs{
-				SubResourceCreate: func(_ context.Context, c client.Client, subResourceName string, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 					return apierrors.NewBadRequest("unexpected error")
 				},
 			}
@@ -147,7 +147,7 @@ var _ = Describe("CanEvict", func() {
 	Context("when dry-run succeeds", func() {
 		It("should return true without error", func() {
 			funcs := interceptor.Funcs{
-				SubResourceCreate: func(_ context.Context, c client.Client, subResourceName string, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 					return nil
 				},
 			}
@@ -167,7 +167,7 @@ var _ = Describe("CanEvict", func() {
 	Context("when pod is not found", func() {
 		It("should return false with error", func() {
 			funcs := interceptor.Funcs{
-				SubResourceCreate: func(_ context.Context, c client.Client, subResourceName string, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 					return apierrors.NewNotFound(schema.GroupResource{}, "pod")
 				},
 			}
@@ -186,7 +186,7 @@ var _ = Describe("CanEvict", func() {
 	Context("when PDB would block", func() {
 		It("should return false without error", func() {
 			funcs := interceptor.Funcs{
-				SubResourceCreate: func(_ context.Context, c client.Client, subResourceName string, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 					return apierrors.NewTooManyRequests("PDB would block", 0)
 				},
 			}
