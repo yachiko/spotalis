@@ -80,7 +80,7 @@ var _ = Describe("AdmissionController", func() {
 			Expect(config.ServiceNamespace).To(Equal("spotalis-system"))
 			Expect(config.ServicePath).To(Equal("/mutate"))
 			Expect(config.WebhookName).To(Equal("spotalis-mutating-webhook"))
-			Expect(config.TLSMinVersion).To(Equal("1.3"))
+			Expect(config.TLSMinVersion).To(Equal(tlsVersion13))
 
 			// Check failure policy
 			Expect(config.FailurePolicy).NotTo(BeNil())
@@ -182,7 +182,7 @@ var _ = Describe("AdmissionController", func() {
 				config.TLSMinVersion = "1.2"
 				Expect(controller.getTLSVersion()).To(Equal(uint16(tls.VersionTLS12)))
 
-				config.TLSMinVersion = "1.3"
+				config.TLSMinVersion = tlsVersion13
 				Expect(controller.getTLSVersion()).To(Equal(uint16(tls.VersionTLS13)))
 
 				config.TLSMinVersion = "invalid"
@@ -200,8 +200,8 @@ var _ = Describe("AdmissionController", func() {
 
 			It("should convert known cipher suite names", func() {
 				config.TLSCipherSuites = []string{
-					"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-					"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+					cipherECDHERSAAES128GCM,
+					cipherECDHERSAAES256GCM,
 				}
 				controller := &AdmissionController{config: config}
 
@@ -213,9 +213,9 @@ var _ = Describe("AdmissionController", func() {
 
 			It("should ignore unknown cipher suites", func() {
 				config.TLSCipherSuites = []string{
-					"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					cipherECDHERSAAES128GCM,
 					"UNKNOWN_CIPHER_SUITE",
-					"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+					cipherECDHERSAAES256GCM,
 				}
 				controller := &AdmissionController{config: config}
 
