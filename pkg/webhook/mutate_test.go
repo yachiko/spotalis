@@ -89,7 +89,7 @@ var _ = Describe("MutationHandler", func() {
 				req := admission.Request{
 					AdmissionRequest: admissionv1.AdmissionRequest{
 						Kind: metav1.GroupVersionKind{
-							Kind: "Deployment",
+							Kind: workloadTypeDeployment,
 						},
 						Object: runtime.RawExtension{
 							Raw: []byte(`{"metadata":{"name":"test-deployment"}}`),
@@ -166,7 +166,7 @@ var _ = Describe("MutationHandler", func() {
 			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Kind: metav1.GroupVersionKind{
-						Kind: "Deployment",
+						Kind: workloadTypeDeployment,
 					},
 					Object: runtime.RawExtension{
 						Raw: []byte("invalid json"),
@@ -344,7 +344,7 @@ var _ = Describe("Configurable Labels", func() {
 				handler.NodeClassifierConfig = nil
 				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
 				Expect(labelKey).To(Equal("karpenter.sh/capacity-type"))
-				Expect(spotValue).To(Equal("spot"))
+				Expect(spotValue).To(Equal(capacityTypeSpot))
 				Expect(onDemandValue).To(Equal("on-demand"))
 			})
 		})
@@ -354,7 +354,7 @@ var _ = Describe("Configurable Labels", func() {
 				handler.NodeClassifierConfig = &pkgconfig.NodeClassifierConfig{}
 				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
 				Expect(labelKey).To(Equal("karpenter.sh/capacity-type"))
-				Expect(spotValue).To(Equal("spot"))
+				Expect(spotValue).To(Equal(capacityTypeSpot))
 				Expect(onDemandValue).To(Equal("on-demand"))
 			})
 		})
@@ -405,7 +405,7 @@ var _ = Describe("Configurable Labels", func() {
 				}
 				labelKey, spotValue, onDemandValue := handler.getCapacityTypeLabelConfig()
 				Expect(labelKey).To(Equal("kubernetes.azure.com/scalesetpriority"))
-				Expect(spotValue).To(Equal("spot"))
+				Expect(spotValue).To(Equal(capacityTypeSpot))
 				Expect(onDemandValue).To(Equal("regular"))
 			})
 		})
@@ -505,7 +505,7 @@ var _ = Describe("Configurable Labels", func() {
 			}
 
 			capacityType := handler.getCapacityTypeFromNodeSelector(pod)
-			Expect(capacityType).To(Equal("spot"))
+			Expect(capacityType).To(Equal(capacityTypeSpot))
 		})
 
 		It("should detect on-demand from custom GKE labels", func() {
@@ -572,7 +572,7 @@ var _ = Describe("Configurable Labels", func() {
 			}
 
 			capacityType := handler.getCapacityTypeFromRequiredAffinity(affinity)
-			Expect(capacityType).To(Equal("spot"))
+			Expect(capacityType).To(Equal(capacityTypeSpot))
 		})
 
 		It("should detect on-demand from custom label in required affinity", func() {

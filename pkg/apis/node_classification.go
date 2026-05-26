@@ -38,6 +38,10 @@ const (
 	NodeTypeUnknown NodeType = "unknown"
 )
 
+// CapacityTypeLabel is the standard Karpenter node label identifying spot vs
+// on-demand capacity.
+const CapacityTypeLabel = "karpenter.sh/capacity-type"
+
 // NodeClassification represents the categorization of cluster nodes based on their type
 type NodeClassification struct {
 	// NodeName is the Kubernetes node name
@@ -146,14 +150,14 @@ func NewDefaultNodeClassifier() *DefaultNodeClassifier {
 		SpotLabels: []metav1.LabelSelector{
 			{
 				MatchLabels: map[string]string{
-					"karpenter.sh/capacity-type": "spot",
+					CapacityTypeLabel: string(NodeTypeSpot),
 				},
 			},
 		},
 		OnDemandLabels: []metav1.LabelSelector{
 			{
 				MatchLabels: map[string]string{
-					"karpenter.sh/capacity-type": "on-demand",
+					CapacityTypeLabel: string(NodeTypeOnDemand),
 				},
 			},
 		},

@@ -41,7 +41,9 @@ const (
 	logLevelError = "error"
 
 	// Log formats
-	logFormatText = "text"
+	logFormatJSON    = "json"
+	logFormatText    = "text"
+	logFormatConsole = "console"
 )
 
 // LoggerConfig contains logging configuration
@@ -76,7 +78,7 @@ type LoggerConfig struct {
 func DefaultLoggerConfig() *LoggerConfig {
 	return &LoggerConfig{
 		Level:            logLevelInfo,
-		Format:           "json",
+		Format:           logFormatJSON,
 		Development:      false,
 		Output:           os.Stdout,
 		ErrorOutput:      os.Stderr,
@@ -117,11 +119,11 @@ func NewLogger(config *LoggerConfig) (*Logger, error) {
 	}
 
 	switch strings.ToLower(config.Format) {
-	case "json":
+	case logFormatJSON:
 		handler = slog.NewJSONHandler(config.Output, opts)
 	case logFormatText:
 		handler = slog.NewTextHandler(config.Output, opts)
-	case "console":
+	case logFormatConsole:
 		handler = NewConsoleHandler(config.Output, opts)
 	default:
 		return nil, fmt.Errorf("unsupported log format: %s", config.Format)
@@ -342,7 +344,7 @@ func parseZapLogLevel(level string) zapcore.Level {
 		return zapcore.InfoLevel
 	case logLevelWarn, "warning":
 		return zapcore.WarnLevel
-	case "error":
+	case logLevelError:
 		return zapcore.ErrorLevel
 	default:
 		return zapcore.InfoLevel

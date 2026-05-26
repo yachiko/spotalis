@@ -287,9 +287,9 @@ func jsonPointerUnescape(s string) string {
 // from the NodeClassifierConfig. Falls back to Karpenter defaults if not configured.
 func (m *MutationHandler) getCapacityTypeLabelConfig() (labelKey, spotValue, onDemandValue string) {
 	// Defaults (Karpenter)
-	labelKey = "karpenter.sh/capacity-type"
-	spotValue = "spot"
-	onDemandValue = "on-demand"
+	labelKey = apis.CapacityTypeLabel
+	spotValue = capacityTypeSpot
+	onDemandValue = capacityTypeOnDemand
 
 	if m.NodeClassifierConfig == nil {
 		return labelKey, spotValue, onDemandValue

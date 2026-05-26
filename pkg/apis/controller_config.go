@@ -110,10 +110,10 @@ func DefaultControllerConfiguration() *ControllerConfiguration {
 		},
 		NodeLabels: NodeLabelConfig{
 			SpotLabels: map[string]string{
-				"karpenter.sh/capacity-type": "spot",
+				CapacityTypeLabel: string(NodeTypeSpot),
 			},
 			OnDemandLabels: map[string]string{
-				"karpenter.sh/capacity-type": "on-demand",
+				CapacityTypeLabel: string(NodeTypeOnDemand),
 			},
 			RefreshInterval: 5 * time.Minute,
 		},
