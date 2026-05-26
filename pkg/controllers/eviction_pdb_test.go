@@ -30,9 +30,9 @@ var _ = Describe("CheckPDBStatus", func() {
 		It("should return CanDisrupt=true", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Labels:    map[string]string{"app": "test"},
+					Name:      testPodName,
+					Namespace: namespaceDefault,
+					Labels: map[string]string{testAppLabel: testAppName},
 				},
 			}
 
@@ -50,20 +50,20 @@ var _ = Describe("CheckPDBStatus", func() {
 		It("should return CanDisrupt=true with PDB details", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Labels:    map[string]string{"app": "test"},
+					Name:      testPodName,
+					Namespace: namespaceDefault,
+					Labels: map[string]string{testAppLabel: testAppName},
 				},
 			}
 
 			pdb := &policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pdb",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 				},
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"app": "test"},
+						MatchLabels: map[string]string{testAppLabel: testAppName},
 					},
 					MinAvailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
 				},
@@ -96,20 +96,20 @@ var _ = Describe("CheckPDBStatus", func() {
 		It("should return CanDisrupt=false with block reason", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Labels:    map[string]string{"app": "test"},
+					Name:      testPodName,
+					Namespace: namespaceDefault,
+					Labels: map[string]string{testAppLabel: testAppName},
 				},
 			}
 
 			pdb := &policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pdb",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 				},
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"app": "test"},
+						MatchLabels: map[string]string{testAppLabel: testAppName},
 					},
 					MinAvailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
 				},
@@ -142,20 +142,20 @@ var _ = Describe("CheckPDBStatus", func() {
 		It("should return CanDisrupt=true (no matching PDB)", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Labels:    map[string]string{"app": "test"},
+					Name:      testPodName,
+					Namespace: namespaceDefault,
+					Labels: map[string]string{testAppLabel: testAppName},
 				},
 			}
 
 			pdb := &policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "other-pdb",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 				},
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"app": "other"},
+						MatchLabels: map[string]string{testAppLabel: "other"},
 					},
 					MinAvailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
 				},
@@ -184,20 +184,20 @@ var _ = Describe("CheckPDBStatus", func() {
 		It("should use first matching PDB", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Labels:    map[string]string{"app": "test", "tier": "backend"},
+					Name:      testPodName,
+					Namespace: namespaceDefault,
+					Labels:    map[string]string{testAppLabel: testAppName, "tier": "backend"},
 				},
 			}
 
 			pdb1 := &policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "first-pdb",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 				},
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"app": "test"},
+						MatchLabels: map[string]string{testAppLabel: testAppName},
 					},
 					MinAvailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
 				},
@@ -212,7 +212,7 @@ var _ = Describe("CheckPDBStatus", func() {
 			pdb2 := &policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "second-pdb",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 				},
 				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector: &metav1.LabelSelector{
