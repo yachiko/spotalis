@@ -18,7 +18,7 @@ func TestAdmissionStateTracker_ConcurrentSafety(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	key := "default/Deployment/test"
+	key := testWorkloadKey
 	generation := int64(1)
 
 	for i := 0; i < numGoroutines; i++ {
@@ -49,7 +49,7 @@ func TestAdmissionStateTracker_GenerationChange(t *testing.T) {
 	tracker := NewAdmissionStateTracker(30 * time.Second)
 	defer tracker.Stop()
 
-	key := "default/Deployment/test"
+	key := testWorkloadKey
 
 	// Add counts with generation 1
 	tracker.IncrementPending(key, capacityTypeSpot, 1)
@@ -78,7 +78,7 @@ func TestAdmissionStateTracker_TTLCleanup(t *testing.T) {
 	tracker := NewAdmissionStateTracker(ttl)
 	defer tracker.Stop()
 
-	key := "default/Deployment/test"
+	key := testWorkloadKey
 	generation := int64(1)
 
 	// Add entry
@@ -111,7 +111,7 @@ func TestAdmissionStateTracker_WorkloadKey(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"default", workloadTypeDeployment, "test", "default/Deployment/test"},
+		{"default", workloadTypeDeployment, "test", testWorkloadKey},
 		{"kube-system", "StatefulSet", "my-app", "kube-system/StatefulSet/my-app"},
 		{"ns1", workloadTypeDeployment, "app", "ns1/Deployment/app"},
 	}

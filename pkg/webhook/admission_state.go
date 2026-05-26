@@ -6,6 +6,22 @@ import (
 	"time"
 )
 
+// TLS and webhook constants.
+const (
+	tlsVersion13            = "1.3"
+	cipherECDHERSAAES128GCM = "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+	cipherECDHERSAAES256GCM = "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+
+	cloudGKEPreemptible  = "cloud.google.com/gke-preemptible"
+	cloudAWSCapacityType = "eks.amazonaws.com/capacityType"
+	customLabelType      = "custom.io/type"
+	customLabelCapacity  = "custom.io/capacity"
+
+	capacityValueSPOT = "SPOT"
+
+	testWorkloadKey = "default/Deployment/test"
+)
+
 // Tuning knobs for the in-memory admission state tracker.
 const (
 	DefaultAdmissionTTL  = 30 * time.Second

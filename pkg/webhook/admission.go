@@ -91,7 +91,7 @@ func DefaultAdmissionConfig() *AdmissionConfig {
 		SideEffects:             &sideEffects,
 		AdmissionReviewVersions: []string{"v1", "v1beta1"},
 		TimeoutSeconds:          &timeoutSeconds,
-		TLSMinVersion:           "1.3",
+		TLSMinVersion:           tlsVersion13,
 		Rules: []admissionv1.RuleWithOperations{
 			{
 				Operations: []admissionv1.OperationType{
@@ -352,7 +352,7 @@ func (a *AdmissionController) getTLSVersion() uint16 {
 		return tls.VersionTLS11
 	case "1.2":
 		return tls.VersionTLS12
-	case "1.3":
+	case tlsVersion13:
 		return tls.VersionTLS13
 	default:
 		return tls.VersionTLS13
@@ -368,9 +368,9 @@ func (a *AdmissionController) getCipherSuites() []uint16 {
 	var suites []uint16
 	for _, suite := range a.config.TLSCipherSuites {
 		switch suite {
-		case "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":
+		case cipherECDHERSAAES128GCM:
 			suites = append(suites, tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256)
-		case "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":
+		case cipherECDHERSAAES256GCM:
 			suites = append(suites, tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384)
 		case "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256":
 			suites = append(suites, tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)

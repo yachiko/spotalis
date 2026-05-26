@@ -29,7 +29,7 @@ var _ = Describe("Staleness Detection", func() {
 
 	BeforeEach(func() {
 		tracker = NewAdmissionStateTracker(30 * time.Second)
-		key = "default/Deployment/test"
+		key = testWorkloadKey
 	})
 
 	AfterEach(func() {
