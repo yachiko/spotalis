@@ -40,7 +40,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 			WebhookAddr:             webhookAddr,
 			LeaderElection:          false,
 			LeaderElectionID:        "test-leader",
-			Namespace:               "test-ns",
+			Namespace:               testNamespaceFix,
 			ReconcileInterval:       10 * time.Second,
 			MaxConcurrentReconciles: 5,
 			WebhookCertDir:          "/tmp/certs",
@@ -69,7 +69,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 			config := testOp.GetConfig()
 			Expect(config).NotTo(BeNil())
 			Expect(config.MetricsAddr).To(Equal(metricsAddr))
-			Expect(config.Namespace).To(Equal("test-ns"))
+			Expect(config.Namespace).To(Equal(testNamespaceFix))
 			Expect(config.LeaderElectionID).To(Equal("test-leader"))
 		})
 
@@ -289,7 +289,7 @@ var _ = Describe("Operator Getters and State Methods", func() {
 		})
 
 		It("should return health checker when set", func() {
-			checker := server.NewHealthChecker(nil, testOp.kubeClient, "test-ns")
+			checker := server.NewHealthChecker(nil, testOp.kubeClient, testNamespaceFix)
 			testOp.healthChecker = checker
 
 			Expect(testOp.GetHealthChecker()).To(Equal(checker))

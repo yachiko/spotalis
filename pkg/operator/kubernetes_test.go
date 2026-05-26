@@ -70,7 +70,7 @@ var _ = Describe("KubernetesConfig", func() {
 				Expect(defaults.QPS).To(Equal(float32(20.0)))
 				Expect(defaults.Burst).To(Equal(30))
 				Expect(defaults.Timeout).To(Equal(30 * time.Second))
-				Expect(defaults.UserAgent).To(ContainSubstring("spotalis"))
+				Expect(defaults.UserAgent).To(ContainSubstring(spotalisShortName))
 				Expect(defaults.ServiceAccount).To(Equal(spotalisController))
 				Expect(defaults.Namespace).To(Equal(spotalisNamespace))
 				Expect(defaults.ClusterRole).To(Equal(spotalisController))
@@ -89,7 +89,7 @@ var _ = Describe("KubernetesConfig", func() {
 				config.Timeout = 60 * time.Second
 				config.UserAgent = "test-agent"
 				config.ServiceAccount = "test-sa"
-				config.Namespace = "test-ns"
+				config.Namespace = testNamespaceFix
 				config.ClusterRole = "test-role"
 				config.RoleBinding = "test-binding"
 
@@ -170,8 +170,8 @@ var _ = Describe("KubernetesConfig", func() {
 						Name:      kubeConfig.ServiceAccount,
 						Namespace: kubeConfig.Namespace,
 						Labels: map[string]string{
-							labelAppName:      "spotalis",
-							labelAppComponent: "controller",
+							labelAppName: spotalisShortName,
+							labelAppComponent: controllerShort,
 						},
 					},
 				}
@@ -179,7 +179,7 @@ var _ = Describe("KubernetesConfig", func() {
 				Expect(sa.Name).To(Equal(kubeConfig.ServiceAccount))
 				Expect(sa.Namespace).To(Equal(kubeConfig.Namespace))
 				Expect(sa.Labels).To(HaveKey(labelAppName))
-				Expect(sa.Labels[labelAppName]).To(Equal("spotalis"))
+				Expect(sa.Labels[labelAppName]).To(Equal(spotalisShortName))
 			})
 
 			It("should create service account in cluster", func() {
@@ -317,14 +317,14 @@ var _ = Describe("KubernetesConfig", func() {
 			labels := createStandardLabels()
 			Expect(labels).To(HaveKey(labelAppName))
 			Expect(labels).To(HaveKey(labelAppComponent))
-			Expect(labels[labelAppName]).To(Equal("spotalis"))
+			Expect(labels[labelAppName]).To(Equal(spotalisShortName))
 		})
 
 		It("should create resource with proper metadata", func() {
 			sa := &corev1.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-sa",
-					Namespace: "test-ns",
+					Namespace: testNamespaceFix,
 				},
 			}
 
@@ -348,8 +348,8 @@ func containsResource(resources []string, resource string) bool {
 
 func createStandardLabels() map[string]string {
 	return map[string]string{
-		labelAppName:      "spotalis",
-		labelAppComponent: "controller",
+		labelAppName: spotalisShortName,
+		labelAppComponent: controllerShort,
 		"app.kubernetes.io/part-of":   "spotalis",
 	}
 }
