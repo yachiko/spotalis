@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("PDB Integration Tests", func() {
 	var (
 		ctx        context.Context

@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("StatefulSet workload management", func() {
 	var (
 		ctx        context.Context
