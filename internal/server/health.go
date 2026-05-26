@@ -32,6 +32,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+// JSON field names and other shared strings reused across the server package.
+const (
+	jsonFieldStatus = "status"
+	jsonFieldUptime = "uptime"
+	jsonFieldError  = "error"
+	jsonFieldCode   = "code"
+
+	componentKubernetesAPI = "kubernetes-api"
+
+	apiGroupApps = "apps"
+
+	admissionAPIVersion = "admission.k8s.io/v1"
+	admissionReviewKind = "AdmissionReview"
+)
+
 // HealthChecker provides health checking functionality for the Spotalis controller
 type HealthChecker struct {
 	manager    manager.Manager
@@ -69,9 +84,9 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	// Check if manually set to unhealthy
 	if unhealthyReason != "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "unhealthy",
+			jsonFieldStatus: "unhealthy",
 			"reason": unhealthyReason,
-			"uptime": time.Since(h.startTime).String(),
+			jsonFieldUptime: time.Since(h.startTime).String(),
 		})
 		return
 	}
@@ -79,10 +94,10 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	// Check if Kubernetes is manually set as down
 	if kubernetesDown {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status":    "unhealthy",
-			"component": "kubernetes-api",
-			"error":     "kubernetes API marked as unavailable",
-			"uptime":    time.Since(h.startTime).String(),
+			jsonFieldStatus:    "unhealthy",
+			"component": componentKubernetesAPI,
+			jsonFieldError:     "kubernetes API marked as unavailable",
+			jsonFieldUptime:    time.Since(h.startTime).String(),
 		})
 		return
 	}
@@ -94,20 +109,20 @@ func (h *HealthChecker) HealthzHandler(c *gin.Context) {
 	if h.kubeClient != nil {
 		if err := h.checkKubernetesAPI(ctx); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status":    "unhealthy",
-				"component": "kubernetes-api",
-				"error":     err.Error(),
-				"uptime":    uptime.String(),
+				jsonFieldStatus:    "unhealthy",
+				"component": componentKubernetesAPI,
+				jsonFieldError:     err.Error(),
+				jsonFieldUptime:    uptime.String(),
 			})
 			return
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
-		"uptime": uptime.String(),
+		jsonFieldStatus: "healthy",
+		jsonFieldUptime: uptime.String(),
 		"checks": gin.H{
-			"kubernetes-api": "ok",
+			componentKubernetesAPI: "ok",
 			"controller":     "running",
 		},
 	})
@@ -136,18 +151,18 @@ func (h *HealthChecker) ReadyzHandler(c *gin.Context) {
 	// Check Kubernetes API status
 	switch {
 	case kubernetesDown:
-		checks["kubernetes-api"] = "manually marked as unavailable"
+		checks[componentKubernetesAPI] = "manually marked as unavailable"
 		healthy = false
 	case h.kubeClient != nil:
 		// Check Kubernetes API connectivity (skip in test mode when kubeClient is nil)
 		if err := h.checkKubernetesAPI(ctx); err != nil {
-			checks["kubernetes-api"] = fmt.Sprintf("failed: %v", err)
+			checks[componentKubernetesAPI] = fmt.Sprintf("failed: %v", err)
 			healthy = false
 		} else {
-			checks["kubernetes-api"] = "ok"
+			checks[componentKubernetesAPI] = "ok"
 		}
 	default:
-		checks["kubernetes-api"] = "skipped (test mode)"
+		checks[componentKubernetesAPI] = "skipped (test mode)"
 	}
 
 	// Check if manager is running
@@ -186,9 +201,9 @@ func (h *HealthChecker) ReadyzHandler(c *gin.Context) {
 	}
 
 	c.JSON(statusCode, gin.H{
-		"status": status,
+		jsonFieldStatus: status,
 		"checks": checks,
-		"uptime": time.Since(h.startTime).String(),
+		jsonFieldUptime: time.Since(h.startTime).String(),
 	})
 }
 
@@ -366,8 +381,8 @@ func (h *HealthHandler) SetChecker(checker *HealthChecker) {
 func (h *HealthHandler) Healthz(c *gin.Context) {
 	if h.checker == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "unhealthy",
-			"error":  "health checker not initialized",
+			jsonFieldStatus: "unhealthy",
+			jsonFieldError:  "health checker not initialized",
 		})
 		return
 	}
@@ -378,8 +393,8 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 func (h *HealthHandler) Readyz(c *gin.Context) {
 	if h.checker == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "not ready",
-			"error":  "health checker not initialized",
+			jsonFieldStatus: "not ready",
+			jsonFieldError:  "health checker not initialized",
 		})
 		return
 	}

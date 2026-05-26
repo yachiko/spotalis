@@ -114,8 +114,8 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 			fmt.Printf("[WEBHOOK] Failed to read request body: %v\n", err)
 		}
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "failed to read request body",
-			"code":  "INVALID_REQUEST_BODY",
+			jsonFieldError: "failed to read request body",
+			jsonFieldCode:  "INVALID_REQUEST_BODY",
 		})
 		return
 	}
@@ -130,8 +130,8 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 			fmt.Printf("[WEBHOOK] Failed to deserialize admission request: %v\n", err)
 		}
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "failed to deserialize admission request",
-			"code":    "INVALID_ADMISSION_REQUEST",
+			jsonFieldError:   "failed to deserialize admission request",
+			jsonFieldCode:    "INVALID_ADMISSION_REQUEST",
 			"details": err.Error(),
 		})
 		return
@@ -139,8 +139,8 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 
 	if admissionReview.Request == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "admission request is nil",
-			"code":  "EMPTY_ADMISSION_REQUEST",
+			jsonFieldError: "admission request is nil",
+			jsonFieldCode:  "EMPTY_ADMISSION_REQUEST",
 		})
 		return
 	}
@@ -172,8 +172,8 @@ func (w *WebhookServer) ValidateHandler(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "failed to read request body",
-			"code":  "INVALID_REQUEST_BODY",
+			jsonFieldError: "failed to read request body",
+			jsonFieldCode:  "INVALID_REQUEST_BODY",
 		})
 		return
 	}
@@ -181,8 +181,8 @@ func (w *WebhookServer) ValidateHandler(c *gin.Context) {
 	var admissionReview v1.AdmissionReview
 	if err := w.deserializeAdmissionRequest(body, &admissionReview); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "failed to deserialize admission request",
-			"code":    "INVALID_ADMISSION_REQUEST",
+			jsonFieldError:   "failed to deserialize admission request",
+			jsonFieldCode:    "INVALID_ADMISSION_REQUEST",
 			"details": err.Error(),
 		})
 		return
@@ -190,8 +190,8 @@ func (w *WebhookServer) ValidateHandler(c *gin.Context) {
 
 	if admissionReview.Request == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "admission request is missing",
-			"code":  "MISSING_ADMISSION_REQUEST",
+			jsonFieldError: "admission request is missing",
+			jsonFieldCode:  "MISSING_ADMISSION_REQUEST",
 		})
 		return
 	}
@@ -255,8 +255,8 @@ func (w *WebhookServer) handleMutation(ctx context.Context, req *v1.AdmissionReq
 func (w *WebhookServer) sendAdmissionResponse(c *gin.Context, response *v1.AdmissionResponse) {
 	admissionReview := v1.AdmissionReview{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "admission.k8s.io/v1",
-			Kind:       "AdmissionReview",
+			APIVersion: admissionAPIVersion,
+			Kind:       admissionReviewKind,
 		},
 		Response: response,
 	}
@@ -305,8 +305,8 @@ func (w *WebhookHandler) SetServer(server *WebhookServer) {
 func (w *WebhookHandler) Mutate(c *gin.Context) {
 	if w.server == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "webhook server not initialized",
-			"code":  "WEBHOOK_SERVER_NOT_INITIALIZED",
+			jsonFieldError: "webhook server not initialized",
+			jsonFieldCode:  "WEBHOOK_SERVER_NOT_INITIALIZED",
 		})
 		return
 	}
@@ -317,8 +317,8 @@ func (w *WebhookHandler) Mutate(c *gin.Context) {
 func (w *WebhookHandler) Validate(c *gin.Context) {
 	if w.server == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "webhook server not initialized",
-			"code":  "WEBHOOK_SERVER_NOT_INITIALIZED",
+			jsonFieldError: "webhook server not initialized",
+			jsonFieldCode:  "WEBHOOK_SERVER_NOT_INITIALIZED",
 		})
 		return
 	}
