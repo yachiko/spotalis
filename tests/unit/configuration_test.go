@@ -229,8 +229,8 @@ var _ = Describe("WorkloadConfiguration", func() {
 		Context("when spotalis is enabled", func() {
 			It("should parse all valid annotations", func() {
 				annotations := map[string]string{
-					annotationEnabled:         stringTrue,
-					annotationMinOnDemand:   "2",
+					annotationEnabled:        stringTrue,
+					annotationMinOnDemand:    "2",
 					annotationSpotPercentage: stringPct70,
 				}
 
@@ -243,7 +243,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 
 			It("should handle spot percentage without % symbol", func() {
 				annotations := map[string]string{
-					annotationEnabled:         stringTrue,
+					annotationEnabled:        stringTrue,
 					annotationSpotPercentage: "80",
 				}
 
@@ -266,7 +266,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 
 			It("should fail with invalid min-on-demand value", func() {
 				annotations := map[string]string{
-					annotationEnabled:       stringTrue,
+					annotationEnabled:     stringTrue,
 					annotationMinOnDemand: stringInvalid,
 				}
 
@@ -277,7 +277,7 @@ var _ = Describe("WorkloadConfiguration", func() {
 
 			It("should fail with invalid spot-percentage value", func() {
 				annotations := map[string]string{
-					annotationEnabled:         stringTrue,
+					annotationEnabled:        stringTrue,
 					annotationSpotPercentage: "invalid%",
 				}
 

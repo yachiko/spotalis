@@ -709,7 +709,7 @@ func (r *StatefulSetReconciler) updatePodTemplateForNodePlacement(statefulSet *a
 		// Add common spot instance tolerations
 		spotTolerations := []corev1.Toleration{
 			{
-				Key:      "spot",
+				Key:      string(apis.NodeTypeSpot),
 				Operator: corev1.TolerationOpExists,
 				Effect:   corev1.TaintEffectNoSchedule,
 			},

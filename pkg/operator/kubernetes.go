@@ -81,6 +81,9 @@ const (
 	spotalisShortName = "spotalis"
 	controllerShort   = "controller"
 	testNamespaceFix  = "test-ns"
+	testPodFix        = "test-pod"
+	hookPreShutdown   = "pre-shutdown-delay"
+	hookCleanup       = "cleanup-resources"
 )
 
 // KubernetesConfig contains Kubernetes client configuration
@@ -340,7 +343,7 @@ func (k *KubernetesClientManager) ensureNamespace(ctx context.Context) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.Namespace,
 			Labels: map[string]string{
-				labelAppName: spotalisShortName,
+				labelAppName:      spotalisShortName,
 				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},
@@ -366,7 +369,7 @@ func (k *KubernetesClientManager) ensureServiceAccount(ctx context.Context) erro
 			Name:      k.config.ServiceAccount,
 			Namespace: k.config.Namespace,
 			Labels: map[string]string{
-				labelAppName: spotalisShortName,
+				labelAppName:      spotalisShortName,
 				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},
@@ -391,7 +394,7 @@ func (k *KubernetesClientManager) ensureClusterRole(ctx context.Context) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.ClusterRole,
 			Labels: map[string]string{
-				labelAppName: spotalisShortName,
+				labelAppName:      spotalisShortName,
 				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},
@@ -460,7 +463,7 @@ func (k *KubernetesClientManager) ensureClusterRoleBinding(ctx context.Context) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k.config.RoleBinding,
 			Labels: map[string]string{
-				labelAppName: spotalisShortName,
+				labelAppName:      spotalisShortName,
 				labelAppComponent: controllerShort,
 				labelAppManagedBy: spotalisController,
 			},

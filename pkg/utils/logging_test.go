@@ -354,7 +354,7 @@ var _ = Describe("Logging", func() {
 		It("should handle invalid log configuration", func() {
 			invalidConfig := &LoggerConfig{
 				Level:  "invalid",
-				Format:           logFormatJSON,
+				Format: logFormatJSON,
 				Output: buffer,
 			}
 

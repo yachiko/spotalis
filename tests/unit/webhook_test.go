@@ -284,7 +284,7 @@ var _ = Describe("MutationHandler", func() {
 					Namespace: stringDefault,
 					Annotations: map[string]string{
 						annotationSpotPercentage: "70",
-						annotationMinOnDemand:   "1",
+						annotationMinOnDemand:    "1",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
@@ -393,7 +393,7 @@ var _ = Describe("MutationHandler", func() {
 					Namespace: stringDefault,
 					Annotations: map[string]string{
 						annotationSpotPercentage: "50",
-						annotationMinOnDemand:   "2",
+						annotationMinOnDemand:    "2",
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
