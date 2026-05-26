@@ -59,10 +59,10 @@ var _ = Describe("StatefulSetReconciler", func() {
 		// Create properly initialized NodeClassifierService
 		nodeClassifier = config.NewNodeClassifierService(fakeClient, &config.NodeClassifierConfig{
 			SpotLabels: map[string]string{
-				"node.kubernetes.io/instance-type": "spot",
+				nodeInstanceTypeKey: string(apis.NodeTypeSpot),
 			},
 			OnDemandLabels: map[string]string{
-				"node.kubernetes.io/instance-type": "on-demand",
+				nodeInstanceTypeKey: string(apis.NodeTypeOnDemand),
 			},
 		})
 
@@ -103,30 +103,30 @@ var _ = Describe("StatefulSetReconciler", func() {
 		BeforeEach(func() {
 			statefulset = &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70",
+						annotations.SpotPercentageAnnotation: "70",
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								testAppLabel: testAppName,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -144,8 +144,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 			// First reconcile
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -170,8 +170,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "nonexistent",
-					Namespace: "default",
+					Name:      testNonexistent,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -183,14 +183,14 @@ var _ = Describe("StatefulSetReconciler", func() {
 		It("should increment count when statefulset has no annotations", func() {
 			statefulsetWithoutAnnotations := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 				},
@@ -203,8 +203,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -220,13 +220,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 		BeforeEach(func() {
 			statefulSet = &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						annotations.EnabledLabel: enabledLabelTrue,
 					},
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "60",
+						annotations.SpotPercentageAnnotation: "60",
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
@@ -245,13 +245,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
 					},
-					ServiceName: "test-service",
+					ServiceName: testServiceName,
 				},
 				Status: appsv1.StatefulSetStatus{
 					Replicas:        3,
@@ -266,8 +266,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 			It("should return without error", func() {
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      "nonexistent",
-						Namespace: "default",
+						Name:      testNonexistent,
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -282,8 +282,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 			It("should skip reconciliation", func() {
 				statefulSetWithoutAnnotations := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-statefulset",
-						Namespace: "default",
+						Name:      testStatefulSetName,
+						Namespace: namespaceDefault,
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Replicas: int32Ptr(3),
@@ -292,7 +292,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 								"app": "test-sts",
 							},
 						},
-						ServiceName: "test-service",
+						ServiceName: testServiceName,
 					},
 				}
 
@@ -300,8 +300,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      "test-statefulset",
-						Namespace: "default",
+						Name:      testStatefulSetName,
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -320,8 +320,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 			It("should reconcile successfully", func() {
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      "test-statefulset",
-						Namespace: "default",
+						Name:      testStatefulSetName,
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -336,16 +336,16 @@ var _ = Describe("StatefulSetReconciler", func() {
 				invalidStatefulSet.Name = "invalid-statefulset"
 				invalidStatefulSet.ResourceVersion = "" // Clear resourceVersion for Create
 				invalidStatefulSet.Labels = map[string]string{
-					"spotalis.io/enabled": "true",
+					annotations.EnabledLabel: enabledLabelTrue,
 				}
-				invalidStatefulSet.Annotations["spotalis.io/spot-percentage"] = "invalid"
+				invalidStatefulSet.Annotations[annotations.SpotPercentageAnnotation] = "invalid"
 
 				Expect(fakeClient.Create(ctx, invalidStatefulSet)).To(Succeed())
 
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      "invalid-statefulset",
-						Namespace: "default",
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -363,8 +363,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 		BeforeEach(func() {
 			statefulSet = &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
@@ -373,7 +373,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 							"app": "test-sts",
 						},
 					},
-					ServiceName: "test-service",
+					ServiceName: testServiceName,
 				},
 				Status: appsv1.StatefulSetStatus{
 					Replicas:      3,
@@ -386,17 +386,17 @@ var _ = Describe("StatefulSetReconciler", func() {
 			// Create nodes for the pods to run on
 			spotNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "spot-node-1",
+					Name: testNodeSpot,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "spot", // Updated to match classifier config
+						nodeInstanceTypeKey: string(apis.NodeTypeSpot), // Updated to match classifier config
 					},
 				},
 			}
 			onDemandNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "ondemand-node-1",
+					Name: testNodeOnDemand,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "on-demand", // Updated to match classifier config
+						nodeInstanceTypeKey: string(apis.NodeTypeOnDemand), // Updated to match classifier config
 					},
 				},
 			}
@@ -409,13 +409,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("test-statefulset-%d", i),
-						Namespace: "default",
+						Namespace: namespaceDefault,
 						Labels: map[string]string{
 							"app": "test-sts",
 						},
 					},
 					Spec: corev1.PodSpec{
-						NodeName: "spot-node-1",
+						NodeName: testNodeSpot,
 					},
 				}
 				Expect(fakeClient.Create(ctx, pod)).To(Succeed())
@@ -424,13 +424,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-statefulset-2",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
 						"app": "test-sts",
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeName: "ondemand-node-1",
+					NodeName: testNodeOnDemand,
 				},
 			}
 			Expect(fakeClient.Create(ctx, pod)).To(Succeed())
@@ -520,8 +520,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 		BeforeEach(func() {
 			statefulSet = &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(5),
@@ -539,13 +539,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
 					},
-					ServiceName: "test-service",
+					ServiceName: testServiceName,
 				},
 			}
 
@@ -564,17 +564,17 @@ var _ = Describe("StatefulSetReconciler", func() {
 			// Create nodes
 			spotNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "spot-node-1",
+					Name: testNodeSpot,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "spot", // Updated to match classifier config
+						nodeInstanceTypeKey: string(apis.NodeTypeSpot), // Updated to match classifier config
 					},
 				},
 			}
 			onDemandNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "ondemand-node-1",
+					Name: testNodeOnDemand,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "on-demand", // Updated to match classifier config
+						nodeInstanceTypeKey: string(apis.NodeTypeOnDemand), // Updated to match classifier config
 					},
 				},
 			}
@@ -586,17 +586,17 @@ var _ = Describe("StatefulSetReconciler", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("test-statefulset-%d", i),
-						Namespace: "default",
+						Namespace: namespaceDefault,
 						Labels: map[string]string{
 							"app": "test-sts",
 						},
 					},
 					Spec: corev1.PodSpec{
-						NodeName: "spot-node-1",
+						NodeName: testNodeSpot,
 						Containers: []corev1.Container{
 							{
-								Name:  "test-container",
-								Image: "nginx:latest",
+								Name:  testContainerName,
+								Image: testImageNginx,
 							},
 						},
 					},
@@ -608,17 +608,17 @@ var _ = Describe("StatefulSetReconciler", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-statefulset-4",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
 						"app": "test-sts",
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeName: "ondemand-node-1",
+					NodeName: testNodeOnDemand,
 					Containers: []corev1.Container{
 						{
-							Name:  "test-container",
-							Image: "nginx:latest",
+							Name:  testContainerName,
+							Image: testImageNginx,
 						},
 					},
 				},
@@ -670,7 +670,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"app":     "test-sts",
-							"version": "v1",
+							testStringVersion: "v1",
 						},
 					},
 				},
@@ -681,7 +681,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(selector).To(Equal(client.MatchingLabels{
 				"app":     "test-sts",
-				"version": "v1",
+				testStringVersion: "v1",
 			}))
 		})
 
@@ -706,12 +706,12 @@ var _ = Describe("StatefulSetReconciler", func() {
 				statefulSet := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ordered-scaling-test",
-						Namespace: "default",
+						Namespace: namespaceDefault,
 						Labels: map[string]string{
-							"spotalis.io/enabled": "true",
+							annotations.EnabledLabel: enabledLabelTrue,
 						},
 						Annotations: map[string]string{
-							"spotalis.io/spot-percentage": "50",
+							annotations.SpotPercentageAnnotation: "50",
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
@@ -730,8 +730,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "test-container",
-										Image: "nginx:latest",
+										Name:  testContainerName,
+										Image: testImageNginx,
 									},
 								},
 							},
@@ -745,7 +745,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      "ordered-scaling-test",
-						Namespace: "default",
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -761,12 +761,12 @@ var _ = Describe("StatefulSetReconciler", func() {
 				statefulSet := &appsv1.StatefulSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pvc-test",
-						Namespace: "default",
+						Namespace: namespaceDefault,
 						Labels: map[string]string{
-							"spotalis.io/enabled": "true",
+							annotations.EnabledLabel: enabledLabelTrue,
 						},
 						Annotations: map[string]string{
-							"spotalis.io/spot-percentage": "40",
+							annotations.SpotPercentageAnnotation: "40",
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
@@ -785,8 +785,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "test-container",
-										Image: "nginx:latest",
+										Name:  testContainerName,
+										Image: testImageNginx,
 										VolumeMounts: []corev1.VolumeMount{
 											{
 												Name:      "data",
@@ -823,7 +823,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      "pvc-test",
-						Namespace: "default",
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -839,13 +839,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 		It("should handle StatefulSet with nil replica count", func() {
 			statefulSet := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						annotations.EnabledLabel: enabledLabelTrue,
 					},
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "50",
+						annotations.SpotPercentageAnnotation: "50",
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
@@ -855,7 +855,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 							"app": "test-sts",
 						},
 					},
-					ServiceName: "test-service",
+					ServiceName: testServiceName,
 				},
 				Status: appsv1.StatefulSetStatus{
 					Replicas: 1, // Default to 1
@@ -866,8 +866,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -883,10 +883,10 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			statefulSet := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "50",
+						annotations.SpotPercentageAnnotation: "50",
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
@@ -896,7 +896,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 							"app": "test-sts",
 						},
 					},
-					ServiceName: "test-service",
+					ServiceName: testServiceName,
 				},
 			}
 
@@ -904,8 +904,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -1039,7 +1039,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 			statefulSet := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "invalid-selector-sts",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas: int32Ptr(1),
@@ -1084,13 +1084,13 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			statefulSet := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						annotations.EnabledLabel: enabledLabelTrue,
 					},
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70",
+						annotations.SpotPercentageAnnotation: "70",
 					},
 				},
 				Spec: appsv1.StatefulSetSpec{
@@ -1098,7 +1098,7 @@ var _ = Describe("StatefulSetReconciler", func() {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "test-sts"},
 					},
-					ServiceName: "test-service",
+					ServiceName: testServiceName,
 				},
 				Status: appsv1.StatefulSetStatus{
 					ReadyReplicas:   3,
@@ -1111,8 +1111,8 @@ var _ = Describe("StatefulSetReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-statefulset",
-					Namespace: "default",
+					Name:      testStatefulSetName,
+					Namespace: namespaceDefault,
 				},
 			}
 

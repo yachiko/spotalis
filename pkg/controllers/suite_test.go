@@ -23,6 +23,23 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// Test fixture constants shared across the controllers test suite.
+const (
+	testAppLabel        = "app"
+	testAppName         = "test"
+	testContainerName   = "test-container"
+	testImageNginx      = "nginx:latest"
+	testDeploymentName  = "test-deployment"
+	testStatefulSetName = "test-statefulset"
+	testServiceName     = "test-service"
+	testPodName         = "test-pod"
+	testStringVersion   = "version"
+	testNodeSpot        = "spot-node-1"
+	testNodeOnDemand    = "ondemand-node-1"
+	testNonexistent     = "nonexistent"
+	nodeInstanceTypeKey = "node.kubernetes.io/instance-type"
+)
+
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controllers Suite")

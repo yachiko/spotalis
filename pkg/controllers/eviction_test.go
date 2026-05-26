@@ -32,8 +32,8 @@ var _ = Describe("EvictPod", func() {
 
 		pod = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-pod",
-				Namespace: "default",
+				Name:      testPodName,
+				Namespace: namespaceDefault,
 			},
 			Spec: corev1.PodSpec{
 				TerminationGracePeriodSeconds: ptr.To[int64](30),
@@ -66,7 +66,7 @@ var _ = Describe("EvictPod", func() {
 		It("should return EvictionResultAlreadyGone", func() {
 			funcs := interceptor.Funcs{
 				SubResourceCreate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
-					return apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pods"}, "test-pod")
+					return apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pods"}, testPodName)
 				},
 			}
 
@@ -138,8 +138,8 @@ var _ = Describe("CanEvict", func() {
 
 		pod = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-pod",
-				Namespace: "default",
+				Name:      testPodName,
+				Namespace: namespaceDefault,
 			},
 		}
 	})
@@ -208,10 +208,10 @@ var _ = Describe("EvictionError", func() {
 	Context("NewEvictionBlockedError", func() {
 		It("should create proper error with wrapping", func() {
 			originalErr := apierrors.NewTooManyRequests("", 0)
-			err := NewEvictionBlockedError("test-pod", "PDB blocking", originalErr)
+			err := NewEvictionBlockedError(testPodName, "PDB blocking", originalErr)
 
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("test-pod"))
+			Expect(err.Error()).To(ContainSubstring(testPodName))
 			Expect(err.Error()).To(ContainSubstring("PDB blocking"))
 			Expect(IsEvictionBlocked(err)).To(BeTrue())
 		})

@@ -72,7 +72,7 @@ type NamespaceFilterConfig struct {
 func DefaultNamespaceFilterConfig() *NamespaceFilterConfig {
 	return &NamespaceFilterConfig{
 		IncludeNamespaces:       []string{},
-		ExcludeNamespaces:       []string{"kube-system", "kube-public", "kube-node-lease"},
+		ExcludeNamespaces:       []string{namespaceKubeSystem, namespaceKubePublic, namespaceKubeNodeLease},
 		IncludePatterns:         []string{},
 		ExcludePatterns:         []string{"^kube-.*", "^openshift-.*"},
 		RequiredLabels:          make(map[string]string),
@@ -83,7 +83,7 @@ func DefaultNamespaceFilterConfig() *NamespaceFilterConfig {
 		TenantLabelKey:          "tenant",
 		TenantNamespaces:        make(map[string][]string),
 		IncludeSystemNamespaces: false,
-		SystemNamespaces:        []string{"kube-system", "kube-public", "kube-node-lease", "default"},
+		SystemNamespaces:        []string{namespaceKubeSystem, namespaceKubePublic, namespaceKubeNodeLease, namespaceDefault},
 		EnableDynamicFiltering:  true,
 		RefreshInterval:         "5m",
 		CacheEnabled:            true,

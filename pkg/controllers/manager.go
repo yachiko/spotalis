@@ -30,6 +30,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+// Default controller-manager network endpoints.
+const (
+	defaultMetricsAddr = ":8080"
+	defaultHealthAddr  = ":8081"
+	enabledLabelTrue   = "true"
+
+	namespaceKubeSystem    = "kube-system"
+	namespaceKubePublic    = "kube-public"
+	namespaceKubeNodeLease = "kube-node-lease"
+	namespaceDefault       = "default"
+)
+
 // ManagerConfig contains configuration for the controller manager
 type ManagerConfig struct {
 	// Controller configuration
@@ -97,8 +109,8 @@ func DefaultManagerConfig() *ManagerConfig {
 		EnableStatefulSets:      true,
 		EnableDaemonSets:        false,
 		LeaderElection:          true,
-		MetricsBindAddress:      ":8080",
-		HealthProbeBindAddress:  ":8081",
+		MetricsBindAddress:      defaultMetricsAddr,
+		HealthProbeBindAddress:  defaultHealthAddr,
 		CacheSyncTimeout:        10 * time.Minute,
 		GracefulShutdownTimeout: 30 * time.Second,
 	}
@@ -147,7 +159,7 @@ func NewControllerManager(
 		if client != nil {
 			namespaceFilterConfig := DefaultNamespaceFilterConfig()
 			namespaceFilterConfig.RequiredLabels = map[string]string{
-				"spotalis.io/enabled": "true",
+				annotations.EnabledLabel: enabledLabelTrue,
 			}
 			var err error
 			namespaceFilter, err = NewNamespaceFilter(namespaceFilterConfig, client)

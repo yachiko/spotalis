@@ -48,12 +48,12 @@ var _ = Describe("ControllerManager", func() {
 			EnableStatefulSets:      true,
 			EnableDaemonSets:        false,
 			LeaderElection:          true,
-			MetricsBindAddress:      ":8080",
-			HealthProbeBindAddress:  ":8081",
+			MetricsBindAddress:      defaultMetricsAddr,
+			HealthProbeBindAddress:  defaultHealthAddr,
 			CacheSyncTimeout:        5 * time.Minute,
 			GracefulShutdownTimeout: 15 * time.Second,
-			WatchNamespaces:         []string{"default", "kube-system"},
-			IgnoreNamespaces:        []string{"kube-public"},
+			WatchNamespaces:         []string{namespaceDefault, namespaceKubeSystem},
+			IgnoreNamespaces:        []string{namespaceKubePublic},
 		}
 
 		// Initialize nodeClassifier with a mock client for each test
@@ -121,8 +121,8 @@ var _ = Describe("ControllerManager", func() {
 			Expect(defaults.EnableStatefulSets).To(BeTrue())
 			Expect(defaults.EnableDaemonSets).To(BeFalse())
 			Expect(defaults.LeaderElection).To(BeTrue())
-			Expect(defaults.MetricsBindAddress).To(Equal(":8080"))
-			Expect(defaults.HealthProbeBindAddress).To(Equal(":8081"))
+			Expect(defaults.MetricsBindAddress).To(Equal(defaultMetricsAddr))
+			Expect(defaults.HealthProbeBindAddress).To(Equal(defaultHealthAddr))
 			Expect(defaults.CacheSyncTimeout).To(Equal(10 * time.Minute))
 			Expect(defaults.GracefulShutdownTimeout).To(Equal(30 * time.Second))
 		})
@@ -283,12 +283,12 @@ var _ = Describe("ControllerManager", func() {
 			config.EnableStatefulSets = true
 			config.EnableDaemonSets = false
 			config.LeaderElection = true
-			config.MetricsBindAddress = ":8080"
-			config.HealthProbeBindAddress = ":8081"
+			config.MetricsBindAddress = defaultMetricsAddr
+			config.HealthProbeBindAddress = defaultHealthAddr
 			config.CacheSyncTimeout = 10 * time.Minute
 			config.GracefulShutdownTimeout = 30 * time.Second
-			config.WatchNamespaces = []string{"default"}
-			config.IgnoreNamespaces = []string{"kube-system"}
+			config.WatchNamespaces = []string{namespaceDefault}
+			config.IgnoreNamespaces = []string{namespaceKubeSystem}
 
 			// If we can set these without compilation errors, the struct is correct
 			Expect(config.MaxConcurrentReconciles).To(Equal(5))
