@@ -45,17 +45,17 @@ var _ = Describe("ConfigurationLoader", func() {
 		}
 		// Clean up any environment variables we may have set
 		envVars := []string{
-			"SPOTALIS_NAMESPACE",
-			"SPOTALIS_MAX_CONCURRENT_RECONCILES",
-			"SPOTALIS_WEBHOOK_PORT",
-			"SPOTALIS_WEBHOOK_ENABLED",
-			"SPOTALIS_METRICS_BIND_ADDRESS",
-			"SPOTALIS_LOG_LEVEL",
-			"SPOTALIS_LOG_DEVELOPMENT",
-			"SPOTALIS_LEADER_ELECTION_ENABLED",
-			"SPOTALIS_RECONCILE_INTERVAL",
-			"SPOTALIS_RECONCILE_TIMEOUT",
-			"SPOTALIS_KUBE_TIMEOUT",
+			envNamespace,
+			envMaxConcurrentReconciles,
+			envWebhookPort,
+			envWebhookEnabled,
+			envMetricsBindAddress,
+			envLogLevel,
+			envLogDevelopment,
+			envLeaderElectionEnabled,
+			envReconcileInterval,
+			envReconcileTimeout,
+			envKubeTimeout,
 		}
 		for _, env := range envVars {
 			_ = os.Unsetenv(env)
@@ -75,7 +75,7 @@ var _ = Describe("ConfigurationLoader", func() {
 			Expect(config).NotTo(BeNil())
 
 			// Test controller defaults
-			Expect(config.Controller.Namespace).To(Equal("spotalis-system"))
+			Expect(config.Controller.Namespace).To(Equal(defaultNamespace))
 			Expect(config.Controller.MaxConcurrentReconciles).To(Equal(10))
 			Expect(config.Controller.ReconcileInterval).To(Equal(30 * time.Second))
 			Expect(config.Controller.ReconcileTimeout).To(Equal(5 * time.Minute))
@@ -178,7 +178,7 @@ logging:
 
 		Context("when file does not exist", func() {
 			It("should load from environment and defaults only", func() {
-				err := os.Setenv("SPOTALIS_NAMESPACE", "env-only-namespace")
+				err := os.Setenv(envNamespace, "env-only-namespace")
 				Expect(err).NotTo(HaveOccurred())
 
 				loader := NewConfigurationLoader()
@@ -209,8 +209,8 @@ logging:
 				// Set environment variables that should override
 				// Set environment variables
 				envVars := map[string]string{
-					"SPOTALIS_NAMESPACE":    "env-namespace",
-					"SPOTALIS_WEBHOOK_PORT": "7443",
+					envNamespace:    "env-namespace",
+					envWebhookPort: "7443",
 				}
 
 				for key, value := range envVars {
@@ -273,14 +273,14 @@ webhook:
 		Context("when environment variables are set", func() {
 			It("should load configuration from environment variables", func() {
 				envVars := map[string]string{
-					"SPOTALIS_NAMESPACE":                 "env-namespace",
-					"SPOTALIS_MAX_CONCURRENT_RECONCILES": "15",
-					"SPOTALIS_WEBHOOK_PORT":              "7443",
-					"SPOTALIS_WEBHOOK_ENABLED":           "false",
-					"SPOTALIS_LOG_LEVEL":                 "debug",
-					"SPOTALIS_LOG_DEVELOPMENT":           "true",
-					"SPOTALIS_METRICS_BIND_ADDRESS":      ":7080",
-					"SPOTALIS_LEADER_ELECTION_ENABLED":   "false",
+					envNamespace:                 "env-namespace",
+					envMaxConcurrentReconciles: "15",
+					envWebhookPort:              "7443",
+					envWebhookEnabled:           "false",
+					envLogLevel:                 "debug",
+					envLogDevelopment:           "true",
+					envMetricsBindAddress:      ":7080",
+					envLeaderElectionEnabled:   "false",
 				}
 
 				for key, value := range envVars {
@@ -305,9 +305,9 @@ webhook:
 
 			It("should handle duration environment variables", func() {
 				envVars := map[string]string{
-					"SPOTALIS_RECONCILE_INTERVAL": "45s",
-					"SPOTALIS_RECONCILE_TIMEOUT":  "10m",
-					"SPOTALIS_KUBE_TIMEOUT":       "60s",
+					envReconcileInterval: "45s",
+					envReconcileTimeout:  "10m",
+					envKubeTimeout:       "60s",
 				}
 
 				for key, value := range envVars {
@@ -325,7 +325,7 @@ webhook:
 			})
 
 			It("should handle invalid environment variable values", func() {
-				err := os.Setenv("SPOTALIS_WEBHOOK_PORT", "invalid-port")
+				err := os.Setenv(envWebhookPort, "invalid-port")
 				Expect(err).NotTo(HaveOccurred())
 
 				loader := NewConfigurationLoader()
@@ -343,7 +343,7 @@ webhook:
 				Expect(config).NotTo(BeNil())
 
 				// Should have default values
-				Expect(config.Controller.Namespace).To(Equal("spotalis-system"))
+				Expect(config.Controller.Namespace).To(Equal(defaultNamespace))
 				Expect(config.Webhook.Port).To(Equal(9443))
 				Expect(config.Logging.Level).To(Equal("info"))
 			})

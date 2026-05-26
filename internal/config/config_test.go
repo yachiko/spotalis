@@ -93,7 +93,7 @@ var _ = Describe("Config", func() {
 		Context("when working with individual config types", func() {
 			It("should create ControllerConfig with basic fields", func() {
 				controller := ControllerConfig{
-					Namespace:               "spotalis-system",
+					Namespace:               defaultNamespace,
 					MaxConcurrentReconciles: 10,
 					ReconcileInterval:       30 * time.Second,
 					ReconcileTimeout:        5 * time.Minute,
@@ -101,7 +101,7 @@ var _ = Describe("Config", func() {
 					EnableStatefulSets:      true,
 					ReadOnlyMode:            false,
 				}
-				Expect(controller.Namespace).To(Equal("spotalis-system"))
+				Expect(controller.Namespace).To(Equal(defaultNamespace))
 				Expect(controller.MaxConcurrentReconciles).To(Equal(10))
 				Expect(controller.ReconcileInterval).To(Equal(30 * time.Second))
 				Expect(controller.ReconcileTimeout).To(Equal(5 * time.Minute))
@@ -115,10 +115,10 @@ var _ = Describe("Config", func() {
 					Enabled:          true,
 					Port:             9443,
 					CertDir:          "/tmp/certs",
-					CertName:         "tls.crt",
-					KeyName:          "tls.key",
+					CertName:         tlsCertName,
+					KeyName:          tlsKeyName,
 					ServiceName:      "webhook-service",
-					ServiceNamespace: "spotalis-system",
+					ServiceNamespace: defaultNamespace,
 					ServicePath:      "/mutate",
 					TLSMinVersion:    "1.2",
 					FailurePolicy:    "Fail",
@@ -145,14 +145,14 @@ var _ = Describe("Config", func() {
 			It("should create LeaderElectionConfig with timing settings", func() {
 				leader := LeaderElectionConfig{
 					Enabled:       true,
-					ID:            "spotalis-controller",
+					ID:            defaultControllerName,
 					LeaseName:     "spotalis-lease",
 					LeaseDuration: 60 * time.Second,
 					RenewDeadline: 40 * time.Second,
 					RetryPeriod:   10 * time.Second,
 				}
 				Expect(leader.Enabled).To(BeTrue())
-				Expect(leader.ID).To(Equal("spotalis-controller"))
+				Expect(leader.ID).To(Equal(defaultControllerName))
 				Expect(leader.LeaseDuration).To(Equal(60 * time.Second))
 			})
 
