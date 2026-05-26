@@ -58,10 +58,10 @@ var _ = Describe("DeploymentReconciler", func() {
 		// Create properly initialized NodeClassifierService
 		nodeClassifier = config.NewNodeClassifierService(fakeClient, &config.NodeClassifierConfig{
 			SpotLabels: map[string]string{
-				"node.kubernetes.io/instance-type": "spot",
+				nodeInstanceTypeKey: string(apis.NodeTypeSpot),
 			},
 			OnDemandLabels: map[string]string{
-				"node.kubernetes.io/instance-type": "on-demand",
+				nodeInstanceTypeKey: string(apis.NodeTypeOnDemand),
 			},
 		})
 
@@ -102,30 +102,30 @@ var _ = Describe("DeploymentReconciler", func() {
 		BeforeEach(func() {
 			deployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70",
+						annotations.SpotPercentageAnnotation: "70",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								testAppLabel: testAppName,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -143,8 +143,8 @@ var _ = Describe("DeploymentReconciler", func() {
 			// First reconcile
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -169,8 +169,8 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "nonexistent",
-					Namespace: "default",
+					Name:      testNonexistent,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -182,14 +182,14 @@ var _ = Describe("DeploymentReconciler", func() {
 		It("should increment count when deployment has no annotations", func() {
 			deploymentWithoutAnnotations := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 				},
@@ -202,8 +202,8 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -219,33 +219,33 @@ var _ = Describe("DeploymentReconciler", func() {
 		BeforeEach(func() {
 			deployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						annotations.EnabledLabel: enabledLabelTrue,
 					},
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70",
+						annotations.SpotPercentageAnnotation: "70",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								testAppLabel: testAppName,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -265,8 +265,8 @@ var _ = Describe("DeploymentReconciler", func() {
 			It("should return without error", func() {
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      "nonexistent",
-						Namespace: "default",
+						Name:      testNonexistent,
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -281,14 +281,14 @@ var _ = Describe("DeploymentReconciler", func() {
 			It("should skip reconciliation", func() {
 				deploymentWithoutAnnotations := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-deployment",
-						Namespace: "default",
+						Name:      testDeploymentName,
+						Namespace: namespaceDefault,
 					},
 					Spec: appsv1.DeploymentSpec{
 						Replicas: int32Ptr(3),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"app": "test",
+								testAppLabel: testAppName,
 							},
 						},
 					},
@@ -298,8 +298,8 @@ var _ = Describe("DeploymentReconciler", func() {
 
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      "test-deployment",
-						Namespace: "default",
+						Name:      testDeploymentName,
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -318,8 +318,8 @@ var _ = Describe("DeploymentReconciler", func() {
 			It("should reconcile successfully", func() {
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      "test-deployment",
-						Namespace: "default",
+						Name:      testDeploymentName,
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -333,15 +333,15 @@ var _ = Describe("DeploymentReconciler", func() {
 				invalidDeployment := deployment.DeepCopy()
 				invalidDeployment.Name = "invalid-deployment"
 				invalidDeployment.ResourceVersion = "" // Clear resourceVersion for Create
-				invalidDeployment.Labels["spotalis.io/enabled"] = "true"
-				invalidDeployment.Annotations["spotalis.io/spot-percentage"] = "invalid"
+				invalidDeployment.Labels[annotations.EnabledLabel] = enabledLabelTrue
+				invalidDeployment.Annotations[annotations.SpotPercentageAnnotation] = "invalid"
 
 				Expect(fakeClient.Create(ctx, invalidDeployment)).To(Succeed())
 
 				req := ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      "invalid-deployment",
-						Namespace: "default",
+						Namespace: namespaceDefault,
 					},
 				}
 
@@ -359,14 +359,14 @@ var _ = Describe("DeploymentReconciler", func() {
 		BeforeEach(func() {
 			deployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 				},
@@ -381,18 +381,18 @@ var _ = Describe("DeploymentReconciler", func() {
 			// Create nodes for the pods to run on
 			spotNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "spot-node-1",
+					Name: testNodeSpot,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "t3.medium",
+						nodeInstanceTypeKey: "t3.medium",
 						"karpenter.sh/capacity-type":       "spot",
 					},
 				},
 			}
 			onDemandNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "ondemand-node-1",
+					Name: testNodeOnDemand,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "t3.medium",
+						nodeInstanceTypeKey: "t3.medium",
 						"karpenter.sh/capacity-type":       "on-demand",
 					},
 				},
@@ -406,13 +406,13 @@ var _ = Describe("DeploymentReconciler", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("test-pod-spot-%d", i),
-						Namespace: "default",
+						Namespace: namespaceDefault,
 						Labels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 					Spec: corev1.PodSpec{
-						NodeName: "spot-node-1",
+						NodeName: testNodeSpot,
 					},
 				}
 				Expect(fakeClient.Create(ctx, pod)).To(Succeed())
@@ -422,13 +422,13 @@ var _ = Describe("DeploymentReconciler", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("test-pod-ondemand-%d", i),
-						Namespace: "default",
+						Namespace: namespaceDefault,
 						Labels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 					Spec: corev1.PodSpec{
-						NodeName: "ondemand-node-1",
+						NodeName: testNodeOnDemand,
 					},
 				}
 				Expect(fakeClient.Create(ctx, pod)).To(Succeed())
@@ -519,27 +519,27 @@ var _ = Describe("DeploymentReconciler", func() {
 		BeforeEach(func() {
 			deployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(5),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"app": "test",
+								testAppLabel: testAppName,
 							},
 						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "test-container",
-									Image: "nginx:latest",
+									Name:  testContainerName,
+									Image: testImageNginx,
 								},
 							},
 						},
@@ -562,17 +562,17 @@ var _ = Describe("DeploymentReconciler", func() {
 			// Create nodes
 			spotNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "spot-node-1",
+					Name: testNodeSpot,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "spot", // Updated to match classifier config
+						nodeInstanceTypeKey: string(apis.NodeTypeSpot), // Updated to match classifier config
 					},
 				},
 			}
 			onDemandNode := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "ondemand-node-1",
+					Name: testNodeOnDemand,
 					Labels: map[string]string{
-						"node.kubernetes.io/instance-type": "on-demand", // Updated to match classifier config
+						nodeInstanceTypeKey: string(apis.NodeTypeOnDemand), // Updated to match classifier config
 					},
 				},
 			}
@@ -584,17 +584,17 @@ var _ = Describe("DeploymentReconciler", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("test-pod-spot-%d", i),
-						Namespace: "default",
+						Namespace: namespaceDefault,
 						Labels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 					Spec: corev1.PodSpec{
-						NodeName: "spot-node-1",
+						NodeName: testNodeSpot,
 						Containers: []corev1.Container{
 							{
-								Name:  "test-container",
-								Image: "nginx:latest",
+								Name:  testContainerName,
+								Image: testImageNginx,
 							},
 						},
 					},
@@ -606,17 +606,17 @@ var _ = Describe("DeploymentReconciler", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-ondemand-0",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"app": "test",
+						testAppLabel: testAppName,
 					},
 				},
 				Spec: corev1.PodSpec{
-					NodeName: "ondemand-node-1",
+					NodeName: testNodeOnDemand,
 					Containers: []corev1.Container{
 						{
-							Name:  "test-container",
-							Image: "nginx:latest",
+							Name:  testContainerName,
+							Image: testImageNginx,
 						},
 					},
 				},
@@ -657,8 +657,8 @@ var _ = Describe("DeploymentReconciler", func() {
 				Spec: appsv1.DeploymentSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app":     "test",
-							"version": "v1",
+							testAppLabel: testAppName,
+							testStringVersion: "v1",
 						},
 					},
 				},
@@ -668,8 +668,8 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(selector).To(Equal(client.MatchingLabels{
-				"app":     "test",
-				"version": "v1",
+				testAppLabel: testAppName,
+				testStringVersion: "v1",
 			}))
 		})
 
@@ -692,20 +692,20 @@ var _ = Describe("DeploymentReconciler", func() {
 		It("should handle deployment with nil replica count", func() {
 			deployment := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						annotations.EnabledLabel: enabledLabelTrue,
 					},
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "50",
+						annotations.SpotPercentageAnnotation: "50",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: nil, // Nil replicas
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 				},
@@ -718,8 +718,8 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -735,17 +735,17 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			deployment := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "50",
+						annotations.SpotPercentageAnnotation: "50",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app": "test",
+							testAppLabel: testAppName,
 						},
 					},
 				},
@@ -755,8 +755,8 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 			}
 
@@ -918,7 +918,7 @@ var _ = Describe("DeploymentReconciler", func() {
 			deployment := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "invalid-selector-deployment",
-					Namespace: "default",
+					Namespace: namespaceDefault,
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(1),
@@ -946,7 +946,7 @@ var _ = Describe("DeploymentReconciler", func() {
 			}
 
 			// This would be called during reconciliation
-			reconciler.MetricsCollector.RecordWorkloadMetrics("default", "test-deployment", "Deployment", state)
+			reconciler.MetricsCollector.RecordWorkloadMetrics("default", testDeploymentName, "Deployment", state)
 
 			Expect(mockMetrics.RecordedMetrics).To(HaveLen(1))
 			Expect(mockMetrics.RecordedMetrics[0].Namespace).To(Equal("default"))
@@ -963,19 +963,19 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			deployment := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 					Labels: map[string]string{
-						"spotalis.io/enabled": "true",
+						annotations.EnabledLabel: enabledLabelTrue,
 					},
 					Annotations: map[string]string{
-						"spotalis.io/spot-percentage": "70",
+						annotations.SpotPercentageAnnotation: "70",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: int32Ptr(3),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"app": "test"},
+						MatchLabels: map[string]string{testAppLabel: testAppName},
 					},
 				},
 				Status: appsv1.DeploymentStatus{
@@ -990,8 +990,8 @@ var _ = Describe("DeploymentReconciler", func() {
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "test-deployment",
-					Namespace: "default",
+					Name:      testDeploymentName,
+					Namespace: namespaceDefault,
 				},
 			}
 
