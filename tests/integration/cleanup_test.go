@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 var _ = Describe("Resource cleanup mechanisms", func() {
 	var (
 		ctx        context.Context
