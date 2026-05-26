@@ -193,7 +193,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"karpenter.sh/capacity-type": "spot",
+							CapacityTypeLabel: string(NodeTypeSpot),
 						},
 					},
 				}
@@ -206,7 +206,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"karpenter.sh/capacity-type": "on-demand",
+							CapacityTypeLabel: string(NodeTypeOnDemand),
 						},
 					},
 				}
@@ -248,13 +248,13 @@ var _ = Describe("DefaultNodeClassifier", func() {
 
 			// Test with a spot node
 			nodeLabels := labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "spot",
+				CapacityTypeLabel: string(NodeTypeSpot),
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeTrue())
 
 			// Test with a non-spot node
 			nodeLabels = labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "on-demand",
+				CapacityTypeLabel: string(NodeTypeOnDemand),
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeFalse())
 		})
@@ -265,13 +265,13 @@ var _ = Describe("DefaultNodeClassifier", func() {
 
 			// Test with an on-demand node
 			nodeLabels := labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "on-demand",
+				CapacityTypeLabel: string(NodeTypeOnDemand),
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeTrue())
 
 			// Test with a spot node
 			nodeLabels = labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "spot",
+				CapacityTypeLabel: string(NodeTypeSpot),
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeFalse())
 		})

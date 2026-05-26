@@ -205,11 +205,11 @@ var _ = Describe("KubernetesConfig", func() {
 		Describe("RBAC Rules", func() {
 			It("should require proper permissions for deployments", func() {
 				// Test that we know what permissions are needed
-				requiredVerbs := []string{"get", "list", "watch", "update", "patch"}
+				requiredVerbs := []string{verbGet, verbList, verbWatch, verbUpdate, verbPatch}
 				requiredResources := []string{"deployments", "deployments/status"}
 
 				for _, verb := range requiredVerbs {
-					Expect(verb).To(BeElementOf("get", "list", "watch", "create", "update", "patch", "delete"))
+					Expect(verb).To(BeElementOf(verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete))
 				}
 
 				for _, resource := range requiredResources {
@@ -219,11 +219,11 @@ var _ = Describe("KubernetesConfig", func() {
 
 			It("should require proper permissions for statefulsets", func() {
 				// Test that we know what permissions are needed
-				requiredVerbs := []string{"get", "list", "watch", "update", "patch"}
+				requiredVerbs := []string{verbGet, verbList, verbWatch, verbUpdate, verbPatch}
 				requiredResources := []string{"statefulsets", "statefulsets/status"}
 
 				for _, verb := range requiredVerbs {
-					Expect(verb).To(BeElementOf("get", "list", "watch", "create", "update", "patch", "delete"))
+					Expect(verb).To(BeElementOf(verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete))
 				}
 
 				for _, resource := range requiredResources {
@@ -233,11 +233,11 @@ var _ = Describe("KubernetesConfig", func() {
 
 			It("should require proper permissions for pods and nodes", func() {
 				// Test that we know what permissions are needed
-				requiredVerbs := []string{"get", "list", "watch"}
+				requiredVerbs := []string{verbGet, verbList, verbWatch}
 				requiredResources := []string{"pods", "nodes"}
 
 				for _, verb := range requiredVerbs {
-					Expect(verb).To(BeElementOf("get", "list", "watch", "create", "update", "patch", "delete"))
+					Expect(verb).To(BeElementOf(verbGet, verbList, verbWatch, verbCreate, verbUpdate, verbPatch, verbDelete))
 				}
 
 				for _, resource := range requiredResources {
