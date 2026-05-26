@@ -45,8 +45,6 @@ spec:
         securityContext:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-        command:
-        - /controller
         args:
         - --config=/etc/spotalis/config.yaml
         env:
@@ -73,7 +71,7 @@ spec:
           periodSeconds: 20
         readinessProbe:
           httpGet:
-            path: /healthz
+            path: /readyz
             port: health
           initialDelaySeconds: 5
           periodSeconds: 10
