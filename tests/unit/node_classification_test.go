@@ -112,10 +112,10 @@ var _ = Describe("NodeClassification", func() {
 			classifier = &MockNodeClassifier{}
 			node = &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-node",
+					Name: testNodeName,
 					Labels: map[string]string{
-						"kubernetes.io/os":                 "linux",
-						"node.kubernetes.io/lifecycle":     "spot",
+						labelKubernetesOS:                 stringLinux,
+						labelNodeLifecycle:     stringSpot,
 						"topology.kubernetes.io/region":    "us-west-2",
 						"topology.kubernetes.io/zone":      "us-west-2a",
 						"node.kubernetes.io/instance-type": "m5.large",
@@ -135,7 +135,7 @@ var _ = Describe("NodeClassification", func() {
 
 		It("should update all classification fields", func() {
 			classification := &apis.NodeClassification{
-				NodeName: "test-node",
+				NodeName: testNodeName,
 			}
 			classifier.SetNodeType(apis.NodeTypeSpot)
 
@@ -155,7 +155,7 @@ var _ = Describe("NodeClassification", func() {
 		It("should handle unschedulable nodes", func() {
 			node.Spec.Unschedulable = true
 			classification := &apis.NodeClassification{
-				NodeName: "test-node",
+				NodeName: testNodeName,
 			}
 
 			classification.Update(node, classifier)
@@ -165,10 +165,10 @@ var _ = Describe("NodeClassification", func() {
 
 		It("should handle missing topology labels", func() {
 			node.Labels = map[string]string{
-				"kubernetes.io/os": "linux",
+				labelKubernetesOS: stringLinux,
 			}
 			classification := &apis.NodeClassification{
-				NodeName: "test-node",
+				NodeName: testNodeName,
 			}
 
 			classification.Update(node, classifier)
@@ -194,7 +194,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"karpenter.sh/capacity-type": "spot",
+							labelCapacityType: stringSpot,
 						},
 					},
 				}
@@ -207,7 +207,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"karpenter.sh/capacity-type": "on-demand",
+							labelCapacityType: stringOnDemand,
 						},
 					},
 				}
@@ -222,7 +222,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"node.kubernetes.io/lifecycle": "spot",
+							labelNodeLifecycle: stringSpot,
 						},
 					},
 				}
@@ -235,7 +235,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"node.kubernetes.io/lifecycle": "normal",
+							labelNodeLifecycle: "normal",
 						},
 					},
 				}
@@ -250,7 +250,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"cloud.google.com/gke-preemptible": "true",
+							"cloud.google.com/gke-preemptible": stringTrue,
 						},
 					},
 				}
@@ -265,7 +265,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"kubernetes.azure.com/scalesetpriority": "spot",
+							"kubernetes.azure.com/scalesetpriority": stringSpot,
 						},
 					},
 				}
@@ -280,7 +280,7 @@ var _ = Describe("DefaultNodeClassifier", func() {
 				node := &corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"kubernetes.io/os": "linux",
+							labelKubernetesOS: stringLinux,
 						},
 					},
 				}
@@ -307,13 +307,13 @@ var _ = Describe("DefaultNodeClassifier", func() {
 
 			// Test with a spot node
 			nodeLabels := labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "spot",
+				labelCapacityType: stringSpot,
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeTrue())
 
 			// Test with a non-spot node
 			nodeLabels = labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "on-demand",
+				labelCapacityType: stringOnDemand,
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeFalse())
 		})
@@ -324,13 +324,13 @@ var _ = Describe("DefaultNodeClassifier", func() {
 
 			// Test with an on-demand node
 			nodeLabels := labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "on-demand",
+				labelCapacityType: stringOnDemand,
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeTrue())
 
 			// Test with a spot node
 			nodeLabels = labels.Set(map[string]string{
-				"karpenter.sh/capacity-type": "spot",
+				labelCapacityType: stringSpot,
 			})
 			Expect(selector.Matches(nodeLabels)).To(BeFalse())
 		})
@@ -358,14 +358,14 @@ var _ = Describe("NodeCache", func() {
 		It("should return correct type for cached nodes", func() {
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-node",
+					Name: testNodeName,
 				},
 			}
 			classifier.SetNodeType(apis.NodeTypeSpot)
 
 			cache.UpdateNode(node)
 
-			nodeType := cache.GetNodeType("test-node")
+			nodeType := cache.GetNodeType(testNodeName)
 			Expect(nodeType).To(Equal(apis.NodeTypeSpot))
 		})
 	})
