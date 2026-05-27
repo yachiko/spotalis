@@ -422,7 +422,20 @@ var _ = Describe("AnnotationParser", func() {
 				errors := parser.ValidateAnnotations(obj)
 				Expect(errors).To(HaveLen(1))
 				Expect(errors[0].Error()).To(ContainSubstring("invalid spotalis.io/min-on-demand"))
-				Expect(errors[0].Error()).To(ContainSubstring("must be non-negative"))
+				Expect(errors[0].Error()).To(ContainSubstring("must be between 0 and"))
+			})
+
+			It("should return error for min-on-demand above MaxMinOnDemand", func() {
+				obj := &MockObject{
+					annotations: map[string]string{
+						MinOnDemandAnnotation: "100001",
+					},
+				}
+
+				errors := parser.ValidateAnnotations(obj)
+				Expect(errors).To(HaveLen(1))
+				Expect(errors[0].Error()).To(ContainSubstring("invalid spotalis.io/min-on-demand"))
+				Expect(errors[0].Error()).To(ContainSubstring("must be between 0 and"))
 			})
 
 			It("should return error for non-numeric min-on-demand", func() {

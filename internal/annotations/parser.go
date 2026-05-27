@@ -46,6 +46,14 @@ const (
 	// BooleanTrue represents the string "true" for annotation values
 	BooleanTrue = "true"
 
+	// MaxMinOnDemand is the upper bound enforced on the
+	// spotalis.io/min-on-demand annotation. The cap is intentionally
+	// well below int32 max — far enough above any plausible single-workload
+	// replica count (kubelet caps a node at ~110 pods) that operators are
+	// not constrained, while preventing an attacker-supplied value from
+	// causing scheduling-failure DoS or downstream integer overflows.
+	MaxMinOnDemand = 10000
+
 	// testPctSeventy is the canonical "70%" string used in spot-percentage tests.
 	testPctSeventy = "70%"
 	// testInvalid is the placeholder value used to assert parser rejection.
@@ -104,22 +112,25 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 		if err != nil {
 			return nil, fmt.Errorf("invalid spot-percentage annotation: %w", err)
 		}
-		if percentage < 0 || percentage > int(^uint32(0)) {
-			return nil, fmt.Errorf("spot-percentage annotation out of valid range: %d", percentage)
+		if percentage < 0 || percentage > 100 {
+			return nil, fmt.Errorf("spot-percentage annotation must be between 0 and 100, got %d", percentage)
 		}
-		config.SpotPercentage = int32(percentage) // #nosec G109,G115 - Bounds checked above
+		config.SpotPercentage = int32(percentage) // #nosec G109 - bounded 0..100 above
 	}
 
-	// Parse minimum on-demand replicas
+	// Parse minimum on-demand replicas. The upper bound is intentionally
+	// well below int32 max: kubelet caps a single node at ~110 pods and a
+	// cluster scaling beyond MaxMinOnDemand replicas should be using a
+	// dedicated scheduler tier, not a single workload's annotation.
 	if minOnDemand, exists := annotations[MinOnDemandAnnotation]; exists {
 		count, err := strconv.Atoi(minOnDemand)
 		if err != nil {
 			return nil, fmt.Errorf("invalid min-on-demand annotation: %w", err)
 		}
-		if count < 0 || count > int(^uint32(0)) {
-			return nil, fmt.Errorf("min-on-demand annotation out of valid range: %d", count)
+		if count < 0 || count > MaxMinOnDemand {
+			return nil, fmt.Errorf("min-on-demand annotation must be between 0 and %d, got %d", MaxMinOnDemand, count)
 		}
-		config.MinOnDemand = int32(count) // #nosec G109,G115 - Bounds checked above
+		config.MinOnDemand = int32(count) // #nosec G109 - bounded 0..MaxMinOnDemand above
 	}
 
 	return config, nil
@@ -250,8 +261,8 @@ func (p *AnnotationParser) validateMinOnDemand(value string) error {
 		return fmt.Errorf("must be an integer: %w", err)
 	}
 
-	if count < 0 {
-		return fmt.Errorf("must be non-negative, got %d", count)
+	if count < 0 || count > MaxMinOnDemand {
+		return fmt.Errorf("must be between 0 and %d, got %d", MaxMinOnDemand, count)
 	}
 
 	return nil
