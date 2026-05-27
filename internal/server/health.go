@@ -49,6 +49,14 @@ const (
 	statusUnhealthy = "unhealthy"
 
 	kindDeployment = "Deployment"
+
+	// maxAdmissionRequestBytes is the cap applied to inbound admission review
+	// payloads. The Kubernetes apiserver enforces a 3 MiB cap on its own
+	// outgoing requests; a real pod manifest is well under 1 MiB. 3 MiB leaves
+	// headroom for resources with large PodSpec annotations or many init
+	// containers while preventing a malicious client from streaming arbitrary
+	// payloads into the webhook's memory.
+	maxAdmissionRequestBytes = 3 * 1024 * 1024
 )
 
 // HealthChecker provides health checking functionality for the Spotalis controller

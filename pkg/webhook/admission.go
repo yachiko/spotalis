@@ -343,13 +343,12 @@ func (a *AdmissionController) extractCABundle(certPath string) error {
 	return nil
 }
 
-// getTLSVersion converts TLS version string to constant
+// getTLSVersion converts TLS version string to constant. Only TLS 1.2 and
+// 1.3 are accepted; any other value (including the older "1.0"/"1.1"
+// settings previously permitted) falls back to the secure default 1.3 so
+// that a misconfigured TLSMinVersion cannot silently weaken the handshake.
 func (a *AdmissionController) getTLSVersion() uint16 {
 	switch a.config.TLSMinVersion {
-	case "1.0":
-		return tls.VersionTLS10
-	case "1.1":
-		return tls.VersionTLS11
 	case "1.2":
 		return tls.VersionTLS12
 	case tlsVersion13:
