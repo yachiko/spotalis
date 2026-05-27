@@ -107,7 +107,9 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 		return
 	}
 
-	// Parse admission request
+	// Parse admission request. Cap the body so a malicious client cannot
+	// exhaust memory by streaming an arbitrarily large payload.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAdmissionRequestBytes)
 	body, err := c.GetRawData()
 	if err != nil {
 		if !w.quiet {
@@ -169,6 +171,7 @@ func (w *WebhookServer) MutateHandler(c *gin.Context) {
 // ValidateHandler implements the /validate webhook endpoint (for future use)
 func (w *WebhookServer) ValidateHandler(c *gin.Context) {
 	// For now, always allow - validation logic can be added later
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAdmissionRequestBytes)
 	body, err := c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{

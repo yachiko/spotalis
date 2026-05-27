@@ -172,12 +172,13 @@ var _ = Describe("AdmissionController", func() {
 			It("should return correct TLS version constants", func() {
 				controller := &AdmissionController{config: config}
 
-				// Test different TLS versions
+				// 1.0 and 1.1 are no longer accepted and fall back to the
+				// secure default (1.3) instead of weakening the handshake.
 				config.TLSMinVersion = "1.0"
-				Expect(controller.getTLSVersion()).To(Equal(uint16(tls.VersionTLS10)))
+				Expect(controller.getTLSVersion()).To(Equal(uint16(tls.VersionTLS13)))
 
 				config.TLSMinVersion = "1.1"
-				Expect(controller.getTLSVersion()).To(Equal(uint16(tls.VersionTLS11)))
+				Expect(controller.getTLSVersion()).To(Equal(uint16(tls.VersionTLS13)))
 
 				config.TLSMinVersion = "1.2"
 				Expect(controller.getTLSVersion()).To(Equal(uint16(tls.VersionTLS12)))
