@@ -5,6 +5,13 @@
 <h1 align="center">Spotalis</h1>
 <p align="center"><strong>Annotation‑first spot vs on‑demand replica optimizer for Kubernetes</strong></p>
 
+<p align="center">
+  <a href="https://github.com/yachiko/spotalis/actions/workflows/ci.yml"><img src="https://github.com/yachiko/spotalis/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/yachiko/spotalis/releases"><img src="https://img.shields.io/github/v/release/yachiko/spotalis" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/yachiko/spotalis" alt="License"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/yachiko/spotalis" alt="Go version"></a>
+</p>
+
 ---
 
 ## ✨ Overview

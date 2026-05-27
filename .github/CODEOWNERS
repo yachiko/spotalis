@@ -1,0 +1,4 @@
+# Default owner for everything in this repo. Replaces Dependabot's deprecated
+# `reviewers:` config — CODEOWNERS is what GitHub now uses to auto-request
+# review on any PR (Dependabot PRs included).
+*       @yachiko

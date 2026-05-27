@@ -3,12 +3,10 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
       timezone: "Europe/Warsaw"
     labels:
       - "dependencies"
-    reviewers:
-      - "yachiko"
     assignees:
       - "yachiko"
     open-pull-requests-limit: 5
@@ -24,13 +22,11 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
       timezone: "Europe/Warsaw"
     labels:
       - "dependencies"
       - "ci"
-    reviewers:
-      - "yachiko"
     assignees:
       - "yachiko"
     open-pull-requests-limit: 5
@@ -46,12 +42,10 @@ updates:
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
       timezone: "Europe/Warsaw"
     labels:
       - "dependencies"
-    reviewers:
-      - "yachiko"
     assignees:
       - "yachiko"
     open-pull-requests-limit: 5
