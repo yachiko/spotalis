@@ -12,12 +12,13 @@ updates:
     open-pull-requests-limit: 5
     groups:
       go-modules:
+        applies-to: version-updates
         patterns:
           - "*"
-        update-types:
-          - "major"
-          - "minor"
-          - "patch"
+      go-modules-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -32,12 +33,13 @@ updates:
     open-pull-requests-limit: 5
     groups:
       github-actions:
+        applies-to: version-updates
         patterns:
           - "*"
-        update-types:
-          - "major"
-          - "minor"
-          - "patch"
+      github-actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -51,9 +53,10 @@ updates:
     open-pull-requests-limit: 5
     groups:
       docker:
+        applies-to: version-updates
         patterns:
           - "*"
-        update-types:
-          - "major"
-          - "minor"
-          - "patch"
+      docker-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
