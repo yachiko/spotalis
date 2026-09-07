@@ -47,7 +47,10 @@ import (
 	"github.com/yachiko/spotalis/internal/server"
 	"github.com/yachiko/spotalis/pkg/controllers"
 	"github.com/yachiko/spotalis/pkg/metrics"
+	"github.com/yachiko/spotalis/pkg/observation"
 	webhookMutate "github.com/yachiko/spotalis/pkg/webhook"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -77,6 +80,7 @@ type Operator struct {
 	// Core services
 	annotationParser *annotations.AnnotationParser
 	nodeClassifier   *config.NodeClassifierService
+	workloadObserver *observation.Service
 	metricsCollector *metrics.Collector
 	mutationHandler  *webhookMutate.MutationHandler
 
@@ -696,6 +700,13 @@ func (o *Operator) initializeCoreServices() error {
 		},
 	}
 	o.nodeClassifier = config.NewNodeClassifierService(o.GetClient(), nodeClassifierConfig)
+	if err := o.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, observation.PodControllerOwnerUIDIndex, observation.IndexPodControllerOwnerUID); err != nil {
+		return fmt.Errorf("index pod controller owners: %w", err)
+	}
+	if err := o.GetFieldIndexer().IndexField(context.Background(), &appsv1.ReplicaSet{}, observation.ReplicaSetControllerOwnerUIDIndex, observation.IndexReplicaSetControllerOwnerUID); err != nil {
+		return fmt.Errorf("index ReplicaSet controller owners: %w", err)
+	}
+	o.workloadObserver = observation.NewService(o.GetClient(), o.nodeClassifier)
 
 	// Initialize metrics collector
 	o.metricsCollector = metrics.NewCollector()
@@ -708,6 +719,7 @@ func (o *Operator) initializeCoreServices() error {
 	// Initialize mutation handler
 	o.mutationHandler = webhookMutate.NewMutationHandler(o.GetClient(), o.GetScheme())
 	o.mutationHandler.SetNodeClassifier(o.nodeClassifier)
+	o.mutationHandler.Observer = o.workloadObserver
 	o.mutationHandler.SetMetricsCollector(o.metricsCollector)
 
 	return nil
@@ -784,6 +796,7 @@ func (o *Operator) setupControllers() error {
 		Scheme:            o.GetScheme(),
 		AnnotationParser:  o.annotationParser,
 		NodeClassifier:    o.nodeClassifier,
+		Observer:          o.workloadObserver,
 		NamespaceFilter:   namespaceFilter,
 		ReconcileInterval: o.config.ReconcileInterval,
 		MetricsCollector:  o.metricsCollector,
@@ -807,6 +820,7 @@ func (o *Operator) setupControllers() error {
 		Scheme:            o.GetScheme(),
 		AnnotationParser:  o.annotationParser,
 		NodeClassifier:    o.nodeClassifier,
+		Observer:          o.workloadObserver,
 		NamespaceFilter:   namespaceFilter,
 		ReconcileInterval: o.config.ReconcileInterval,
 		MetricsCollector:  o.metricsCollector,

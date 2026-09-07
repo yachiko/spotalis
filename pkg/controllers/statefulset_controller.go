@@ -29,6 +29,7 @@ import (
 	"github.com/yachiko/spotalis/internal/config"
 	"github.com/yachiko/spotalis/pkg/apis"
 	pkgconfig "github.com/yachiko/spotalis/pkg/config"
+	"github.com/yachiko/spotalis/pkg/observation"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +47,7 @@ type StatefulSetReconciler struct {
 	Scheme                       *runtime.Scheme
 	AnnotationParser             *annotations.AnnotationParser
 	NodeClassifier               *config.NodeClassifierService
+	Observer                     *observation.Service
 	NamespaceFilter              *NamespaceFilter // Filter for namespace-level permissions
 	ReconcileInterval            time.Duration
 	MaxConcurrentRecons          int
@@ -320,6 +322,14 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 // calculateCurrentReplicaState analyzes the current state of StatefulSet replicas
 func (r *StatefulSetReconciler) calculateCurrentReplicaState(ctx context.Context, statefulSet *appsv1.StatefulSet) (*apis.ReplicaState, error) {
+	if r.Observer != nil {
+		snapshot, err := r.Observer.Observe(ctx, statefulSet)
+		if err != nil {
+			return nil, err
+		}
+		spot, onDemand := snapshot.ActualCounts()
+		return &apis.ReplicaState{WorkloadRef: snapshot.WorkloadRef, CurrentSpot: spot, CurrentOnDemand: onDemand, LastReconciled: snapshot.ObservedAt}, nil
+	}
 	// Get all pods for this StatefulSet
 	podList := &corev1.PodList{}
 	selector, err := statefulSetLabelSelector(statefulSet)
@@ -494,6 +504,14 @@ func (r *StatefulSetReconciler) performPodRebalancing(ctx context.Context, state
 
 // categorizePodsByNodeType gets all pods for a StatefulSet and categorizes them by node type
 func (r *StatefulSetReconciler) categorizePodsByNodeType(ctx context.Context, statefulSet *appsv1.StatefulSet) (spotPods, onDemandPods []corev1.Pod, err error) {
+	if r.Observer != nil {
+		snapshot, err := r.Observer.Observe(ctx, statefulSet)
+		if err != nil {
+			return nil, nil, err
+		}
+		spot, onDemand := snapshot.EligiblePods()
+		return spot, onDemand, nil
+	}
 	// Get all pods for this StatefulSet
 	podList := &corev1.PodList{}
 	selector, err := statefulSetLabelSelector(statefulSet)

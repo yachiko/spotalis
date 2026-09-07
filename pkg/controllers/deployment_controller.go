@@ -13,6 +13,7 @@ import (
 	"github.com/yachiko/spotalis/internal/config"
 	"github.com/yachiko/spotalis/pkg/apis"
 	pkgconfig "github.com/yachiko/spotalis/pkg/config"
+	"github.com/yachiko/spotalis/pkg/observation"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +39,7 @@ type DeploymentReconciler struct {
 	Scheme                       *runtime.Scheme
 	AnnotationParser             *annotations.AnnotationParser
 	NodeClassifier               *config.NodeClassifierService
+	Observer                     *observation.Service
 	NamespaceFilter              *NamespaceFilter // Filter for namespace-level permissions
 	ReconcileInterval            time.Duration
 	MaxConcurrentRecons          int
@@ -362,6 +364,14 @@ func (r *DeploymentReconciler) isDeploymentStableAndReady(_ context.Context, dep
 
 // calculateCurrentReplicaState analyzes the current state of deployment replicas
 func (r *DeploymentReconciler) calculateCurrentReplicaState(ctx context.Context, deployment *appsv1.Deployment) (*apis.ReplicaState, error) {
+	if r.Observer != nil {
+		snapshot, err := r.Observer.Observe(ctx, deployment)
+		if err != nil {
+			return nil, err
+		}
+		spot, onDemand := snapshot.ActualCounts()
+		return &apis.ReplicaState{WorkloadRef: snapshot.WorkloadRef, CurrentSpot: spot, CurrentOnDemand: onDemand, LastReconciled: snapshot.ObservedAt}, nil
+	}
 	// Get all pods for this deployment
 	podList := &corev1.PodList{}
 	selector, err := deploymentLabelSelector(deployment)
@@ -535,6 +545,14 @@ func (r *DeploymentReconciler) performPodRebalancing(ctx context.Context, deploy
 
 // categorizeDeploymentPods retrieves and categorizes all pods for a deployment by node type
 func (r *DeploymentReconciler) categorizeDeploymentPods(ctx context.Context, deployment *appsv1.Deployment) ([]corev1.Pod, []corev1.Pod, error) {
+	if r.Observer != nil {
+		snapshot, err := r.Observer.Observe(ctx, deployment)
+		if err != nil {
+			return nil, nil, err
+		}
+		spot, onDemand := snapshot.EligiblePods()
+		return spot, onDemand, nil
+	}
 	// Get all pods for this deployment
 	podList := &corev1.PodList{}
 	selector, err := deploymentLabelSelector(deployment)

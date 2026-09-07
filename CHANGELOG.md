@@ -7,8 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Changed
+- Go 1.27 is now required across local development, CI, and container builds. `make lint` uses golangci-lint v2.13.2 for Go 1.27 compatibility.
 - Replica placement targets now use one overflow-safe integer allocation engine. Floors above a workload's desired replicas are bounded to that desired count; a zero-value policy is valid and targets on-demand placement.
 - Admission compares placement intent with the workload's desired-replica target rather than recalculating percentage targets from each admission burst.
+- Workload placement now uses UID-verified, cache-backed observations with complete label selectors. Missing or failed node classification remains unknown and admission conservatively selects on-demand capacity.
 
 ## [0.1.0] - 2026-05-25
 

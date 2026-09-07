@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/yachiko/spotalis/internal/annotations"
 	"github.com/yachiko/spotalis/internal/config"
@@ -29,6 +30,7 @@ import (
 	pkgconfig "github.com/yachiko/spotalis/pkg/config"
 	"github.com/yachiko/spotalis/pkg/controllers"
 	"github.com/yachiko/spotalis/pkg/metrics"
+	"github.com/yachiko/spotalis/pkg/observation"
 	"gomodules.xyz/jsonpatch/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -57,6 +59,7 @@ type MutationHandler struct {
 	NodeClassifierConfig *pkgconfig.NodeClassifierConfig
 	MetricsCollector     *metrics.Collector
 	AdmissionTracker     *AdmissionStateTracker
+	Observer             *observation.Service
 	decoder              admission.Decoder
 }
 
@@ -138,7 +141,7 @@ func (m *MutationHandler) mutatePod(ctx context.Context, req admission.Request, 
 	logger.V(1).Info("Mutating pod for Spotalis workload")
 
 	// Apply mutations based on workload configuration
-	patches, mutationTypes := m.generatePodPatches(&pod, workloadConfig)
+	patches, mutationTypes := m.generatePodPatches(ctx, &pod, workloadConfig)
 
 	if len(patches) == 0 {
 		logger.MutationSkipped("no mutations needed")
@@ -245,13 +248,13 @@ func (m *MutationHandler) getConfigFromWorkload(ctx context.Context, namespace, 
 }
 
 // generatePodPatches generates JSON patches for pod mutation
-func (m *MutationHandler) generatePodPatches(pod *corev1.Pod, config *apis.WorkloadConfiguration) ([]map[string]interface{}, []string) {
+func (m *MutationHandler) generatePodPatches(ctx context.Context, pod *corev1.Pod, config *apis.WorkloadConfiguration) ([]map[string]interface{}, []string) {
 	var patches []map[string]interface{}
 	var mutationTypes []string
 
 	// Always add/override nodeSelector to ensure correct capacity type
 	// This handles both spot and on-demand scenarios
-	nodeSelectorPatches := m.generateNodeSelectorPatches(pod, config)
+	nodeSelectorPatches := m.generateNodeSelectorPatches(ctx, pod, config)
 	patches = append(patches, nodeSelectorPatches...)
 	if len(nodeSelectorPatches) > 0 {
 		mutationTypes = append(mutationTypes, "nodeSelector")
@@ -317,11 +320,11 @@ func (m *MutationHandler) getCapacityTypeLabelConfig() (labelKey, spotValue, onD
 }
 
 // generateNodeSelectorPatches generates patches for node selector based on current pod distribution
-func (m *MutationHandler) generateNodeSelectorPatches(pod *corev1.Pod, config *apis.WorkloadConfiguration) []map[string]interface{} {
+func (m *MutationHandler) generateNodeSelectorPatches(ctx context.Context, pod *corev1.Pod, config *apis.WorkloadConfiguration) []map[string]interface{} {
 	var patches []map[string]interface{}
 
 	// Determine the target capacity type based on current state
-	capacityType, err := m.determineTargetCapacityType(pod, config)
+	capacityType, err := m.determineTargetCapacityType(ctx, pod, config)
 	if err != nil {
 		// If we can't determine the state, default to on-demand for safety
 		capacityType = capacityTypeOnDemand
@@ -362,8 +365,41 @@ func (m *MutationHandler) generateNodeSelectorPatches(pod *corev1.Pod, config *a
 }
 
 // determineTargetCapacityType determines whether to schedule on spot or on-demand based on current state
-func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *apis.WorkloadConfiguration) (string, error) {
-	ctx := context.Background()
+func (m *MutationHandler) determineTargetCapacityType(ctx context.Context, pod *corev1.Pod, config *apis.WorkloadConfiguration) (string, error) {
+	if m.Observer != nil {
+		workload, err := m.workloadForPod(ctx, pod)
+		if err != nil {
+			return capacityTypeOnDemand, err
+		}
+		snapshot, err := m.Observer.Observe(ctx, workload)
+		if err != nil {
+			return capacityTypeOnDemand, err
+		}
+		if !snapshot.IsFresh(time.Now(), DefaultPodListMaxAge) || snapshot.ClassificationError != nil {
+			return capacityTypeOnDemand, nil
+		}
+		desired, err := workloadDesiredReplicas(workload)
+		if err != nil {
+			return capacityTypeOnDemand, err
+		}
+		allocation, err := apis.AllocateReplicaDistribution(desired, config.AllocationPolicy())
+		if err != nil {
+			return capacityTypeOnDemand, fmt.Errorf("calculate replica allocation: %w", err)
+		}
+		spot, onDemand := snapshot.ActualCounts()
+		if m.AdmissionTracker != nil {
+			key := m.AdmissionTracker.WorkloadKeyForUID(snapshot.WorkloadRef.UID)
+			m.AdmissionTracker.UpdatePodListMetadata(key, snapshot.PodResourceVersion, workload.GetGeneration())
+			return m.AdmissionTracker.SelectAndReserve(key, workload.GetGeneration(), int(spot), int(onDemand), int(allocation.TargetSpot), int(allocation.TargetOnDemand)), nil
+		}
+		if onDemand < allocation.TargetOnDemand {
+			return capacityTypeOnDemand, nil
+		}
+		if spot < allocation.TargetSpot {
+			return capacityTypeSpot, nil
+		}
+		return capacityTypeOnDemand, nil
+	}
 
 	// Get the workload that owns this pod
 	workloadName, workloadKind, err := m.getWorkloadInfo(pod)
@@ -469,6 +505,56 @@ func desiredReplicas(replicas *int32) int32 {
 		return 1
 	}
 	return *replicas
+}
+
+func workloadDesiredReplicas(workload client.Object) (int32, error) {
+	switch typed := workload.(type) {
+	case *appsv1.Deployment:
+		return desiredReplicas(typed.Spec.Replicas), nil
+	case *appsv1.StatefulSet:
+		return desiredReplicas(typed.Spec.Replicas), nil
+	default:
+		return 0, fmt.Errorf("unsupported workload type %T", workload)
+	}
+}
+
+// workloadForPod resolves the direct controller chain and verifies UID identity.
+func (m *MutationHandler) workloadForPod(ctx context.Context, pod *corev1.Pod) (client.Object, error) {
+	for _, owner := range pod.OwnerReferences {
+		switch owner.Kind {
+		case workloadTypeReplicaSet:
+			var rs appsv1.ReplicaSet
+			if err := m.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: owner.Name}, &rs); err != nil {
+				return nil, err
+			}
+			if rs.UID != owner.UID {
+				return nil, fmt.Errorf("ReplicaSet owner UID does not match pod owner reference")
+			}
+			for _, rsOwner := range rs.OwnerReferences {
+				if rsOwner.Kind != workloadTypeDeployment || rsOwner.Controller == nil || !*rsOwner.Controller {
+					continue
+				}
+				var deployment appsv1.Deployment
+				if err := m.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: rsOwner.Name}, &deployment); err != nil {
+					return nil, err
+				}
+				if deployment.UID != rsOwner.UID {
+					return nil, fmt.Errorf("deployment owner UID does not match ReplicaSet owner reference")
+				}
+				return &deployment, nil
+			}
+		case workloadTypeStatefulSet:
+			var sts appsv1.StatefulSet
+			if err := m.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: owner.Name}, &sts); err != nil {
+				return nil, err
+			}
+			if sts.UID != owner.UID {
+				return nil, fmt.Errorf("StatefulSet owner UID does not match pod owner reference")
+			}
+			return &sts, nil
+		}
+	}
+	return nil, fmt.Errorf("no supported workload owner found")
 }
 
 // getWorkloadInfo extracts workload information from pod owner references
