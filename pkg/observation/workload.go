@@ -31,19 +31,27 @@ type NodeClassifier interface {
 type Lifecycle string
 
 const (
-	LifecycleTerminal           Lifecycle = "terminal"
-	LifecycleTerminating        Lifecycle = "terminating"
+	// LifecycleTerminal identifies a completed or failed Pod.
+	LifecycleTerminal Lifecycle = "terminal"
+	// LifecycleTerminating identifies a Pod with a deletion timestamp.
+	LifecycleTerminating Lifecycle = "terminating"
+	// LifecyclePendingUnscheduled identifies a Pending Pod without a Node assignment.
 	LifecyclePendingUnscheduled Lifecycle = "pending_unscheduled"
-	LifecycleScheduledNotReady  Lifecycle = "scheduled_not_ready"
-	LifecycleReady              Lifecycle = "ready"
+	// LifecycleScheduledNotReady identifies an assigned Pod that is not Ready.
+	LifecycleScheduledNotReady Lifecycle = "scheduled_not_ready"
+	// LifecycleReady identifies an assigned Pod with a true Ready condition.
+	LifecycleReady Lifecycle = "ready"
 )
 
 // PlacementIntent records a Pod's requested capacity, not its assigned capacity.
 type PlacementIntent string
 
 const (
-	PlacementIntentUnknown  PlacementIntent = "unknown"
-	PlacementIntentSpot     PlacementIntent = "spot"
+	// PlacementIntentUnknown means the Pod does not express a recognized capacity preference.
+	PlacementIntentUnknown PlacementIntent = "unknown"
+	// PlacementIntentSpot means the Pod requests spot capacity.
+	PlacementIntentSpot PlacementIntent = "spot"
+	// PlacementIntentOnDemand means the Pod requests on-demand capacity.
 	PlacementIntentOnDemand PlacementIntent = "on-demand"
 )
 
@@ -81,6 +89,8 @@ func (s *Snapshot) ActualCounts() (spot, onDemand int32) {
 			spot++
 		case apis.NodeTypeOnDemand:
 			onDemand++
+		case apis.NodeTypeUnknown:
+			// Unknown capacity is intentionally excluded from actual totals.
 		}
 	}
 	return spot, onDemand
@@ -97,6 +107,8 @@ func (s *Snapshot) EligiblePods() (spot, onDemand []corev1.Pod) {
 			spot = append(spot, observed.Pod)
 		case apis.NodeTypeOnDemand:
 			onDemand = append(onDemand, observed.Pod)
+		case apis.NodeTypeUnknown:
+			// Unknown capacity is not eligible for voluntary disruption.
 		}
 	}
 	return spot, onDemand
@@ -109,6 +121,7 @@ type Service struct {
 	now        func() time.Time
 }
 
+// NewService creates a cache-backed workload observation service.
 func NewService(c client.Client, classifier NodeClassifier) *Service {
 	return &Service{client: c, classifier: classifier, now: time.Now}
 }

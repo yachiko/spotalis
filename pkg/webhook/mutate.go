@@ -539,7 +539,7 @@ func (m *MutationHandler) workloadForPod(ctx context.Context, pod *corev1.Pod) (
 					return nil, err
 				}
 				if deployment.UID != rsOwner.UID {
-					return nil, fmt.Errorf("Deployment owner UID does not match ReplicaSet owner reference")
+					return nil, fmt.Errorf("deployment owner UID does not match ReplicaSet owner reference")
 				}
 				return &deployment, nil
 			}
