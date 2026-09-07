@@ -1,22 +1,17 @@
 name: Integration Tests
 
 on:
-  # Always run after merge so a docs-only PR that quietly touched a deploy
-  # script still gets caught before release.
+  # Always run after merge so main has end-to-end validation before release.
   push:
     branches: [main]
-  # On PRs, skip if only documentation / repo metadata changed. paths-ignore
-  # is subtractive: anything not listed here triggers the run, so a new code
-  # file we forgot to allowlist still fails safe.
   pull_request:
     branches: [main, develop]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.github/CODEOWNERS'
-      - '.github/dependabot.yml'
+    # A labeled event starts the suite; synchronize reruns it while the label
+    # remains present.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  # Publish calls this workflow so its image is only released after the same
+  # full Kind validation succeeds.
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,6 +24,9 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'full-integration')
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6

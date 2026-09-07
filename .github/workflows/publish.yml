@@ -19,9 +19,14 @@ permissions:
   packages: write
 
 jobs:
+  integration-tests:
+    name: Integration Tests
+    uses: ./.github/workflows/integration.yml
+
   publish:
     name: Publish Docker Image
     runs-on: ubuntu-latest
+    needs: [integration-tests]
     outputs:
       version: ${{ steps.meta.outputs.version }}
     steps:

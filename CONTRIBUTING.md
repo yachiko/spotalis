@@ -54,6 +54,7 @@ Keep commits small and focused — one logical change per commit. Branch from `m
 - [ ] `make lint` is clean.
 - [ ] `make test` passes.
 - [ ] `make test-integration` passes when you change controller/webhook logic.
+- [ ] Add the `full-integration` label to run the full Kind suite in CI.
 - [ ] User-facing changes have a `CHANGELOG.md` entry under `## [Unreleased]`.
 - [ ] Behavior changes touch the matching reference doc in the same PR (see `docs/style.md`).
 - [ ] New annotations / labels are reflected in `docs/reference/labels-and-annotations.md`.
