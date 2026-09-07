@@ -17,13 +17,16 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/yachiko/spotalis/internal/annotations"
 	"github.com/yachiko/spotalis/internal/config"
 	"github.com/yachiko/spotalis/pkg/metrics"
+	"github.com/yachiko/spotalis/pkg/observation"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -127,6 +130,7 @@ type ControllerManager struct {
 	nodeClassifier   *config.NodeClassifierService
 	namespaceFilter  *NamespaceFilter
 	metricsCollector *metrics.Collector
+	workloadObserver *observation.Service
 
 	// Controllers
 	deploymentController  *DeploymentReconciler
@@ -170,7 +174,7 @@ func NewControllerManager(
 		}
 	}
 
-	return &ControllerManager{
+	controllerManager := &ControllerManager{
 		manager:               mgr,
 		config:                config,
 		kubeClient:            kubeClient,
@@ -180,10 +184,17 @@ func NewControllerManager(
 		metricsCollector:      metricsCollector,
 		controllersRegistered: make(map[string]bool),
 	}
+	if mgr != nil {
+		controllerManager.workloadObserver = observation.NewService(mgr.GetClient(), nodeClassifier)
+	}
+	return controllerManager
 }
 
 // SetupControllers sets up and registers all controllers with the manager
 func (cm *ControllerManager) SetupControllers() error {
+	if err := cm.registerObservationIndexes(); err != nil {
+		return err
+	}
 	if cm.config.EnableDeployments {
 		if err := cm.setupDeploymentController(); err != nil {
 			return fmt.Errorf("failed to setup deployment controller: %w", err)
@@ -196,6 +207,19 @@ func (cm *ControllerManager) SetupControllers() error {
 		}
 	}
 
+	return nil
+}
+
+func (cm *ControllerManager) registerObservationIndexes() error {
+	if cm.manager == nil {
+		return nil
+	}
+	if err := cm.manager.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, observation.PodControllerOwnerUIDIndex, observation.IndexPodControllerOwnerUID); err != nil {
+		return fmt.Errorf("index pod controller owners: %w", err)
+	}
+	if err := cm.manager.GetFieldIndexer().IndexField(context.Background(), &appsv1.ReplicaSet{}, observation.ReplicaSetControllerOwnerUIDIndex, observation.IndexReplicaSetControllerOwnerUID); err != nil {
+		return fmt.Errorf("index ReplicaSet controller owners: %w", err)
+	}
 	return nil
 }
 
@@ -262,6 +286,7 @@ func (cm *ControllerManager) setupDeploymentController() error {
 		Scheme:                       cm.manager.GetScheme(),
 		AnnotationParser:             cm.annotationParser,
 		NodeClassifier:               cm.nodeClassifier,
+		Observer:                     cm.workloadObserver,
 		NamespaceFilter:              cm.namespaceFilter,
 		ReconcileInterval:            cm.config.ReconcileInterval,
 		CooldownPeriod:               timing.CooldownPeriod,
@@ -294,6 +319,7 @@ func (cm *ControllerManager) setupStatefulSetController() error {
 		Scheme:                       cm.manager.GetScheme(),
 		AnnotationParser:             cm.annotationParser,
 		NodeClassifier:               cm.nodeClassifier,
+		Observer:                     cm.workloadObserver,
 		NamespaceFilter:              cm.namespaceFilter,
 		ReconcileInterval:            cm.config.ReconcileInterval,
 		CooldownPeriod:               timing.CooldownPeriod,

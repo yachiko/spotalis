@@ -62,5 +62,6 @@ Mutation: Incoming pod creations for enabled workloads trigger admission logic; 
 ## Related
 - State management: `../reference/state-management.md`
 - Replica distribution strategy: `replica-distribution-strategy.md`
+- Workload observation: `workload-observation.md`
 - Design choices: `design-choices.md`
 - Glossary: `../reference/glossary.md`

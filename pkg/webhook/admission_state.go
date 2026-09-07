@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // TLS and webhook constants.
@@ -94,6 +96,11 @@ func (t *AdmissionStateTracker) WorkloadKey(namespace, kind, name string) string
 	return namespace + "/" + kind + "/" + name
 }
 
+// WorkloadKeyForUID avoids sharing state across same-name workload recreation.
+func (t *AdmissionStateTracker) WorkloadKeyForUID(uid types.UID) string {
+	return "uid/" + string(uid)
+}
+
 // GetPendingCounts returns pending spot and on-demand counts for a workload
 func (t *AdmissionStateTracker) GetPendingCounts(key string, currentGeneration int64) (spot, onDemand int32) {
 	t.mu.RLock()
@@ -129,6 +136,33 @@ func (t *AdmissionStateTracker) IncrementPending(key string, capacityType string
 		p.PendingOnDemand++
 	}
 	p.LastUpdated = time.Now()
+}
+
+// SelectAndReserve makes the placement choice and reservation under one lock.
+func (t *AdmissionStateTracker) SelectAndReserve(
+	key string,
+	generation int64,
+	observedSpot, observedOnDemand, targetSpot, targetOnDemand int,
+) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	p, exists := t.pending[key]
+	if !exists || p.Generation != generation {
+		p = &PendingAdmission{Generation: generation}
+		t.pending[key] = p
+	}
+	capacityType := capacityTypeOnDemand
+	if observedOnDemand+int(p.PendingOnDemand) >= targetOnDemand && observedSpot+int(p.PendingSpot) < targetSpot {
+		capacityType = capacityTypeSpot
+	}
+	if capacityType == capacityTypeSpot {
+		p.PendingSpot++
+	} else {
+		p.PendingOnDemand++
+	}
+	p.LastUpdated = time.Now()
+	return capacityType
 }
 
 // cleanupLoop periodically removes stale entries

@@ -307,7 +307,7 @@ var _ = Describe("MutationHandler", func() {
 					},
 				}
 
-				patches := handler.generateNodeSelectorPatches(pod, nil)
+				patches := handler.generateNodeSelectorPatches(ctx, pod, nil)
 
 				// Find the patch for karpenter.sh/capacity-type
 				var foundPatch map[string]interface{}
@@ -469,7 +469,7 @@ var _ = Describe("Configurable Labels", func() {
 				SpotPercentage: 0, // 0% spot means all on-demand
 			}
 
-			patches := handler.generateNodeSelectorPatches(pod, config)
+			patches := handler.generateNodeSelectorPatches(context.Background(), pod, config)
 
 			// Find the patch for custom.io/type
 			var foundPatch map[string]interface{}
