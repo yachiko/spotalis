@@ -47,9 +47,6 @@ const (
 	// Capacity types
 	capacityTypeOnDemand = "on-demand"
 	capacityTypeSpot     = "spot"
-
-	// Math constants
-	percentageBase = 100.0
 )
 
 // MutationHandler handles admission webhook requests for pod and workload mutation
@@ -375,7 +372,7 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 	}
 
 	// Get workload generation for staleness detection
-	generation, err := m.getWorkloadGeneration(ctx, pod.Namespace, workloadName, workloadKind)
+	generation, desiredReplicas, err := m.getWorkloadGeneration(ctx, pod.Namespace, workloadName, workloadKind)
 	if err != nil {
 		return capacityTypeOnDemand, err
 	}
@@ -412,25 +409,18 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 		effectiveOnDemand = onDemandCount + int(pendingOnDemand)
 	}
 
-	// Calculate totals with effective counts
-	totalPods := effectiveSpot + effectiveOnDemand + 1 // +1 for the new pod being scheduled
-
-	// Calculate required on-demand pods
-	requiredOnDemand := int(config.MinOnDemand)
-
-	// If we haven't met the minimum on-demand requirement, schedule on on-demand
-	if effectiveOnDemand < requiredOnDemand {
-		if m.AdmissionTracker != nil {
-			m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
-		}
-		return capacityTypeOnDemand, nil
+	// The allocation target is defined by the workload's desired replicas, not
+	// by the current burst size. Observed Pods and pending admissions only
+	// determine where this Pod fits relative to that stable target.
+	allocation, err := apis.AllocateReplicaDistribution(desiredReplicas, config.AllocationPolicy())
+	if err != nil {
+		return capacityTypeOnDemand, fmt.Errorf("calculate replica allocation: %w", err)
 	}
+	targetOnDemandCount := int(allocation.TargetOnDemand)
+	targetSpotCount := int(allocation.TargetSpot)
 
-	// Calculate the target distribution based on spot percentage
-	targetSpotCount := int(float64(totalPods) * float64(config.SpotPercentage) / percentageBase)
-	targetOnDemandCount := totalPods - targetSpotCount
-
-	// Prioritize on-demand: if we need more on-demand pods, schedule there
+	// Floor-first: the on-demand target includes the effective floor. If both
+	// targets are met, the final fallback below is the deterministic tie-break.
 	if effectiveOnDemand < targetOnDemandCount {
 		if m.AdmissionTracker != nil {
 			m.AdmissionTracker.IncrementPending(key, capacityTypeOnDemand, generation)
@@ -453,23 +443,32 @@ func (m *MutationHandler) determineTargetCapacityType(pod *corev1.Pod, config *a
 	return capacityTypeOnDemand, nil
 }
 
-// getWorkloadGeneration retrieves the generation of the workload for staleness detection
-func (m *MutationHandler) getWorkloadGeneration(ctx context.Context, namespace, name, kind string) (int64, error) {
+// getWorkloadGeneration returns the workload generation and desired replica
+// count used by the admission allocation target.
+func (m *MutationHandler) getWorkloadGeneration(ctx context.Context, namespace, name, kind string) (int64, int32, error) {
 	switch kind {
 	case workloadTypeDeployment:
 		var deploy appsv1.Deployment
 		if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &deploy); err != nil {
-			return 0, err
+			return 0, 0, err
 		}
-		return deploy.Generation, nil
+		return deploy.Generation, desiredReplicas(deploy.Spec.Replicas), nil
 	case workloadTypeStatefulSet:
 		var sts appsv1.StatefulSet
 		if err := m.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &sts); err != nil {
-			return 0, err
+			return 0, 0, err
 		}
-		return sts.Generation, nil
+		return sts.Generation, desiredReplicas(sts.Spec.Replicas), nil
 	}
-	return 0, nil
+	return 0, 0, fmt.Errorf("unsupported workload kind %q", kind)
+}
+
+// desiredReplicas applies the Kubernetes default for an omitted replicas field.
+func desiredReplicas(replicas *int32) int32 {
+	if replicas == nil {
+		return 1
+	}
+	return *replicas
 }
 
 // getWorkloadInfo extracts workload information from pod owner references

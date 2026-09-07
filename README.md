@@ -18,7 +18,7 @@
 Spotalis continuously computes a safe distribution of your workloads' replicas across spot and on‑demand capacity based on lightweight labels/annotations:
 
 * Zero custom resource definitions – you opt‑in with a label: `spotalis.io/enabled=true` (namespace or workload)
-* Safety guardrails – always honors a minimum on‑demand floor you set
+* Placement guardrails – targets a minimum on-demand floor you set
 * Deterministic distribution algorithm (see strategy & state docs) with clear metrics
 * Single process running controllers + webhook (Karpenter‑style composition)
 
@@ -93,10 +93,10 @@ make docker-build        # Build container image
 Configuration example: [`examples/configs/config.yaml`](examples/configs/config.yaml) (see loader docs: [configuration reference](docs/reference/configuration.md)).
 
 ## 🔒 Safety Model (High Level)
-Spotalis never reduces on‑demand replicas below `spotalis.io/min-on-demand` and reconciles incrementally to avoid thrash. Leader election ensures a single active controller (see [state management](docs/reference/state-management.md)).
+Spotalis calculates an on-demand placement floor from `spotalis.io/min-on-demand` and reconciles incrementally toward it. This target cannot guarantee healthy capacity, available quota, successful scheduling, or prevent external deletion and scaling. Leader election ensures a single active controller (see [state management](docs/reference/state-management.md)).
 
 Independent controls:
-* You can set only `spotalis.io/min-on-demand` to enforce a safety floor while keeping all traffic on on‑demand (omit spot percentage during initial adoption).
+* You can set only `spotalis.io/min-on-demand` to target an on-demand floor while keeping all traffic on on-demand (omit spot percentage during initial adoption).
 * You can set only `spotalis.io/spot-percentage` for pure percentage-driven distribution (implicit floor = 0 unless configured globally).
 * When both are set, the floor always overrides percentage math that would go below it.
 

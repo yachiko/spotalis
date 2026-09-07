@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- Replica placement targets now use one overflow-safe integer allocation engine. Floors above a workload's desired replicas are bounded to that desired count; a zero-value policy is valid and targets on-demand placement.
+- Admission compares placement intent with the workload's desired-replica target rather than recalculating percentage targets from each admission burst.
+
 ## [0.1.0] - 2026-05-25
 
 Maintenance release: fix-up pass after several months of idle time. No new product features; every change is hygiene, dependency freshness, or developer docs. `Chart.yaml` and `appVersion` were already at `0.1.0`.

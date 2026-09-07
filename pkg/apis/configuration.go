@@ -35,6 +35,20 @@ type WorkloadConfiguration struct {
 
 	// SpotPercentage is the target percentage of replicas on spot nodes (0-100)
 	SpotPercentage int32 `json:"spotPercentage"`
+
+	// Policy preserves whether each annotation was omitted or explicitly set,
+	// including an explicit zero. MinOnDemand and SpotPercentage remain as the
+	// resolved compatibility view for existing consumers.
+	Policy WorkloadPolicy `json:"-"`
+}
+
+// AllocationPolicy returns the resolved policy consumed by the allocation
+// engine. Callers resolving inheritance should use Policy.Resolve first.
+func (w WorkloadConfiguration) AllocationPolicy() ReplicaAllocationPolicy {
+	return ReplicaAllocationPolicy{
+		MinOnDemand:    w.MinOnDemand,
+		SpotPercentage: w.SpotPercentage,
+	}
 }
 
 // Validate checks if the WorkloadConfiguration is valid according to business rules
@@ -43,23 +57,7 @@ func (w *WorkloadConfiguration) Validate(totalReplicas int32) error {
 		return nil // Skip validation for disabled workloads
 	}
 
-	if w.MinOnDemand < 0 {
-		return fmt.Errorf("minOnDemand must be >= 0, got %d", w.MinOnDemand)
-	}
-
-	if w.MinOnDemand > totalReplicas {
-		return fmt.Errorf("minOnDemand (%d) cannot exceed total replicas (%d)", w.MinOnDemand, totalReplicas)
-	}
-
-	if w.SpotPercentage < 0 || w.SpotPercentage > 100 {
-		return fmt.Errorf("spotPercentage must be 0-100, got %d", w.SpotPercentage)
-	}
-
-	if w.MinOnDemand == 0 && w.SpotPercentage == 0 {
-		return fmt.Errorf("at least one of minOnDemand or spotPercentage must be specified when enabled")
-	}
-
-	return nil
+	return ValidateReplicaAllocationPolicy(totalReplicas, w.AllocationPolicy())
 }
 
 // IsSpotOptimized returns true if this configuration prefers spot nodes
@@ -92,6 +90,7 @@ func ParseFromAnnotations(annotations map[string]string, enabled bool) (*Workloa
 			return nil, fmt.Errorf("invalid spotalis.io/min-on-demand value: %v", err)
 		}
 		config.MinOnDemand = int32(parsed)
+		config.Policy.MinOnDemand = &config.MinOnDemand
 	}
 
 	// Parse spotPercentage
@@ -102,6 +101,11 @@ func ParseFromAnnotations(annotations map[string]string, enabled bool) (*Workloa
 			return nil, fmt.Errorf("invalid spotalis.io/spot-percentage value: %v", err)
 		}
 		config.SpotPercentage = int32(parsed)
+		config.Policy.SpotPercentage = &config.SpotPercentage
+	}
+
+	if err := ValidateReplicaAllocationPolicy(0, config.AllocationPolicy()); err != nil {
+		return nil, err
 	}
 
 	return config, nil
@@ -113,7 +117,13 @@ func (w *WorkloadConfiguration) ToAnnotations() map[string]string {
 	if !w.Enabled {
 		return annotations
 	}
-	annotations["spotalis.io/min-on-demand"] = strconv.FormatInt(int64(w.MinOnDemand), 10)
-	annotations["spotalis.io/spot-percentage"] = strconv.FormatInt(int64(w.SpotPercentage), 10) + "%"
+	// Parsed policies retain omission. Programmatic configurations without
+	// Policy preserve the legacy behavior of writing both resolved fields.
+	if w.Policy.MinOnDemand != nil || (w.Policy.MinOnDemand == nil && w.Policy.SpotPercentage == nil) {
+		annotations["spotalis.io/min-on-demand"] = strconv.FormatInt(int64(w.MinOnDemand), 10)
+	}
+	if w.Policy.SpotPercentage != nil || (w.Policy.MinOnDemand == nil && w.Policy.SpotPercentage == nil) {
+		annotations["spotalis.io/spot-percentage"] = strconv.FormatInt(int64(w.SpotPercentage), 10) + "%"
+	}
 	return annotations
 }

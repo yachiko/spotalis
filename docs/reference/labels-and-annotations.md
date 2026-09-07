@@ -19,11 +19,11 @@ If the label is absent or not "true", the workload is ignored even if tuning ann
 Kind | Key | Type | If absent | Required | Description | Stability | Since
 -----|-----|------|-----------|----------|-------------|----------|------
 Label | `spotalis.io/enabled` | string (`"true"` to enable) | workload is ignored | Yes (to activate) | Opts workload into management | Stable | v0.x
-Annotation | `spotalis.io/spot-percentage` | int (0–100) | `0` (all replicas on on-demand) | No | Target % of replicas on spot (capped by safety floor) | Stable | v0.x
-Annotation | `spotalis.io/min-on-demand` | int (>=0) | `0` (no on-demand floor) | No | Minimum on-demand replica floor | Stable | v0.x
+Annotation | `spotalis.io/spot-percentage` | int (0–100) | resolved to `0` (all replicas on on-demand) | No | Target % of replicas on spot (capped by placement floor) | Stable | v0.x
+Annotation | `spotalis.io/min-on-demand` | int (>=0) | resolved to `0` (no on-demand floor) | No | Minimum on-demand placement floor | Stable | v0.x
 
 ## Tuning Annotation Details
-Use annotations only after the label enables the workload. Annotations are parsed by `ParseFromAnnotations` in `pkg/apis/configuration.go`; **missing annotations are not back-filled with sensible defaults** — `spot-percentage` and `min-on-demand` both become `0` if you do not set them. Enabling a workload with the label alone produces a 100% on-demand layout until you add at least one of the tuning annotations.
+Use annotations only after the label enables the workload. The parser preserves a missing value separately from an explicit `0`, so a policy resolver can apply inheritance correctly. After resolution, missing `spot-percentage` and `min-on-demand` default to `0`; enabling a workload with the label alone therefore targets a 100% on-demand layout.
 
 ## Precedence & Inheritance
 1. Workload annotations (highest)
@@ -36,18 +36,19 @@ Workload-level annotations override namespace label–provided defaults where ap
 ## Validation Rules
 Rule | Condition | Result
 ---- | --------- | ------
-Range check | `spot-percentage` < 0 or > 100 | Rejected / clamped (implementation-dependent)
-Floor feasibility | `min-on-demand` > replicas | Controller clamps spot target to 0
+Range check | `spot-percentage` < 0 or > 100 | Rejected
+Floor feasibility | `min-on-demand` > replicas | Valid; effective floor is clamped to desired replicas and Spot target is 0
 Enablement missing | enablement label absent or != "true" | Annotations ignored
 
 ## Rounding & Calculation
 Distribution formula (see strategy doc for full detail). Spot uses **integer division**, not `ceil` or `round`:
 ```
-targetSpot = min( (totalReplicas * spotPercentage) / 100, totalReplicas - minOnDemand )
+effectiveFloor = min(minOnDemand, totalReplicas)
+targetSpot = min( (totalReplicas * spotPercentage) / 100, totalReplicas - effectiveFloor )
 ```
 Edge Cases:
 - `totalReplicas == 0`: no action.
-- `totalReplicas ≤ minOnDemand`: force all replicas to on-demand (targetSpot = 0).
+- `totalReplicas ≤ minOnDemand`: force all replicas to on-demand (targetSpot = 0). This is a placement target, not a healthy-capacity or uptime guarantee.
 - Truncation: 73% of 10 yields 7 spot replicas, not 8. Set `spot-percentage` slightly higher than the rounded value you have in mind if you want to bias toward more spot.
 
 ## Examples

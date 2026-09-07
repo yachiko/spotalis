@@ -116,6 +116,7 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 			return nil, fmt.Errorf("spot-percentage annotation must be between 0 and 100, got %d", percentage)
 		}
 		config.SpotPercentage = int32(percentage) // #nosec G109 - bounded 0..100 above
+		config.Policy.SpotPercentage = &config.SpotPercentage
 	}
 
 	// Parse minimum on-demand replicas. The upper bound is intentionally
@@ -131,6 +132,7 @@ func (p *AnnotationParser) ParseWorkloadConfiguration(obj metav1.Object) (*apis.
 			return nil, fmt.Errorf("min-on-demand annotation must be between 0 and %d, got %d", MaxMinOnDemand, count)
 		}
 		config.MinOnDemand = int32(count) // #nosec G109 - bounded 0..MaxMinOnDemand above
+		config.Policy.MinOnDemand = &config.MinOnDemand
 	}
 
 	return config, nil

@@ -64,19 +64,17 @@ func (r *ReplicaState) CalculateDesiredDistribution(config WorkloadConfiguration
 		return
 	}
 
-	// Apply minimum on-demand first (safety constraint)
-	r.DesiredOnDemand = maxInt32(config.MinOnDemand, 0)
-
-	// Calculate spot replicas from percentage
-	if config.SpotPercentage > 0 {
-		spotReplicas := (r.TotalReplicas * config.SpotPercentage) / 100
-		r.DesiredSpot = minInt32(spotReplicas, r.TotalReplicas-r.DesiredOnDemand)
-	} else {
+	allocation, err := AllocateReplicaDistribution(r.TotalReplicas, config.AllocationPolicy())
+	if err != nil {
+		// CalculateDesiredDistribution predates validation errors in the shared
+		// engine. Preserve its no-error compatibility contract while callers
+		// migrate by using the conservative all-on-demand fallback.
+		r.DesiredOnDemand = r.TotalReplicas
 		r.DesiredSpot = 0
+		return
 	}
-
-	// Remaining replicas go to on-demand (safe default)
-	r.DesiredOnDemand = r.TotalReplicas - r.DesiredSpot
+	r.DesiredOnDemand = allocation.TargetOnDemand
+	r.DesiredSpot = allocation.TargetSpot
 }
 
 // GetCurrentTotal returns the total number of current replicas
@@ -222,14 +220,7 @@ func (r *ReplicaState) GetDesiredSpotPercentage() int32 {
 	return (r.DesiredSpot * 100) / r.TotalReplicas
 }
 
-// Helper functions
-func maxInt32(a, b int32) int32 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
+// minInt32 returns the smaller int32 value.
 func minInt32(a, b int32) int32 {
 	if a < b {
 		return a

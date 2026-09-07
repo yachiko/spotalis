@@ -60,3 +60,5 @@ deploy/k8s/certs-generated.yaml
 deploy/k8s/webhook-generated.yaml
 
 tasks/
+# Local refactor planning notes
+refactor/

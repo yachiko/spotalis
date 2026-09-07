@@ -1,103 +1,84 @@
 # Replica Distribution Strategy
 
-Stability: Stable (Algorithm) / Future Extensions Provisional
+Stability: **Stable policy contract**
 
-Explains how Spotalis determines the target allocation of workload replicas across spot and on-demand capacity.
+This document is the authoritative contract for Spotalis placement targets. It describes a target, not a promise that Kubernetes can schedule or keep that target healthy.
 
-Related docs: [Labels & Annotations](../reference/labels-and-annotations.md), [State Management](../reference/state-management.md), [Configuration](../reference/configuration.md)
+## Policy inputs and defaults
 
-## Goals
-1. Respect operator safety constraints (minimum on-demand replicas)
-2. Achieve user-declared spot percentage target
-3. Minimize disruptive changes (migrate only when necessary)
-4. Prefer reliability over cost when constraints conflict
+For a managed workload, the policy has two independent fields:
 
-## Inputs
-| Source | Field | Description |
-|--------|-------|-------------|
-| Workload spec | replicas | Total desired replica count (T) |
-| Annotation | spotalis.io/spot-percentage | Target percentage (P) of replicas on spot |
-| Annotation | spotalis.io/min-on-demand | Minimum on-demand count (M) |
-| Admission (webhook) | effective counts | Current observed pods plus pending admissions tracked during bursts |
+| Field | Symbol | Valid values | Omitted / explicit zero |
+|---|---:|---|---|
+| `spotalis.io/min-on-demand` | M | integer >= 0 | Omitted is available for inheritance; `0` explicitly removes a lower-priority floor. The resolved default is `0`. |
+| `spotalis.io/spot-percentage` | P | integer 0 through 100 | Omitted is available for inheritance; `0` explicitly requests no Spot target. The resolved default is `0`. |
+| Workload desired replicas | T | integer >= 0 | Taken from the Deployment or StatefulSet desired replica count. |
 
-## Core Formula
-Let T=total replicas, P=spot percentage (0-100), M=min on-demand.
+The workload API preserves an omitted field separately from an explicit zero (`apis.WorkloadPolicy`). A resolver applies explicit fields over inherited defaults before allocation. Until inheritance is resolved, an omitted value must not be converted to zero.
 
-Spot uses **integer division** (truncation toward zero) — not `round` or `ceil`. The implementation is `ReplicaState.CalculateDesiredDistribution` in `pkg/apis/replica_state.go`.
+A managed workload with both resolved values at zero is valid and targets all replicas to on-demand. Invalid negative counts, negative percentages, percentages over 100, and negative desired replicas are rejected. A floor larger than the current desired replica count is valid: it is bounded below.
 
-```
-targetSpot = min( (T * P) / 100, T - M )
-```
-Derived On-Demand:
-```
+## One allocation engine
+
+`apis.AllocateReplicaDistribution(T, ReplicaAllocationPolicy)` is the only calculation of desired targets. It uses integer arithmetic with an `int64` intermediate; consumers must not use floating-point percentage arithmetic.
+
+For validated inputs:
+
+```text
+effectiveFloor = min(M, T)
+targetSpot     = min(floor(T * P / 100), T - effectiveFloor)
 targetOnDemand = T - targetSpot
 ```
 
-Edge Handling:
-- Clamp P < 0 to 0; P > 100 to 100 (implicit by parser validation)
-- If T ≤ M then all replicas forced on-demand (targetSpot=0, targetOnDemand=T)
-- If P = 0 → targetSpot=0 (all on-demand)
+Therefore both targets are non-negative, sum to `T`, and `targetOnDemand >= effectiveFloor`. Percentage fractions always truncate toward zero.
 
-## Example Scenarios
-| T  | P  | M | Computation                                  | Result (Spot/OnDemand) |
-|----|----|---|----------------------------------------------|------------------------|
-| 10 | 70 | 1 | min( (10*70)/100=7,  10-1=9 )                | 7 / 3                  |
-| 10 | 73 | 1 | min( (10*73)/100=7,  10-1=9 )                | 7 / 3                  |
-| 10 | 90 | 4 | min( (10*90)/100=9,  10-4=6 )                | 6 / 4                  |
-| 3  | 80 | 2 | min( (3*80)/100=2,   3-2=1 )                 | 1 / 2                  |
-| 5  | 0  | 1 | spot skipped because P=0                     | 0 / 5                  |
+| T | P | M | Effective floor | Spot / On-demand |
+|---:|---:|---:|---:|---:|
+| 0 | 70 | 1 | 0 | 0 / 0 |
+| 3 | 80 | 5 | 3 | 0 / 3 |
+| 3 | 100 | 3 | 3 | 0 / 3 |
+| 10 | 0 | 1 | 1 | 0 / 10 |
+| 10 | 73 | 1 | 1 | 7 / 3 |
+| 10 | 100 | 0 | 0 | 10 / 0 |
+| 10 | 90 | 4 | 4 | 6 / 4 |
 
-Row 2 illustrates the truncation rule: 73% of 10 is 7.3, but integer division produces 7 (not 8 — there is no rounding).
+`ReplicaState.CalculateDesiredDistribution` remains a compatibility wrapper around this engine while callers migrate.
 
-> Avoid configurations where M > T (the minimum floor exceeds the total). The current code does not specifically clamp this case; pick `min-on-demand` ≤ `replicas`.
+## Four different counts
 
-## Reconciliation Actions
-The `ReplicaState.GetNextAction()` method selects next step:
-1. Fix total count (scale up/down) if drift in total replicas
-2. Adjust distribution (migrate) only when correct total achieved
-3. Prefer scaling down spot first on surplus (resilience bias)
+Do not conflate these quantities:
 
-Actions:
-- scale-up-on-demand / scale-up-spot
-- scale-down-spot / scale-down-on-demand
-- migrate-to-spot / migrate-to-on-demand
-- none
+1. **Desired targets** are the `targetSpot` and `targetOnDemand` calculated from workload desired replicas.
+2. **Admission placement intents** are node-selector decisions for Pods that have been admitted, including short-lived reservations for requests not yet observable as Pods.
+3. **Actual scheduled capacity** is the observed placement of Pods. A Pending Pod may have an intent but no scheduled node yet.
+4. **Ready capacity** is the observed ready subset. It is the relevant safety signal for disruptive controller actions.
 
-## Drift Logic
-A workload NeedsReconciliation when current (C_on, C_spot) != desired (D_on, D_spot).
-- On-demand drift = C_on - D_on (positive => excess on-demand)
-- Spot drift = C_spot - D_spot (positive => excess spot)
+A Deployment rollout can create surge Pods, and an HPA, user, or native workload controller can change desired replicas independently. These situations can temporarily differ from the target. Spotalis converges as Pods are admitted, observed, created, and removed; it does not rewrite `spec.replicas` or promise an instantaneous exact percentage.
 
-Migration chosen when totals match but distribution differs; direction determined by which side has excess.
+## Admission contract
 
-## Safety Ordering
-1. Never reduce on-demand below M
-2. Scale up on-demand before spot if total under-provisioned and both deficits exist
-3. Scale down spot before on-demand when over-provisioned
-4. Migrations occur only if safe capacity available (implementation dependent future guard rails)
+Admission compares placement intents to the desired target for the workload's desired `T`; it must not redefine `T` from every incoming Pod or from the current burst total.
 
-## Staleness & Cooldowns
-- Cooldown period prevents rapid oscillations; controllers wait `controllers.workloadTiming.cooldownPeriod` after disruptive action.
-- Disruption window (if configured) restricts when rebalancing actions may execute; outside window only observe state.
- - Admission burst safety: webhook bases decisions on effective counts (current + pending) to prevent race-driven over-allocation.
+For an admission with observed counts plus unobserved reservations `(onDemand, spot)`, choose in this order:
 
-## Failure Modes & Mitigations
-| Failure | Mitigation |
-|---------|-----------|
-| Spot capacity unavailable | M ensures baseline on-demand; migration halts until rebalance possible |
-| Rapid workload scale changes | Periodic reconcile re-evaluates; cooldown enforces pacing |
-| Extreme P after scale (e.g., T shrinks) | Formula recomputes; may shift replicas back to on-demand safely |
-| PDB blocking eviction | Eviction API respects PDBs; controller logs and retries later |
+1. If `onDemand < targetOnDemand`, select on-demand. This is the floor-first rule.
+2. Otherwise, if `spot < targetSpot`, select Spot.
+3. Otherwise select on-demand as the deterministic tie-breaker.
 
-## Future Extensions (Provisional)
-- Weighted historical stability factor for spot adoption ramp-up
-- Burst scaling guard (limit migrations per window)
-- Multi-pool strategy annotations (deferred)
- - Proactive PDB pre-checks to optimize eviction attempts
+The decision and reservation must be atomic per workload. Reservations are separate temporary accounting for rollout surge or concurrent admission; they do not modify the desired target. For example, with `T=10`, `P=70`, and `M=2`, the target is 7 Spot / 3 on-demand. If the observed/reserved intent is 2 on-demand and 6 Spot, the next Pod is on-demand. Once it is 3 on-demand and 6 Spot, the next is Spot. Any additional surge Pod after 3/7 gets the deterministic on-demand intent until observation and reconciliation converge.
 
-## See Also
-- [Labels & Annotations](../reference/labels-and-annotations.md)
-- [State Management](../reference/state-management.md)
-- [Configuration](../reference/configuration.md)
-- [Design Choices](./design-choices.md)
-- [Glossary](../reference/glossary.md)
+Reservation identity, expiry, idempotence, and multi-replica authority are admission-accounting concerns; see the implementation work for those guarantees.
+
+## Limits of the floor
+
+The floor is a placement target. It cannot guarantee that the floor is Ready or healthy, that compute quota or on-demand nodes exist, or that an external actor will not delete Pods or scale the workload down. Spot interruption, scheduling failure, failed startup, PDB restrictions, rollouts, and external scaling can all leave actual or Ready on-demand capacity below the target. Controllers must observe the difference and converge conservatively rather than claim the policy guarantees availability.
+
+## Reconciliation direction
+
+When reconciling observed placement, repair a deficit before elective cost rebalancing. In particular, do not voluntarily reduce on-demand placement below the effective floor. Reconciliation operates incrementally and may be blocked when capacity is unknown or not Ready; it is not evidence that replacement capacity exists.
+
+## See also
+
+- [Workload labels and annotations](../reference/labels-and-annotations.md)
+- [State management](../reference/state-management.md)
+- [Design choices](./design-choices.md)

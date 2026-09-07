@@ -102,16 +102,14 @@ var _ = Describe("WorkloadConfiguration", func() {
 					Expect(err.Error()).To(ContainSubstring("minOnDemand must be >= 0"))
 				})
 
-				It("should fail when minOnDemand exceeds total replicas", func() {
+				It("should allow minOnDemand above total replicas", func() {
 					config := &WorkloadConfiguration{
 						Enabled:        true,
 						MinOnDemand:    15,
 						SpotPercentage: 50,
 					}
 
-					err := config.Validate(10)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("minOnDemand (15) cannot exceed total replicas (10)"))
+					Expect(config.Validate(10)).To(Succeed())
 				})
 			})
 
@@ -142,16 +140,14 @@ var _ = Describe("WorkloadConfiguration", func() {
 			})
 
 			Context("when both minOnDemand and spotPercentage are zero", func() {
-				It("should fail validation", func() {
+				It("should allow an all-on-demand policy", func() {
 					config := &WorkloadConfiguration{
 						Enabled:        true,
 						MinOnDemand:    0,
 						SpotPercentage: 0,
 					}
 
-					err := config.Validate(10)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("at least one of minOnDemand or spotPercentage must be specified"))
+					Expect(config.Validate(10)).To(Succeed())
 				})
 			})
 		})
@@ -218,6 +214,10 @@ var _ = Describe("WorkloadConfiguration", func() {
 				Expect(config.Enabled).To(BeTrue())
 				Expect(config.MinOnDemand).To(Equal(int32(2)))
 				Expect(config.SpotPercentage).To(Equal(int32(70)))
+				Expect(config.Policy.MinOnDemand).NotTo(BeNil())
+				Expect(*config.Policy.MinOnDemand).To(Equal(int32(2)))
+				Expect(config.Policy.SpotPercentage).NotTo(BeNil())
+				Expect(*config.Policy.SpotPercentage).To(Equal(int32(70)))
 			})
 
 			It("should handle spot percentage without percent symbol", func() {
@@ -227,6 +227,17 @@ var _ = Describe("WorkloadConfiguration", func() {
 				config, err := ParseFromAnnotations(annotations, true)
 				Expect(err).To(BeNil())
 				Expect(config.SpotPercentage).To(Equal(int32(80)))
+				Expect(config.Policy.MinOnDemand).To(BeNil())
+			})
+
+			It("should preserve an explicit zero annotation", func() {
+				annotations := map[string]string{annotationMinOnDemand: "0"}
+				config, err := ParseFromAnnotations(annotations, true)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config.Policy.MinOnDemand).NotTo(BeNil())
+				Expect(*config.Policy.MinOnDemand).To(Equal(int32(0)))
+				Expect(config.Policy.SpotPercentage).To(BeNil())
+				Expect(config.ToAnnotations()).To(Equal(map[string]string{annotationMinOnDemand: "0"}))
 			})
 		})
 
