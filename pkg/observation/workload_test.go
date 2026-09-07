@@ -16,8 +16,10 @@ import (
 
 const (
 	testAppName         = "api"
+	testAppLabel        = "app"
 	testReplicaSetKind  = "ReplicaSet"
 	testStatefulSetKind = "StatefulSet"
+	testSpotNode        = string(apis.NodeTypeSpot)
 )
 
 type staticClassifier map[string]apis.NodeType
@@ -48,15 +50,15 @@ func TestDeploymentSnapshotUsesOwnerUIDsAndExpressions(t *testing.T) {
 	oldDeploymentUID := types.UID("deployment-old")
 	replicaSetUID := types.UID("rs-current")
 	oldReplicaSetUID := types.UID("rs-old")
-	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: testAppName, Namespace: "default", UID: deploymentUID}, Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "app", Operator: metav1.LabelSelectorOpIn, Values: []string{testAppName}}}}}}
+	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: testAppName, Namespace: "default", UID: deploymentUID}, Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: testAppLabel, Operator: metav1.LabelSelectorOpIn, Values: []string{testAppName}}}}}}
 	currentRS := &appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: testAppName + "-current", Namespace: "default", UID: replicaSetUID, OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: testAppName, UID: deploymentUID, Controller: &controller}}}}
 	oldRS := &appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: testAppName + "-old", Namespace: "default", UID: oldReplicaSetUID, OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: testAppName, UID: oldDeploymentUID, Controller: &controller}}}}
 	ready := corev1.ConditionTrue
 	objects := []client.Object{
 		deployment, currentRS, oldRS,
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ready-spot", Namespace: "default", Labels: map[string]string{"app": testAppName}, OwnerReferences: []metav1.OwnerReference{{Kind: testReplicaSetKind, UID: replicaSetUID, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: "spot"}, Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: ready}}}},
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pending", Namespace: "default", Labels: map[string]string{"app": testAppName}, OwnerReferences: []metav1.OwnerReference{{Kind: testReplicaSetKind, UID: replicaSetUID, Controller: &controller}}}, Spec: corev1.PodSpec{NodeSelector: map[string]string{apis.CapacityTypeLabel: "on-demand"}}, Status: corev1.PodStatus{Phase: corev1.PodPending}},
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "old", Namespace: "default", Labels: map[string]string{"app": testAppName}, OwnerReferences: []metav1.OwnerReference{{Kind: testReplicaSetKind, UID: oldReplicaSetUID, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: "on-demand"}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ready-spot", Namespace: "default", Labels: map[string]string{testAppLabel: testAppName}, OwnerReferences: []metav1.OwnerReference{{Kind: testReplicaSetKind, UID: replicaSetUID, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: testSpotNode}, Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: ready}}}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pending", Namespace: "default", Labels: map[string]string{testAppLabel: testAppName}, OwnerReferences: []metav1.OwnerReference{{Kind: testReplicaSetKind, UID: replicaSetUID, Controller: &controller}}}, Spec: corev1.PodSpec{NodeSelector: map[string]string{apis.CapacityTypeLabel: "on-demand"}}, Status: corev1.PodStatus{Phase: corev1.PodPending}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "old", Namespace: "default", Labels: map[string]string{testAppLabel: testAppName}, OwnerReferences: []metav1.OwnerReference{{Kind: testReplicaSetKind, UID: oldReplicaSetUID, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: "on-demand"}},
 	}
 	scheme := runtime.NewScheme()
 	if err := appsv1.AddToScheme(scheme); err != nil {
@@ -67,7 +69,7 @@ func TestDeploymentSnapshotUsesOwnerUIDsAndExpressions(t *testing.T) {
 	}
 	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithIndex(&corev1.Pod{}, PodControllerOwnerUIDIndex, IndexPodControllerOwnerUID).WithIndex(&appsv1.ReplicaSet{}, ReplicaSetControllerOwnerUIDIndex, IndexReplicaSetControllerOwnerUID).Build()
 	counting := &countingClient{Client: base}
-	snapshot, err := NewService(counting, staticClassifier{"spot": apis.NodeTypeSpot}).Observe(context.Background(), deployment)
+	snapshot, err := NewService(counting, staticClassifier{testSpotNode: apis.NodeTypeSpot}).Observe(context.Background(), deployment)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,12 +98,12 @@ func TestDeploymentSnapshotUsesOwnerUIDsAndExpressions(t *testing.T) {
 func TestStatefulSetSnapshotKeepsTerminalAndTerminatingSeparate(t *testing.T) {
 	controller := true
 	uid := types.UID("statefulset")
-	sts := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "default", UID: uid}, Spec: appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "db"}}}}
+	sts := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "default", UID: uid}, Spec: appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{testAppLabel: "db"}}}}
 	now := metav1.Now()
 	objects := []client.Object{
 		sts,
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "terminating", Namespace: "default", Labels: map[string]string{"app": "db"}, DeletionTimestamp: &now, Finalizers: []string{"test"}, OwnerReferences: []metav1.OwnerReference{{Kind: testStatefulSetKind, UID: uid, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: "spot"}, Status: corev1.PodStatus{Phase: corev1.PodRunning}},
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "failed", Namespace: "default", Labels: map[string]string{"app": "db"}, OwnerReferences: []metav1.OwnerReference{{Kind: testStatefulSetKind, UID: uid, Controller: &controller}}}, Status: corev1.PodStatus{Phase: corev1.PodFailed}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "terminating", Namespace: "default", Labels: map[string]string{testAppLabel: "db"}, DeletionTimestamp: &now, Finalizers: []string{"test"}, OwnerReferences: []metav1.OwnerReference{{Kind: testStatefulSetKind, UID: uid, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: testSpotNode}, Status: corev1.PodStatus{Phase: corev1.PodRunning}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "failed", Namespace: "default", Labels: map[string]string{testAppLabel: "db"}, OwnerReferences: []metav1.OwnerReference{{Kind: testStatefulSetKind, UID: uid, Controller: &controller}}}, Status: corev1.PodStatus{Phase: corev1.PodFailed}},
 	}
 	scheme := runtime.NewScheme()
 	if err := appsv1.AddToScheme(scheme); err != nil {
@@ -111,7 +113,7 @@ func TestStatefulSetSnapshotKeepsTerminalAndTerminatingSeparate(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithIndex(&corev1.Pod{}, PodControllerOwnerUIDIndex, IndexPodControllerOwnerUID).Build()
-	snapshot, err := NewService(c, staticClassifier{"spot": apis.NodeTypeSpot}).Observe(context.Background(), sts)
+	snapshot, err := NewService(c, staticClassifier{testSpotNode: apis.NodeTypeSpot}).Observe(context.Background(), sts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,10 +133,10 @@ func TestStatefulSetSnapshotKeepsTerminalAndTerminatingSeparate(t *testing.T) {
 func TestSnapshotPreservesUnknownCapacityAndClassifierFailure(t *testing.T) {
 	controller := true
 	uid := types.UID("statefulset")
-	sts := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "default", UID: uid}, Spec: appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "db"}}}}
+	sts := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "default", UID: uid}, Spec: appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{testAppLabel: "db"}}}}
 	objects := []client.Object{
 		sts,
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "not-ready", Namespace: "default", Labels: map[string]string{"app": "db"}, OwnerReferences: []metav1.OwnerReference{{Kind: testStatefulSetKind, UID: uid, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: "missing-node"}, Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionUnknown}}}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "not-ready", Namespace: "default", Labels: map[string]string{testAppLabel: "db"}, OwnerReferences: []metav1.OwnerReference{{Kind: testStatefulSetKind, UID: uid, Controller: &controller}}}, Spec: corev1.PodSpec{NodeName: "missing-node"}, Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionUnknown}}}},
 	}
 	scheme := runtime.NewScheme()
 	if err := appsv1.AddToScheme(scheme); err != nil {
