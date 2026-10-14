@@ -32,10 +32,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4
 
       - name: Build docker image
-        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b  # v7
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f  # v7
         with:
           set: |
             *.tags=spotalis:local
@@ -43,7 +43,7 @@ jobs:
             *.output=type=docker,dest=${{ runner.temp }}/spotalis.tar
 
       - name: Upload artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
         with:
           name: spotalis
           path: ${{ runner.temp }}/spotalis.tar
@@ -62,7 +62,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Download artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8
         with:
           name: spotalis
           path: ${{ runner.temp }}
@@ -74,7 +74,7 @@ jobs:
           docker image ls -a
 
       - name: Set up Kind
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc  # v1
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa  # v1.15.1
         with:
           install_only: true
 
