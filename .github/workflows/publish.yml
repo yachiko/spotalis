@@ -55,7 +55,7 @@ jobs:
           images: ghcr.io/yachiko/spotalis
 
       - name: Build docker image
-        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f  # v7
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e  # v7
         with:
           push: true
           files: |
