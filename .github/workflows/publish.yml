@@ -42,7 +42,7 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -55,7 +55,7 @@ jobs:
           images: ghcr.io/yachiko/spotalis
 
       - name: Build docker image
-        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f  # v7
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e  # v7
         with:
           push: true
           files: |
