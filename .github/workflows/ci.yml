@@ -32,7 +32,7 @@ jobs:
         run: make deps
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7  # v9
+        uses: golangci/golangci-lint-action@9f0b11b3341294e84cdab095bb6d02e54f6b7fee  # v9
         with:
           version: v2.13.2
 
