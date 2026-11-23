@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v6
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v6
         with:
           go-version-file: go.mod
 
@@ -32,7 +32,7 @@ jobs:
         run: make deps
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7  # v9
+        uses: golangci/golangci-lint-action@17ebc353996a2841dc0b207c184c1722a219b928  # v9
         with:
           version: v2.13.2
 
@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v6
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v6
         with:
           go-version-file: go.mod
 
